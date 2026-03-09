@@ -1,0 +1,19 @@
+{
+  "evidence_root": "/home/pi/netrapi_test_evidence",
+  "total_record_seconds": 10800,
+  "clip_divisions": 36,
+  "check_interval_seconds": 30,
+  "recording_grace_period": 120,
+  "camera_width": 1280,
+  "camera_height": 720,
+  "camera_fps": 30,
+  "prefer_mp4": true,
+  "fallback_to_h264": true,
+  "preview_enabled": true,
+  "preview_rotation_degrees": 180,
+  "preview_info_enabled": true,
+  "stop_on_clip_failure": false,
+  "ffprobe_path": "ffprobe",
+  "camera_index": 0,
+  "extra_rpicam_args": []
+}
