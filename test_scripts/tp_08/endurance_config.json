@@ -1,0 +1,47 @@
+{
+  "evidence_root": "C:/Users/Grego/Desktop/Coding/Projects/NetraPi/test_scripts/tp_08/evidence",
+  "total_record_seconds": 10800,
+  "clip_divisions": 36,
+  "check_interval_seconds": 30,
+  "recording_grace_period": 120,
+  "v4l2_device": "/dev/video0",
+  "v4l2_buffer_frames": 1,
+  "camera_mode_id": "mjpeg_640x480_30",
+  "camera_modes": [
+    {
+      "id": "mjpeg_1280x720_30",
+      "label": "MJPEG 1280x720 @ 30 fps",
+      "input_format": "mjpeg",
+      "width": 1280,
+      "height": 720,
+      "fps": 30.0
+    },
+    {
+      "id": "mjpeg_800x600_30",
+      "label": "MJPEG 800x600 @ 30 fps",
+      "input_format": "mjpeg",
+      "width": 800,
+      "height": 600,
+      "fps": 30.0
+    },
+    {
+      "id": "mjpeg_640x480_30",
+      "label": "MJPEG 640x480 @ 30 fps",
+      "input_format": "mjpeg",
+      "width": 640,
+      "height": 480,
+      "fps": 30.0
+    }
+  ],
+  "preview_enabled": true,
+  "preview_rotation_degrees": 180,
+  "preview_info_enabled": true,
+  "stop_on_clip_failure": false,
+  "fix_playback_timing": true,
+  "ffmpeg_crf": 20,
+  "outside_temp_f": null,
+  "outside_temp_file": null,
+  "tp09_max_internal_temp_c": 85,
+  "tp09_avg_internal_temp_c_limit": 82,
+  "tp09_min_avg_outside_temp_f": 80
+}

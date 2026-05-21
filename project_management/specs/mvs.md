@@ -128,9 +128,8 @@ Build a minimal, end-to-end smart dash cam system that monitors driving behavior
 - M-10.10: The edge software shall run as a managed service on the Raspberry Pi.
 
 ### R-10.2 Power Loss Recovery
-- M-10.20: On startup after power loss, the system shall resume video capture.
-- M-10.21: Pending upload records shall be reloaded from local storage.
-- M-10.22: Pending uploads shall continue without data corruption.
+- M-10.20: Pending upload records shall be reloaded from local storage.
+- M-10.21: Pending uploads shall continue without data corruption.
 
 ### R-10.3 CI/CD
 - M-10.30: Automated CI pipelines shall execute on repository updates, including linting and test suites.

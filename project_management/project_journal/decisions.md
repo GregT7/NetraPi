@@ -26,6 +26,20 @@
 11. Can add more features onto this project later
     1. Wont modify the mvs
     2. Will make it explicitly clear what was the initial project scope and the additional feature scope, dividing documentation
+12. Use online driving clips to build test set
+13. These types of driving clips will be extracted: rolling stop, run-through stop, irrelevant stop sign, stop queue, and complete stop
+14. Continue to simply write tests to ensure isolated, basic functionality works
+15. However, when developing the backlog items, try to sprinkle in designing the actual comprehensive system. Near the end, I'll build the full, complete system.
+~~16. Ran the 3 hour long driving script and it failed due to heat issues with the battery and pi.~~
+    ~~1. Update the physical installation backlog to not reference this test~~
+    ~~2. Create a separate backlog item for heat management and getting the system to work in hot environments (ie not in a closed glovebox if possible)~~
+17. Centralized config class with subconfig classes will be used.
+    1. This object will be the source of truth for all settings
+    2. Classes that are dependent on the config object will only reference the data (@property def width(self) -> int: return self._config.width)
+18. Don't worry about detecting additional unsafe events once one is already found and the process of managing the event has not finished
+    1. Don't need to make a multithreaded model, don't want to overcomplicate things
+    2. Its unlikely 2 events would overlap with one another
+    3. There is some potential for there to be a gap in recorded frames between the time the unsafe event recording process has finished and once the rolling buffer starts to be populated again
 
 
 ## Chats
