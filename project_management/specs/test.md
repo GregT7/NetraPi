@@ -4,7 +4,7 @@
 Verify that NetraPi satisfies the full MVS through staged, repeatable tests across the edge device, local persistence layer, cloud storage, backend API, database, frontend, and deployment pipeline.
 
 ## 2. How to Use This Plan
-This document is ordered by **implementation phase**, not just by subsystem. Earlier tests should be executable before later layers exist.
+This document is ordered by **sprint** (see `project_journal/sprint.md`), not just by subsystem. Earlier tests should be executable before later layers exist.
 
 Each test includes:
 - **Reqs**: the requirement IDs covered
@@ -46,8 +46,11 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 ---
 
-# Phase 1 — Constraints and Physical Configuration
+# Sprint 1 — Foundation and Edge Bring-Up
 
+*Tests: TP-01 to TP-15*
+
+## Constraints and Physical Configuration
 ### TP-01: Budget compliance check
 - **Description**: Verifies the total NetraPi system cost remains within the allowed budget.
 - **Test level**: Inspection
@@ -65,7 +68,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Description**: Verifies the Raspberry Pi detects the camera and can display clear live output.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
-- **Reqs**:
+- **Reqs**: M-2.10
 - **Prerequisites**
   - Equipment purchased: Pi, camera, compatible ribbon cable
   - OS loaded on Pi
@@ -73,7 +76,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   1. Connect the Pi camera to the Raspberry Pi.
   2. Open a terminal on the Pi.
   3. Run `rpicam-hello --list-cameras` and confirm the camera is detected.
-  4. Run `libcamera-hello` and observe the temporary preview.
+  4. Run `rpicam-hello` and observe the temporary preview.
 - **Pass criteria**
   - The camera appears in the detected camera list.
   - Temporary preview footage appears.
@@ -182,50 +185,76 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   2. Monitor for overheating, shutdowns, or unsafe temperatures.
 - **Pass criteria**
   - The average outside air temperature over the 3 hours is 80 °F or greater.
-  - The internal temperature of the Pi never exceeds 185 °F.
-  - The average internal temperature of the Pi across the 3 hours is below 180 °F.
+  - The internal temperature of the Pi never exceeds 85 °C.
+  - The average internal temperature of the Pi across the 3 hours is below 82 °C.
 
----
-# Phase 2 — Edge Capture, Buffering, and Local ML
+## Edge Capture, Buffering, and Local ML
 
 ### TP-10: Coral TPU smoke test
 - **Description**: Verifies the Coral USB TPU is detected and usable on the Raspberry Pi.
 - **Test level**: Integration
 - **Verification approach**: Inspection
-- **Reqs**:
+- **Reqs**: M-3.11, M-3.12
 - **Prerequisites**
   - Pi, Coral USB TPU, and required cables connected
   - OS and Python installed
 - **Steps**
-  1. Update system and install Edge TPU runtime:
-     ```
-     sudo apt update
-     sudo apt install libedgetpu1-std
-     ```
+  1. Update system, download pycoral code
   2. Verify Python installation: `python3 --version`
   3. Run `lsusb` and confirm Coral device appears.
   4. Run a minimal interpreter script to load the TPU delegate.
 - **Pass criteria**
   - Coral appears in `lsusb` (e.g., "Global Unichip Corp.")
-  - Delegate loads successfully without errors.
+  - TPU Inference successfully classifies an images
 
-### TP-11: AI inference smoke test (camera + TPU)
-- **Description**: Verifies real-time inference runs on live camera feed with object detection output.
+### TP-11: Live camera-to-TPU inference functional smoke test
+- **Description**: Verifies the end-to-end live inference pipeline runs using a camera feed and produces valid object detection outputs using the Coral TPU.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
-- **Reqs**:
+- **Reqs**: M-3.10, M-3.11, M-3.12
 - **Prerequisites**
-  - TPU smoke test passed
-  - Camera smoke test passed (Phase 1)
+  - TP-10 passed
+  - Camera capture path validated
+  - Edge-TPU-compatible detection model available
+  - Live inference script available
 - **Steps**
-  1. Run a Coral-compatible detection script with live camera feed.
-  2. Observe bounding boxes and classification output.
-  3. Point camera at 2 common objects and observe confidence.
-  4. Move camera quickly and observe recovery latency.
+  1. Launch the live inference script with camera input.
+  2. Confirm frames are continuously received and processed.
+  3. Point the camera at one or more supported object classes (e.g., person, car, stop sign).
+  4. Observe detection output in the console or annotated frames.
+  5. Move the object or camera slightly and confirm detections update over time.
 - **Pass criteria**
-  - Live feed displays bounding boxes.
-  - Objects detected with ≥70% confidence.
-  - Latency for visual update ≤ 3 seconds.
+  - Live pipeline runs continuously without crashing for 30 seconds.
+  - Frames are processed repeatedly (multiple frames observed).
+  - At least one supported object is detected when clearly visible.
+  - Detection output updates across multiple frames (not a single isolated detection).
+
+### TP-11.5: Live inference pipeline throughput and latency benchmark
+- **Description**: Measures the performance of the live camera-to-TPU inference pipeline, including effective FPS, processing latency, and identification of system bottlenecks.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-3.10, M-3.11, M-3.12
+- **Prerequisites**
+  - TP-11 passed
+  - Timing instrumentation script available
+- **Steps**
+  1. Run the timing test script for the active live inference pipeline.
+  2. Allow the system to process frames for at least 60–100 frames.
+  3. Record the following metrics:
+     - effective processed FPS
+     - average total loop time (ms)
+     - average frame acquisition time (ms), if measured
+     - average preprocess time (ms)
+     - average inference time (ms)
+  4. Identify the dominant contributor to total loop time.
+  5. Repeat the test if needed under slightly different conditions.
+- **Pass criteria**
+  - Performance metrics are successfully recorded and reported.
+  - Effective processed FPS meets one of the following thresholds:
+    - **preferred target:** ≥ 5 FPS
+    - **minimum exploratory threshold:** ≥ 3 FPS
+  - Average total loop time is reasonably consistent.
+  - The main bottleneck in the tested pipeline is clearly identified.
 
 ### TP-12: Detection loop real-time operation
 - **Description**: Verifies continuous inference execution without crashes or stalls.
@@ -245,18 +274,20 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - No crashes, freezes, or exits.
 
 ### TP-13: Capture configuration validation
-- **Description**: Verifies resolution, frame rate, and buffer duration are configurable and applied correctly.
+- **Description**: Verifies resolution and buffer duration are applied, and FPS behavior matches the negotiated MJPG mode for each resolution.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
 - **Reqs**: M-2.14
 - **Prerequisites**
   - Configurable capture settings implemented
 - **Steps**
-  1. Set known config values (resolution, FPS, buffer duration).
+  1. Set known config values (resolution, FPS request, buffer duration) using MJPG capture.
   2. Start capture.
-  3. Inspect logs and output behavior.
+  3. Inspect logs/output for measured FPS, CAP_PROP_FPS, and negotiated per-resolution mode FPS.
 - **Pass criteria**
-  - System uses configured values correctly.
+  - Actual resolution matches configured resolution (within allowed tolerance).
+  - Rolling buffer duration behavior matches configured buffer duration.
+  - Measured FPS is consistent with the negotiated MJPG FPS for that resolution mode (not merely the requested FPS value).
 
 ### TP-14: Rolling buffer and event clip extraction verification
 - **Description**: Verifies rolling buffer and event-triggered clip generation produce correct pre/post coverage.
@@ -268,40 +299,32 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Rolling buffer implemented
   - Event trigger implemented
   - Post-event recording configured
+  - Live camera preview visible with on-screen timestamp overlay
 
 - **Steps**
   1. Set buffer duration to 10 seconds.
-  2. Trigger multiple events (≥5).
-  3. Extract generated clips.
-  4. Measure duration and inspect content.
+  2. Start camera preview and confirm timestamp is visible.
+  3. For each event (3 total), manually trigger the event while simultaneously performing a visible action on camera (for example, wave) to mark activation.
+  4. Extract generated clips.
+  5. Inspect each clip using the timestamp and locate the wave marker.
+  6. Verify timestamp coverage includes at least 5 seconds before the wave and at least 5 seconds after the wave.
+  7. Measure duration and inspect continuity.
 
 - **Pass criteria**
   - Each clip contains:
-    - ~5–10 seconds pre-event footage
+    - Timestamped footage showing at least 5 seconds before the wave/event marker
     - Event moment
-    - ~5–10 seconds post-event footage
+    - Timestamped footage showing at least 5 seconds after the wave/event marker
   - Total duration is ~10–20 seconds.
+  - Camera preview timestamp and saved clip timeline are consistent around the event marker.
   - Video is continuous and playable.
   - No missing frames or abrupt cuts.
 
-### TP-15: Unsafe-event detection minimum capability
-- **Description**: Verifies the system detects at least one unsafe event class.
-- **Test level**: Integration
-- **Verification approach**: Demonstration + Test
-- **Reqs**: M-3.13
-- **Prerequisites**
-  - At least one detection rule/model implemented
-- **Steps**
-  1. Trigger or simulate an unsafe event.
-  2. Observe detection output/logs.
-- **Pass criteria**
-  - System correctly identifies at least one unsafe-event class.
-
-### TP-16: Speaker module feedback verification
+### TP-15: Speaker module feedback verification
 - **Description**: Verifies the speaker module produces audible feedback suitable for in-vehicle use.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**:
+- **Reqs**: M-3.30
 - **Prerequisites**
   - Speaker connected to Pi GPIO
 - **Steps**
@@ -315,115 +338,178 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 ---
 
-# Phase 3 - Unsafe Event Detection
-### TP-17: Stop sign detection trigger activation
-- **Description**: Verifies the system enters stop-sign monitoring mode only after a valid stop sign detection is observed.
+# Sprint 2 — Recording System, Detector, and RecordingManager
+
+*Tests: TP-16 to TP-24. Aligns with Sprint 2 backlogs in `sprint.md`. Prerequisites: Sprint 1 (TP-01–TP-15) where noted.*
+
+Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-20), **RecordingManager** (TP-21–TP-24).
+
+## Recording System Design
+### TP-16: Event clip pipeline and project layout
+- **Description**: Verifies the event/clip pipeline is documented and the repo layout matches the planned `src/` structure for the edge capture path (no DB or cloud wiring required).
+- **Test level**: Inspection
+- **Verification approach**: Inspection
+- **Reqs**: M-2.10, M-2.13, M-2.14, M-3.10
+- **Prerequisites**
+  - `event_clip_pipeline.md` updated for current design
+  - `directory_tree.md` drafted
+- **Steps**
+  1. Review the pipeline diagram for config loading, core classes, and high-level camera → detect → save-clip flow.
+  2. Confirm `directory_tree.md` lists intended modules under `src/`.
+  3. Confirm stub files/directories exist as described.
+- **Pass criteria**
+  - Diagram includes configuration loading and classes needed for the basic on-device pipeline.
+  - High-level flow covers capture, unsafe-event handling, and clip save path.
+  - `directory_tree.md` matches the populated stub layout.
+
+### TP-17: Config loading unit verification
+- **Description**: Verifies JSON config files load into typed config objects used by capture and detector modules.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-2.14
+- **Prerequisites**
+  - Config files under `src/config/`
+  - Config loader implemented
+- **Steps**
+  1. Run unit tests for loading valid config fixtures (camera, buffer, detector, etc. as implemented).
+  2. Run unit test(s) for at least one invalid or missing required field case, if applicable.
+- **Pass criteria**
+  - Valid configs deserialize to expected values.
+  - Invalid config fails predictably (exception or explicit error result).
+  - Tests run without hardware.
+
+## Detector
+### TP-18: Detector data model and unit tests
+- **Description**: Verifies `Classification`, `FrameRecord`, `FrameBuffer`, and `DetectorConfig` behave per the pipeline design.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-3.10, M-3.11, M-3.12
+- **Prerequisites**
+  - Classes implemented per UML
+- **Steps**
+  1. Run unit tests for `FrameRecord` (`raw`, `display`, `patch_classifications`).
+  2. Run unit tests for `FrameBuffer` (`push`, `latest`, `pre_roll_frames` returns display).
+  3. Run unit tests for `DetectorConfig` load/parse from fixture JSON.
+- **Pass criteria**
+  - All unit tests pass without TPU or camera.
+  - `pre_roll_frames()` exposes processed (`display`) frames, not `raw`.
+
+### TP-19: Detector inference unit tests (mocked TPU)
+- **Description**: Verifies `Detector` wiring with mocked `_invoke` (no Coral required).
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-3.10, M-3.11, M-3.12
+- **Prerequisites**
+  - `Detector` stub with `update(pre_buffer)`
+  - Mock or fake `_invoke` in tests
+- **Steps**
+  1. Run unit test: `update(pre_buffer)` patches `classifications` on the latest entry.
+  2. Run unit test: empty or sub-threshold mock output yields expected list behavior.
+- **Pass criteria**
+  - `update` mutates the latest `FrameRecord` in the buffer passed in.
+  - Tests pass without Edge TPU hardware.
+
+### TP-20: Detector on-device smoke
+- **Description**: Verifies `load()`, `verify_tpu()`, and one real `update(pre_buffer)` on the Pi with Coral attached.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-4.10
+- **Reqs**: M-3.10, M-3.11, M-3.12
 - **Prerequisites**
-  - Object detection pipeline operational.
-  - Stop-sign trigger logic implemented.
+  - TP-10 passed
+  - `Detector` implemented through `update`
+  - Test entry point or script with stub/real `detector.json`
 - **Steps**
-  1. Run the system on footage containing an approaching stop sign.
-  2. Observe detection outputs and system state transitions.
-  3. Repeat with footage that contains no stop sign.
+  1. On the Pi, call `load()` then `verify_tpu()`.
+  2. Push at least one `FrameRecord` with real `raw` from camera (or test fixture frame) into `pre_buffer`.
+  3. Call `update(pre_buffer)` and inspect latest entry `classifications`.
 - **Pass criteria**
-  - The system enters stop-sign monitoring mode only when a stop sign is detected above the configured threshold.
-  - The system remains in idle mode when no stop sign is present.
+  - `verify_tpu()` succeeds.
+  - Latest record has a `classifications` list after `update` (may be empty if scene has no allowed classes).
+  - No crash; load/invoke errors are logged or raised clearly.
 
-### TP-18: Stop sign persistence filtering
-- **Description**: Verifies a stop sign must persist across multiple frames before the system treats it as a valid encounter.
+## RecordingManager
+### TP-21: RecordingManager capture unit tests
+- **Description**: Verifies capture-related classes (`Camera`, `FrameProcessor`, `FrameRecord`, `FrameBuffer`, `Recorder`, `ClipPackage`, `PreviewUI`, etc.) pass unit tests and live under the planned `src/` layout.
+- **Test level**: Unit
+- **Verification approach**: Test + Inspection
+- **Reqs**: M-2.10, M-2.13, M-2.14
+- **Prerequisites**
+  - Classes implemented per pipeline UML
+  - `directory_tree.md` defines locations
+- **Steps**
+  1. Run unit test suite for capture/pipeline classes (mock camera/tensor inputs where needed).
+  2. Confirm class files match paths in `directory_tree.md`.
+- **Pass criteria**
+  - Unit tests pass without full `run_loop`.
+  - File locations align with `directory_tree.md`.
+
+### TP-22: RecordingManager idle run loop integration
+- **Description**: Verifies `run_loop()` idle path: camera → `FrameRecord` → `pre_buffer.push` with stub config and without requiring unsafe-event logic.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-4.11
+- **Reqs**: M-2.10, M-2.13, M-2.14
 - **Prerequisites**
-  - Stop-sign persistence logic implemented.
+  - TP-17 passed
+  - Thin test entry point with stub config values
+  - USB camera available on Pi
 - **Steps**
-  1. Run the system on footage where a stop sign appears briefly for fewer frames than the required persistence threshold.
-  2. Run the system on footage where a stop sign remains visible for at least the required number of frames.
+  1. Start the test wrapper that runs `RecordingManager.run_loop()` for a short bounded duration (or N laps).
+  2. Confirm frames enter `pre_buffer` while `clip_active` is false.
+  3. Stop the run cleanly via test harness timeout or documented stop method.
 - **Pass criteria**
-  - Brief or spurious detections do not activate a stop-sign encounter.
-  - Persistent detections activate a stop-sign encounter.
+  - Loop runs without crash for the test duration.
+  - `pre_buffer` receives `FrameRecord` entries with populated `display`.
+  - No clip file written during idle-only run.
 
-### TP-19: Stop sign region-of-interest filtering
-- **Description**: Verifies only stop signs appearing in the defined driving-path region of interest are considered relevant.
+### TP-23: RecordingManager clip-active path and MP4 output
+- **Description**: Verifies `clip_active` post-roll, `ClipPackage.build`, and `Recorder.write_clip` produce a playable MP4 from buffer `display` frames.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-4.12
+- **Reqs**: M-2.13, M-3.20
 - **Prerequisites**
-  - Region-of-interest filtering implemented.
+  - TP-21 passed
+  - Clip path implemented per `event_clip_pipeline.md`
+  - Test hook or simulated unsafe trigger to set `clip_active`
 - **Steps**
-  1. Run the system on footage with a stop sign positioned within the configured valid region.
-  2. Run the system on footage with a stop sign positioned outside the configured valid region.
+  1. Run loop until `pre_buffer` has history; trigger `clip_active` (test hook or stub event).
+  2. Allow post-roll to complete and clip write to finish.
+  3. Open resulting MP4.
 - **Pass criteria**
-  - Stop signs inside the valid region are eligible to start an encounter.
-  - Stop signs outside the valid region are ignored.
+  - MP4 file exists at configured output path.
+  - Video is playable and uses processed (`display`) frames.
+  - Buffers cleared and `clip_active` false after save (per design).
 
-### TP-20: Stop sign approach validation by size or growth
-- **Description**: Verifies the system treats a stop sign as relevant only when its apparent size or growth indicates approach toward the intersection.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-4.13
-- **Prerequisites**
-  - Bounding-box growth or minimum-size logic implemented.
-- **Steps**
-  1. Run the system on footage where a stop sign grows in apparent size as the vehicle approaches.
-  2. Run the system on footage where a distant or irrelevant stop sign remains small or does not grow meaningfully.
-- **Pass criteria**
-  - Approaching stop signs satisfy encounter criteria.
-  - Distant or non-approaching stop signs do not satisfy encounter criteria.
-
-### TP-21: Motion-score computation during stop-sign encounter
-- **Description**: Verifies the system computes and records a motion score while a stop-sign encounter is active.
+### TP-24: RecordingManager Ctrl+C and preview controls
+- **Description**: Verifies clean shutdown on Ctrl+C and preview show/hide per config.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
-- **Reqs**: M-4.20
+- **Reqs**: M-2.10
 - **Prerequisites**
-  - Motion-estimation logic implemented.
-  - Stop-sign encounter state implemented.
+  - TP-22 passed
+  - Preview enabled in test config
 - **Steps**
-  1. Run the system on footage containing a stop-sign approach.
-  2. Observe motion-score output during the encounter window.
+  1. Start run loop with preview on; confirm preview window shows `display` frames.
+  2. Toggle preview off/on if config supports toggle (or verify disabled mode).
+  3. Send Ctrl+C; confirm process exits and camera/resources release without hang.
 - **Pass criteria**
-  - Motion scores are produced and updated throughout the active encounter.
-  - Motion-score values are logged or otherwise observable for review.
+  - Preview shows live processed frames when enabled.
+  - Ctrl+C ends the loop without orphaned process or device lock.
+  - Evidence captured for test matrix (screenshot or short video optional).
 
-### TP-22: Near-zero motion detection
-- **Description**: Verifies the system identifies a near-stop condition when motion remains below the configured stop threshold.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-4.21
-- **Prerequisites**
-  - Motion threshold logic implemented.
-- **Steps**
-  1. Run the system on footage where the vehicle comes to a clear stop at a stop sign.
-  2. Observe the computed motion score and stop-duration tracking.
-- **Pass criteria**
-  - The system detects motion below the stop threshold.
-  - The low-motion interval is accumulated as stop duration.
+---
 
-### TP-23: Adequate stop-duration verification
-- **Description**: Verifies the system classifies an encounter as compliant when low motion is sustained for at least the required minimum duration.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-4.22
-- **Prerequisites**
-  - Stop-duration threshold logic implemented.
-- **Steps**
-  1. Run the system on footage where the vehicle stops at the stop sign for at least the configured minimum duration.
-  2. Allow the stop-sign encounter to complete.
-- **Pass criteria**
-  - The encounter is classified as an adequate stop.
-  - No unsafe stop-sign event is generated.
+# Sprint A — Unsafe Event Detection Core
 
-### TP-24: Rolling-stop classification
+*Tests: TP-25 to TP-30. Stop-sign lifecycle, classification, clips, and audible feedback. Prerequisites: Sprint 2 (TP-16–TP-24) and Sprint 1 as applicable.*
+
+### TP-25: Rolling-stop classification
 - **Description**: Verifies the system classifies an encounter as a rolling stop when the vehicle slows but does not remain below the stop threshold long enough.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-4.23
+- **Reqs**: M-3.13, M-4.21, M-4.41
 - **Prerequisites**
-  - Rolling-stop classification logic implemented.
+  - TP-20, TP-21 passed
+  - Rolling-stop classification logic implemented
 - **Steps**
   1. Run the system on footage where the vehicle slows at the stop sign but does not fully stop for the required duration.
   2. Allow the encounter to complete.
@@ -431,13 +517,14 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - The encounter is classified as a rolling stop.
   - An unsafe event is generated.
 
-### TP-25: Stop-sign bypass classification
+### TP-26: Stop-sign bypass classification
 - **Description**: Verifies the system classifies an encounter as a stop-sign bypass when the vehicle does not meaningfully slow while passing the sign.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-4.24
+- **Reqs**: M-3.13, M-4.21, M-4.41
 - **Prerequisites**
-  - Bypass classification logic implemented.
+  - TP-20, TP-21 passed
+  - Bypass classification logic implemented
 - **Steps**
   1. Run the system on footage where the vehicle passes a relevant stop sign without adequately slowing.
   2. Allow the encounter to complete.
@@ -445,14 +532,14 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - The encounter is classified as a stop-sign bypass.
   - An unsafe event is generated.
 
-### TP-26: Unsafe event clip extraction for stop-sign violation
+### TP-27: Unsafe event clip extraction for stop-sign violation
 - **Description**: Verifies the system saves the appropriate video evidence clip when an unsafe stop-sign event is detected.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
-- **Reqs**: M-4.31, M-2.13
+- **Reqs**: M-2.13, M-3.20, M-4.32
 - **Prerequisites**
-  - Clip extraction implemented.
-  - Unsafe event trigger implemented.
+  - TP-23 passed
+  - EventManager / unsafe trigger implemented
 - **Steps**
   1. Trigger a rolling-stop or stop-sign bypass event.
   2. Inspect the saved clip.
@@ -460,25 +547,26 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - A clip is saved for the unsafe event.
   - The clip contains the relevant stop-sign encounter footage.
 
-### TP-27: Audible feedback on unsafe stop-sign event
-- **Description**: Verifies the system emits audible feedback when a rolling stop or stop-sign bypass event is detected.
+### TP-28: Audible feedback on unsafe stop-sign event
+- **Description**: Verifies the system emits audible feedback when a rolling stop or stop-sign bypass event is detected, within timing constraints.
 - **Test level**: System
 - **Verification approach**: Demonstration
-- **Reqs**: M-4.32
+- **Reqs**: M-3.30, M-3.31
 - **Prerequisites**
   - Audible feedback mechanism implemented.
 - **Steps**
   1. Trigger a rolling-stop event.
   2. Trigger a stop-sign bypass event.
+  3. Record event time and audible feedback time for at least one trigger.
 - **Pass criteria**
   - Audible feedback is produced for each unsafe event type.
-  - Feedback occurs within the configured response window.
+  - Feedback occurs within 10 seconds of the detected event.
 
-### TP-28: No false unsafe event for compliant stop
+### TP-29: No false unsafe event for compliant stop
 - **Description**: Verifies the system does not generate a stop-sign violation event when the driver performs an adequate stop.
 - **Test level**: System
 - **Verification approach**: Test
-- **Reqs**: M-4.22, M-4.33
+- **Reqs**: M-3.13, M-4.21, M-4.41
 - **Prerequisites**
   - Full stop-sign detection and classification pipeline operational.
 - **Steps**
@@ -488,45 +576,14 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - No rolling-stop or bypass event is generated.
   - Encounter is recorded as compliant or ignored without error.
 
-### TP-29: False-positive resistance for irrelevant stop sign
-- **Description**: Verifies the system does not generate an unsafe event for a stop sign that is visible but not relevant to the vehicle’s path.
-- **Test level**: System
-- **Verification approach**: Test
-- **Reqs**: M-4.12, M-4.13, M-4.33
-- **Prerequisites**
-  - Region-of-interest and relevance filtering implemented.
-- **Steps**
-  1. Run the system on footage where a stop sign is visible off to the side or otherwise not applicable to the vehicle path.
-  2. Review encounter and event outputs.
-- **Pass criteria**
-  - The stop sign does not trigger an unsafe-event classification.
-  - No irrelevant stop-sign violation event is logged.
-
-### TP-30: Audible feedback timing
-- **Description**: Ensures audible feedback is delivered in response to unsafe-event detection within timing constraints.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-3.30, M-3.31
-- **Prerequisites**
-  - Audible feedback implemented.
-  - Event detection trigger available.
-- **Steps**
-  1. Trigger unsafe events.
-  2. Record event time and audible feedback time.
-- **Pass criteria**
-  - Audible feedback occurs.
-  - Feedback occurs within 10 seconds of the detected event.
-
-### TP-31: Stop-sign Beep Test
+### TP-30: Stop-sign Beep Test
 - **Description**: Verifies speaker will integrate with ai inference detection by driving past stop sign, having stop sign be recognized, and then activating the speaker.
 - **Test level**: Integration
 - **Verification approach**: Demonstration + Test
-- **Reqs**: 
+- **Reqs**: M-3.10, M-3.13, M-3.30, M-3.31 
 - **Prerequisites**
-  - camera smoke test pass
-  - 3 hour memory + endurance test pass
-  - speaker smoke test pass
-  - tpu inference smoke test pass
+  - TP-10, TP-08, TP-15, TP-20 passed
+  - EventManager / stop-sign pipeline implemented
 - **Steps**
   1. Setup system in car (raspberry pi secured and powered on, camera mounted, tpu plugged in)
   2. Run script that records the experience until 3 beeps occurs (and waits 10 seconds afterwards)
@@ -538,8 +595,10 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 ---
 
-# Phase 4 — Offline-First Operation and Local Persistence
-### TP-32: Local database schema validation
+# Sprint B — Offline-First Operation and Local Persistence
+
+*Tests: TP-31 to TP-42*
+### TP-31: Local database schema validation
 - **Description**: Verifies the local SQLite schema is structured correctly for event storage and queued uploads.
 - **Test level**: Inspection
 - **Verification approach**: Analysis
@@ -553,7 +612,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Schema is normalized to a reasonable level for the project.
   - Event and queue tables contain all required fields for local persistence and upload tracking.
 
-### TP-33: Local database write/read smoke test
+### TP-32: Local database write/read smoke test
 - **Description**: Verifies the application can persist and retrieve dummy records from SQLite.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -567,14 +626,14 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Records are inserted successfully.
   - Retrieved values match what was written.
 
-### TP-34: SQLite availability and connection verification
+### TP-33: SQLite availability and connection verification
 - **Description**: Verifies the application can successfully connect to the SQLite database file before performing any storage operations.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-5.20
 - **Prerequisites**
   - SQLite database path configured.
-  - Database initialization script already executed (TP-62 or TP-63 depending on flow).
+  - Database initialization script already executed (TP-61 or TP-62 depending on flow).
 - **Steps**
   1. Start the application or a small test script.
   2. Attempt to open a connection to the SQLite database file.
@@ -584,7 +643,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Query executes without error.
   - Application confirms database is ready before continuing.
 
-### TP-35: Event metadata local storage verification
+### TP-34: Event metadata local storage verification
 - **Description**: Verifies unsafe stop-sign events are stored in SQLite with required metadata.
 - **Test level**: Integration
 - **Verification approach**: Demonstration + Inspection
@@ -600,7 +659,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Row contains valid timestamp, event type, and clip identifier or path.
   - Row contains stop-sign-related metadata such as stop duration, minimum motion, and detection confidence.
 
-### TP-36: Queue record creation verification
+### TP-35: Queue record creation verification
 - **Description**: Verifies that when an uploadable event is stored locally, a corresponding queued-upload record is created.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -616,7 +675,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Queue row references the correct clip or event record.
   - Initial upload state is set correctly (for example: pending).
 
-### TP-37: Queue schema completeness verification
+### TP-36: Queue schema completeness verification
 - **Description**: Verifies queued-upload records contain all required fields for upload tracking and retry handling.
 - **Test level**: Integration
 - **Verification approach**: Inspection
@@ -629,7 +688,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Pass criteria**
   - Queue row includes clip identifier or event reference, local file path, upload status, retry count, and timestamps.
 
-### TP-38: Offline queue retention verification
+### TP-37: Offline queue retention verification
 - **Description**: Verifies queued uploads remain stored locally when network connectivity is unavailable.
 - **Test level**: Integration
 - **Verification approach**: Demonstration + Inspection
@@ -647,7 +706,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Upload is not marked as successful.
   - No queued data is lost.
 
-### TP-39: Single queued upload processing verification
+### TP-38: Single queued upload processing verification
 - **Description**: Verifies the upload processor can successfully process one pending queued-upload record when connectivity is available.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -665,7 +724,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Upload succeeds.
   - Queue status updates correctly after success.
 
-### TP-40: Queue retry/status update verification
+### TP-39: Queue retry/status update verification
 - **Description**: Verifies failed upload attempts update queue status and retry metadata correctly.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -681,7 +740,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Retry count or failure metadata updates correctly.
   - Record is not falsely marked as uploaded.
 
-### TP-41: Offline capture and detection verification
+### TP-40: Offline capture and detection verification
 - **Description**: Verifies capture and event detection continue without network connectivity.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -694,7 +753,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Pass criteria**
   - Video capture and detection continue offline.
 
-### TP-42: Queue upload on connectivity restoration verification
+### TP-41: Queue upload on connectivity restoration verification
 - **Description**: Verifies pending queued uploads are successfully processed after network connectivity returns.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -711,11 +770,11 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Queue state updates correctly.
   - No duplicate or corrupted uploads are observed.
 
-### TP-43: Queue reload and automatic resume after restart
+### TP-42: Queue reload and automatic resume after restart
 - **Description**: Confirms queued records reload from SQLite and uploads resume automatically after restart.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-5.22, M-10.21, M-10.22
+- **Reqs**: M-5.22, M-10.20, M-10.21
 - **Prerequisites**
   - SQLite queue implemented.
   - Resume logic implemented.
@@ -729,8 +788,10 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - No data corruption is observed.
 ---
 
-# Phase 5 — Cloud Upload and Cloud Persistence
-### TP-44: S3 bucket connectivity and upload smoke test
+# Sprint C — Cloud Upload and Cloud Persistence
+
+*Tests: TP-43 to TP-55*
+### TP-43: S3 bucket connectivity and upload smoke test
 - **Description**: Verifies the Raspberry Pi can authenticate with AWS and upload a file to the S3 bucket.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -746,7 +807,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Upload succeeds.
   - File appears at expected path.
 
-### TP-45: Direct-to-cloud upload over hotspot/mobile data
+### TP-44: Direct-to-cloud upload over hotspot/mobile data
 - **Description**: Verifies uploads work over cellular/hotspot connection.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -759,7 +820,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Pass criteria**
   - Upload succeeds over mobile connection.
 
-### TP-46: Private bucket access control verification
+### TP-45: Private bucket access control verification
 - **Description**: Ensures uploaded objects are not publicly accessible.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -773,7 +834,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Unsigned access fails.
   - Signed access succeeds.
 
-### TP-47: S3 lifecycle retention configuration verification
+### TP-46: S3 lifecycle retention configuration verification
 - **Description**: Verifies lifecycle rules are configured for storage management.
 - **Test level**: Integration
 - **Verification approach**: Inspection
@@ -785,11 +846,11 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Pass criteria**
   - Rules exist and match intended policy.
 
-### TP-48: Stable S3 object path generation verification
+### TP-47: Stable S3 object path generation verification
 - **Description**: Verifies consistent and stable object key generation.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-6.11
+- **Reqs**: M-6.10, M-8.11
 - **Prerequisites**
   - Upload logic implemented.
 - **Steps**
@@ -800,7 +861,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Keys are stable and deterministic.
   - No reliance on signed URLs for storage.
 
-### TP-49: Supabase/Postgres connectivity smoke test
+### TP-48: Supabase/Postgres connectivity smoke test
 - **Description**: Verifies connection to Supabase PostgreSQL instance.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -813,7 +874,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Connection succeeds.
   - Query executes.
 
-### TP-50: Supabase schema deployment verification
+### TP-49: Supabase schema deployment verification
 - **Description**: Verifies schema is correctly deployed to Supabase.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -826,7 +887,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Pass criteria**
   - Tables and fields exist as expected.
 
-### TP-51: Cloud metadata write/read verification
+### TP-50: Cloud metadata write/read verification
 - **Description**: Verifies metadata persistence in Supabase.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -839,7 +900,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Pass criteria**
   - Data persists and matches input.
 
-### TP-52: Pi-to-Supabase metadata transmission verification
+### TP-51: Pi-to-Supabase metadata transmission verification
 - **Description**: Verifies Pi can send metadata directly to Supabase.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -853,7 +914,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Metadata successfully stored.
   - Data integrity maintained.
 
-### TP-53: S3 and metadata linkage verification
+### TP-52: S3 and metadata linkage verification
 - **Description**: Verifies metadata correctly references S3 object keys.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -869,7 +930,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Metadata contains correct S3 object key.
   - Key maps to valid object in S3.
 
-### TP-54: Mid-upload interruption queue retention verification
+### TP-53: Mid-upload interruption queue retention verification
 - **Description**: Verifies uploads interrupted by connectivity loss remain recoverable locally.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -885,7 +946,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Event remains queued locally.
   - Retry state is correct.
 
-### TP-55: Queue recovery after connectivity restoration
+### TP-54: Queue recovery after connectivity restoration
 - **Description**: Verifies queued uploads complete after connectivity returns.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -900,7 +961,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - S3 and Supabase updated.
   - Local state updated correctly.
 
-### TP-56: End-to-end driving event cloud persistence verification
+### TP-55: End-to-end driving event cloud persistence verification
 - **Description**: Verifies full pipeline from driving event to cloud persistence across SQLite, S3, and Supabase.
 - **Test level**: System
 - **Verification approach**: Demonstration + Test + Inspection
@@ -916,7 +977,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Event persists correctly across all layers.
   - Records are consistent.
 
-### TP-57: End-to-end interrupted upload recovery during driving verification
+### TP-56: End-to-end interrupted upload recovery during driving verification
 - **Description**: Verifies real-world recovery from connectivity loss during event upload.
 - **Test level**: System
 - **Verification approach**: Demonstration + Test + Inspection
@@ -936,8 +997,10 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 ---
 
-# Phase 6 — Deployment, Runtime Management, and CI/CD
-### TP-58: Edge managed-service runtime verification
+# Sprint D — Secure Backend, Deployment, and CI/CD
+
+*Tests: TP-56 to TP-65 (see `sprint.md` for overlap with Sprints F, H, I)*
+### TP-57: Edge managed-service runtime verification
 - **Description**: Verifies the edge software runs as a managed service on the Raspberry Pi and can be monitored through the service manager.
 - **Test level**: System
 - **Verification approach**: Inspection + Demonstration
@@ -954,24 +1017,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Service status shows the runtime as active.
   - Runtime can be started and monitored without manually launching the Python script.
 
-### TP-59: Power-loss recovery and capture resume
-- **Description**: Verifies the system restarts automatically after power loss and resumes edge runtime operation.
-- **Test level**: System
-- **Verification approach**: Test
-- **Reqs**: M-10.20
-- **Prerequisites**
-  - Auto-start or restart logic implemented.
-- **Steps**
-  1. Run the edge runtime.
-  2. Interrupt power to the Raspberry Pi.
-  3. Restore power.
-  4. Observe startup behavior and runtime recovery.
-- **Pass criteria**
-  - System starts automatically after power is restored.
-  - Edge runtime resumes without manual intervention.
-  - Video capture or runtime operation resumes after startup.
-
-### TP-60: Backend Docker container build verification
+### TP-58: Backend Docker container build verification
 - **Description**: Verifies the backend can be containerized successfully using Docker and started from the built image.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -987,7 +1033,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Backend container starts without crash.
   - Backend service is reachable from its exposed port or health endpoint.
 
-### TP-61: Frontend build and deployment artifact verification
+### TP-59: Frontend build and deployment artifact verification
 - **Description**: Verifies the frontend builds successfully into a deployable artifact for hosting.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1003,7 +1049,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Static deployment artifacts are generated.
   - Build output contains the expected application assets.
 
-### TP-62: Backend deployment verification
+### TP-60: Backend deployment verification
 - **Description**: Verifies the backend deploys successfully to the target hosting environment from the containerized build.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1020,7 +1066,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Deployed backend is reachable.
   - Backend health endpoint or equivalent responds successfully.
 
-### TP-63: Frontend deployment verification
+### TP-61: Frontend deployment verification
 - **Description**: Verifies the frontend deploys successfully to the target hosting environment.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1036,7 +1082,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Deployed frontend loads without crash.
   - Production frontend assets are served correctly.
 
-### TP-64: Frontend-to-backend connectivity verification
+### TP-62: Frontend-to-backend connectivity verification
 - **Description**: Verifies the deployed frontend can successfully communicate with the deployed backend using the intended production configuration.
 - **Test level**: System
 - **Verification approach**: Test + Demonstration
@@ -1054,7 +1100,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Data or health information is rendered correctly in the frontend.
   - No CORS or configuration errors block communication.
 
-### TP-65: CI pipeline gate verification
+### TP-63: CI pipeline gate verification
 - **Description**: Verifies automated CI pipelines execute required quality gates such as linting, builds, and tests on repository updates.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1071,7 +1117,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Required build steps execute automatically.
   - Pipeline reports pass/fail status clearly.
 
-### TP-65: Merge-gated continuous deployment verification
+### TP-64: Merge-gated continuous deployment verification
 - **Description**: Verifies backend and frontend deploy automatically on merge to main only when required CI checks pass.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1088,7 +1134,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Passing CI checks are required before deployment proceeds.
   - Failed required checks prevent deployment.
 
-### TP-66: Post-deployment health check verification
+### TP-65: Post-deployment health check verification
 - **Description**: Verifies deployment workflows run post-deployment health checks and only mark deployment successful when those checks pass.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1106,8 +1152,10 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 ---
 
-# Phase 7 — End-to-End System Integration
-### TP-67: End-to-end unsafe event pipeline with alert
+# Sprint E — End-to-End System Integration
+
+*Tests: TP-66 to TP-71 (plus security/E2E tests noted in `sprint.md`)*
+### TP-66: End-to-end unsafe event pipeline with alert
 - **Description**: Verifies an unsafe event is detected on the edge device, triggers an audible alert, and propagates through the full system.
 - **Test level**: System
 - **Verification approach**: Test + Demonstration
@@ -1130,7 +1178,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Event is uploaded to cloud storage and database.
   - Event appears in the frontend.
 
-### TP-68: End-to-end offline-first event handling with alert
+### TP-67: End-to-end offline-first event handling with alert
 - **Description**: Verifies unsafe events are handled correctly while offline and later synchronized, including alert behavior.
 - **Test level**: System
 - **Verification approach**: Test
@@ -1150,7 +1198,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Upload resumes automatically after reconnection.
   - Event appears in the frontend after synchronization.
 
-### TP-69: End-to-end metadata consistency verification
+### TP-68: End-to-end metadata consistency verification
 - **Description**: Verifies event metadata remains consistent across edge storage, backend, cloud database, and frontend.
 - **Test level**: System
 - **Verification approach**: Inspection + Test
@@ -1167,7 +1215,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Timestamps and metadata values are consistent.
   - Clip reference corresponds to the correct event.
 
-### TP-70: End-to-end frontend playback verification
+### TP-69: End-to-end frontend playback verification
 - **Description**: Verifies a captured event clip can be retrieved and played through the deployed frontend.
 - **Test level**: System
 - **Verification approach**: Demonstration
@@ -1185,11 +1233,11 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Correct clip is retrieved.
   - Clip plays successfully.
 
-### TP-71: End-to-end restart and recovery verification
+### TP-70: End-to-end restart and recovery verification
 - **Description**: Verifies the system recovers from a restart without breaking the event pipeline.
 - **Test level**: System
 - **Verification approach**: Test
-- **Reqs**: M-10.10, M-10.20, M-5.22
+- **Reqs**: M-10.10, M-5.22
 - **Prerequisites**
   - Managed runtime implemented.
   - Queue persistence implemented.
@@ -1204,7 +1252,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Pending uploads resume.
   - Event completes full pipeline after restart.
 
-### TP-72: End-to-end deployed system smoke test with alert
+### TP-71: End-to-end deployed system smoke test with alert
 - **Description**: Verifies a minimal real-world flow from event detection to frontend display, including alert behavior.
 - **Test level**: System
 - **Verification approach**: Demonstration
@@ -1222,8 +1270,10 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Event is visible and reviewable in frontend.
 ---
 
-# Phase 8 — Frontend Visualization and Reviewer Experience
-### TP-73: Frontend application shell loads
+# Sprint G — Frontend Visualization and Reviewer Experience
+
+*Tests: TP-72 to TP-85*
+### TP-72: Frontend application shell loads
 - **Description**: Verifies the frontend launches successfully and presents the base application shell for NetraPi.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -1239,7 +1289,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - A recognizable NetraPi frontend shell is displayed.
   - Core page regions or placeholders are visible.
 
-### TP-74: Event data retrieval from backend
+### TP-73: Event data retrieval from backend
 - **Description**: Verifies the frontend can retrieve event records from the backend data source.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1256,7 +1306,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Event records are returned without frontend error.
   - Retrieved data is available for rendering.
 
-### TP-75: Event list rendering
+### TP-74: Event list rendering
 - **Description**: Verifies retrieved event records are rendered into a visible event list or table.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -1271,7 +1321,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Each rendered row or card corresponds to a backend event.
   - Empty or missing data does not crash the page.
 
-### TP-76: Event metadata and timestamp display
+### TP-75: Event metadata and timestamp display
 - **Description**: Verifies the frontend displays key event metadata and timestamps for each event.
 - **Test level**: Integration
 - **Verification approach**: Inspection
@@ -1286,7 +1336,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Event timestamps are visible.
   - Displayed values match the stored event record.
 
-### TP-77: Event detail selection and inspection
+### TP-76: Event detail selection and inspection
 - **Description**: Verifies a user can select an event and inspect a more detailed event view.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -1303,7 +1353,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Detail view corresponds to the chosen event.
   - Additional event information is visible without UI failure.
 
-### TP-78: Video playback via signed URL
+### TP-77: Video playback via signed URL
 - **Description**: Verifies the frontend supports secure playback of an event clip using a signed URL.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -1319,7 +1369,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Clip plays successfully in the frontend.
   - Playback is associated with the selected event.
 
-### TP-79: Event filtering controls
+### TP-78: Event filtering controls
 - **Description**: Verifies the frontend supports filtering displayed events by date range and collection phase.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -1336,7 +1386,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Displayed records update correctly by collection phase.
   - Filter changes do not require manual page recovery.
 
-### TP-80: Aggregate metrics display
+### TP-79: Aggregate metrics display
 - **Description**: Verifies the frontend displays aggregate safety metrics derived from collected event data.
 - **Test level**: Integration
 - **Verification approach**: Inspection + Demonstration
@@ -1352,7 +1402,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Displayed values correspond to available dataset content.
   - Metrics view loads without crash or missing-state failure.
 
-### TP-81: Metrics-over-time charting
+### TP-80: Metrics-over-time charting
 - **Description**: Verifies the frontend displays charts illustrating safety metrics over time.
 - **Test level**: Integration
 - **Verification approach**: Inspection
@@ -1368,7 +1418,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Chart axes, labels, or legends are understandable.
   - Chart renders without distortion or missing data failure.
 
-### TP-82: Baseline vs post-baseline comparison display
+### TP-81: Baseline vs post-baseline comparison display
 - **Description**: Verifies the frontend displays baseline and post-baseline comparison summaries.
 - **Test level**: Integration
 - **Verification approach**: Inspection + Demonstration
@@ -1384,7 +1434,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Comparison content is understandable to a reviewer.
   - UI frames results as evaluation of feedback and self-monitoring effects.
 
-### TP-83: Baseline vs post-baseline visual distinction
+### TP-82: Baseline vs post-baseline visual distinction
 - **Description**: Verifies visualizations clearly distinguish baseline and post-baseline data.
 - **Test level**: Integration
 - **Verification approach**: Inspection
@@ -1400,7 +1450,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Labels, legends, colors, or markers are consistent.
   - A reviewer can tell which data belongs to which phase without ambiguity.
 
-### TP-84: Configuration parameter transparency
+### TP-83: Configuration parameter transparency
 - **Description**: Verifies the frontend displays the configuration parameters used during data collection or experimentation.
 - **Test level**: Acceptance
 - **Verification approach**: Inspection
@@ -1415,7 +1465,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Displayed parameters are understandable to a reviewer.
   - Values appear tied to the correct dataset, run, or phase.
 
-### TP-85: Source-code and documentation access
+### TP-84: Source-code and documentation access
 - **Description**: Verifies the frontend provides access to source code and technical documentation for reviewer follow-up.
 - **Test level**: Acceptance
 - **Verification approach**: Inspection
@@ -1430,7 +1480,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - References are visible and understandable.
   - Linked destinations are relevant to the project.
 
-### TP-86: Project overview page
+### TP-85: Project overview page
 - **Description**: Verifies the frontend presents NetraPi as an interactive technical artifact with concise project overview content.
 - **Test level**: Acceptance
 - **Verification approach**: Inspection
@@ -1448,8 +1498,10 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 ---
 
-# Phase 9 — Experimentation and Impact Evaluation
-### TP-87: Baseline mode initialization and configuration verification
+# Sprint J — Experimentation and Impact Evaluation
+
+*Tests: TP-86 to TP-92*
+### TP-86: Baseline mode initialization and configuration verification
 - **Description**: Verifies that when baseline mode starts, the system uses full-session recording and saves the exact model and configuration being used for the experiment.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -1475,7 +1527,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
     - key parameters used for detection
   - Configuration values remain the same across restarts (no unexpected changes).
 
-### TP-88: Baseline collection minimum hours
+### TP-87: Baseline collection minimum hours
 - **Description**: Validates baseline collection retains full-session video and reaches the required duration with fixed configuration.
 - **Test level**: Acceptance
 - **Verification approach**: Test + Analysis
@@ -1492,7 +1544,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Full-session video is retained and uploaded.
   - Same model/configuration is used across the baseline phase.
 
-### TP-89: Baseline metrics computation and storage
+### TP-88: Baseline metrics computation and storage
 - **Description**: Verifies baseline footage is processed to produce concrete stop-sign safety metrics and that those metrics are stored correctly.
 - **Test level**: Acceptance
 - **Verification approach**: Analysis + Inspection
@@ -1523,7 +1575,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
     - rolling_stop_rate is correctly calculated
   - Metrics in a defined storage location.
 
-### TP-90: Post-baseline mode switch and behavior verification
+### TP-89: Post-baseline mode switch and behavior verification
 - **Description**: Verifies that switching from baseline mode to post-baseline mode changes storage behavior from full-session recording to clip-based recording, while keeping the same model and detection settings.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
@@ -1551,7 +1603,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
     - No full-session recording is produced.
   - Model and detection parameters are identical between both modes.
 
-### TP-91: Post-baseline clip-based collection
+### TP-90: Post-baseline clip-based collection
 - **Description**: Verifies the system performs clip-based storage during post-baseline operation under the same fixed configuration.
 - **Test level**: Acceptance
 - **Verification approach**: Test
@@ -1567,7 +1619,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Associated metadata is retained.
   - Configuration remains unchanged from baseline.
 
-### TP-92: Phase labeling and metrics separation
+### TP-91: Phase labeling and metrics separation
 - **Description**: Verifies baseline and post-baseline data and metrics are stored with correct phase labels and are not mixed.
 - **Test level**: Integration
 - **Verification approach**: Inspection + Analysis
@@ -1584,7 +1636,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
   - Metrics are associated with the correct phase.
   - No mixing of phase data is observed.
 
-### TP-93: Baseline vs post-baseline metrics comparison
+### TP-92: Baseline vs post-baseline metrics comparison
 - **Description**: Verifies that baseline and post-baseline safety metrics are compared using the same definitions and that the comparison produces meaningful differences (e.g., change in rolling stop rate).
 - **Test level**: Acceptance
 - **Verification approach**: Analysis + Inspection
