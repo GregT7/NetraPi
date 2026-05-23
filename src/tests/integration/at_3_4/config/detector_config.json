@@ -1,0 +1,4 @@
+{
+  "score_threshold": 0.35,
+  "min_box_center_x": 0.5
+}

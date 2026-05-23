@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "segments_dir": "data/trips",
+  "segment_seconds": 300,
+  "ffmpeg_crf": 20
+}

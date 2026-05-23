@@ -1,0 +1,25 @@
+# NetraPi edge pipeline (systemd).
+#
+# Install:
+#   sudo cp src/main/edge/netrapi-edge.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now netrapi-edge.service
+#
+# Edit WorkingDirectory, User, and ExecStart paths for your Pi clone and venv.
+
+[Unit]
+Description=NetraPi edge capture, detection, and clip recording
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/NetraPi
+Environment=PYTHONPATH=src/main/edge
+ExecStart=/home/pi/NetraPi/venv/bin/python src/main/edge/main.py --verify-tpu
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

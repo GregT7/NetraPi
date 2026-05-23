@@ -1,0 +1,13 @@
+{
+  "model_path": "models/model.tflite",
+  "labels_path": "models/labels.txt",
+  "input_width": 320,
+  "input_height": 320,
+  "channels": 3,
+  "input_dtype": "uint8",
+  "score_threshold": 0.5,
+  "top_k": 5,
+  "allowed_classes": [
+    "stop sign"
+  ]
+}

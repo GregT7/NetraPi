@@ -1,0 +1,20 @@
+{
+  "motion_roi": {
+    "x_min": 0.25,
+    "x_max": 0.75,
+    "y_min": 0.55,
+    "y_max": 0.95
+  },
+  "flow_scale": 0.5,
+  "motion_smoothing_window": 5,
+  "stopped_motion_threshold": 0.6,
+  "crawl_motion_threshold": 2.5,
+  "farneback": {
+    "pyr_scale": 0.5,
+    "levels": 3,
+    "winsize": 15,
+    "iterations": 3,
+    "poly_n": 5,
+    "poly_sigma": 1.2
+  }
+}

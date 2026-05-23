@@ -1,0 +1,7 @@
+{
+  "trigger_labels": [
+    "stop sign"
+  ],
+  "area_history_seconds": 20.0,
+  "note": "EventManager approach + motion + kNN. trigger_labels: detector classifications used for area series. Score filtering uses detector.json score_threshold only."
+}

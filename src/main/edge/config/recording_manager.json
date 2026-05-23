@@ -1,0 +1,14 @@
+{
+  "clips_dir": "src/main/data/clips",
+  "pre_roll_seconds": 10.0,
+  "post_roll_seconds": 10.0,
+  "coverage_tolerance": 0.95,
+  "display": {
+    "contrast": 1.0,
+    "tone_enabled": false,
+    "tone_brightness": 10.0
+  },
+  "record_safe_events": true,
+  "ffmpeg_crf": 20,
+  "note": "Clip timing, output path, display pixels. MP4 output uses ffmpeg H.264 (requires ffmpeg on PATH). Unsafe events always begin capture; record_safe_events toggles safe (complete stop) events."
+}

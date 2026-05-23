@@ -1,0 +1,9 @@
+{
+  "window_name": "Test Preview",
+  "window_x": 10,
+  "window_y": 20,
+  "max_width": 800,
+  "max_height": 600,
+  "enabled": true,
+  "toggle_key": "t"
+}

@@ -1,0 +1,35 @@
+{
+  "experiment_id": "ap_050",
+  "experiment_name": "window_5_motion_area_2_stopped_lo_k3_min_area",
+  "reference_run_id": "20260705T174249Z",
+  "reference_run_at": "2026-07-05T17:42:51Z",
+  "offline_stage1_accuracy": "84.0%",
+  "offline_e2e_accuracy": "83.3%",
+  "offline_clip_count": 104,
+  "excel_workbook": "src/tests/analysis/live_motion_analysis/ex_motion.xlsx",
+  "source_data_copy": "src/tests/analysis/batch_analysis/evaluation/motion_area_2/data",
+  "approach_source_row": "winner_pf02 on approach_config sheet",
+  "motion_source_row": "stopped_lo on motion_config sheet (live stopped_motion_threshold=0.6)",
+  "metrics_source_row": "window_5 on metrics_config sheet",
+  "knn1_source_row": "k3 + runtime4 on knn1_config / feature_sets sheets",
+  "knn2_source_row": "k3_min_area + min_area on knn2_config / feature_sets sheets",
+  "approach_anchor": "per_frame_first_detect",
+  "prepared_at": "2026-07-09T19:23:57.076524+00:00",
+  "training_areas_files": 104,
+  "training_motion_files": 104,
+  "stage1_feature_names": [
+    "post_drop_mean_motion",
+    "post_drop_min_motion",
+    "post_drop_p95_motion",
+    "post_drop_stop_fraction"
+  ],
+  "stage2_feature_names": [
+    "post_drop_min_motion",
+    "approach_area_sum_pct"
+  ],
+  "stage1_train_count": 77,
+  "stage2_train_count": 48,
+  "k_neighbors": 3,
+  "post_drop_window_s": 5.0,
+  "stopped_motion_threshold": 0.6
+}

@@ -1,0 +1,17 @@
+{
+  "device": "/dev/video0",
+  "ndim": 3,
+  "channels": 3,
+  "mode_id": "mjpeg_640x480_30",
+  "modes": [
+    {
+      "id": "mjpeg_640x480_30",
+      "label": "MJPEG 640x480 @ 30 fps",
+      "input_format": "mjpeg",
+      "width": 640,
+      "height": 480,
+      "spec_fps": 30.0,
+      "recommended_fps": 29.5
+    }
+  ]
+}
