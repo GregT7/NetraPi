@@ -1,0 +1,15 @@
+# Offline stop-sign analysis tooling (local only — not committed)
+analysis/
+
+# Integration / ad-hoc run outputs (logs, manifests, per-run dumps)
+**/run_data/
+
+# Generated images / logs under other test trees
+**/graphs/
+**/viz/
+**/metrics/graphs/
+**/results.log.txt
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.jsonl

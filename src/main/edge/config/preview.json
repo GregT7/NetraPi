@@ -1,0 +1,9 @@
+{
+  "window_name": "NetraPi Preview",
+  "window_x": 0,
+  "window_y": 0,
+  "max_width": 1280,
+  "max_height": 720,
+  "enabled": true,
+  "toggle_key": "t"
+}

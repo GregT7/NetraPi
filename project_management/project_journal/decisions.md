@@ -7,9 +7,9 @@
 4. Evidence videos will be hosted on YouTube using unlisted links
 5. Will create a YouTube channel for hosting videos
 6. Naming of files locally will use this template <test-id>_<short-desc>_<result>.<ext>, examples:
-    1. TP-01_camera-mount_stable.mp4
-    2. TP-10_audio-feedback_6.8s-pass.mp4
-    3. TP-14_offline-queue_upload-pass.mp4
+    1. TP-01_camera-mount_stable_PASS.mp4
+    2. TP-10_audio-feedback_6.8s_PASS.mp4
+    3. TP-14_offline-queue_upload-_PASS.mp4
 7. Videos will have a standardized format
     1. Title naming: Netrapi <TP-##> - <Test Name> - <result:pass/partial/fail>
         1. TP-10 – Audible Feedback Timing – PASS
@@ -27,7 +27,7 @@
     1. Wont modify the mvs
     2. Will make it explicitly clear what was the initial project scope and the additional feature scope, dividing documentation
 12. Use online driving clips to build test set
-13. These types of driving clips will be extracted: rolling stop, run-through stop, irrelevant stop sign, stop queue, and complete stop
+13. These types of driving clips will be extracted: rolling stop, run-through stop, ~~irrelevant stop sign, stop queue,~~ and complete stop
 14. Continue to simply write tests to ensure isolated, basic functionality works
 15. However, when developing the backlog items, try to sprinkle in designing the actual comprehensive system. Near the end, I'll build the full, complete system.
 ~~16. Ran the 3 hour long driving script and it failed due to heat issues with the battery and pi.~~
@@ -40,6 +40,15 @@
     1. Don't need to make a multithreaded model, don't want to overcomplicate things
     2. Its unlikely 2 events would overlap with one another
     3. There is some potential for there to be a gap in recorded frames between the time the unsafe event recording process has finished and once the rolling buffer starts to be populated again
+19. Remove the study aspect of the project. It doesn't really make sense to keep this when the only unsafe event that is detected is related to stop signs. I already completely stop at most stop signs.
+20. the tests inside test.md don't have to fully describe ALL of the tests actually created and used within the src/tests folder
+    1. tests.md just describes some unit tests that must be there (ie TP-19: Detector inference unit tests (mocked TPU))
+21. Dropped the offline upload queue. Edge keeps SQLite event metadata + clips on disk; cloud uploads are one-at-a-time when connectivity is available (no pending/retry queue state machine).
+22. Cloud media/metadata path is backend-orchestrated: the Pi authenticates to the FastAPI backend with an API key; the backend issues a short-lived S3 presigned PUT for the clip and persists event metadata to Postgres. The Pi does not hold permanent AWS or Postgres credentials, and does not write directly to Supabase.
+23. Removed `project_journal/sprint.md`. Sprint groupings and near-term milestones live in `test.md` section headers (through Sprint E). Frontend / full CI / collection-evaluation tests deferred until those layers are ready.
+24. Sprint E E2E portion is verification only (no new feature work). Dropped the dedicated managed-service (systemd) test from the deploy/E2E sprint; M-10.10 remains in MVS and may get a later dedicated test. Active plan ends at TP-55.
+25. Combined former Sprint E (backend deploy) and Sprint F (edge ↔ deployed backend E2E) into a single Sprint E (TP-49–55).
+
 
 
 ## Chats

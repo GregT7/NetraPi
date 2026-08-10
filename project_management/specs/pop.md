@@ -33,7 +33,7 @@ Although the original career-driven incentive for this project changed after gai
   - TPU-compiled `.tflite` models (or lightweight heuristics where appropriate)
 - Extract pre/post-event video clips
 - Log event metadata locally
-- Operate **offline-first**, queuing uploads when connectivity is unavailable
+- Continue capture/detection offline; upload clips one at a time when connectivity is available (no offline upload queue)
 
 > Explicitly out of scope:
 > - Speeding detection
@@ -41,9 +41,9 @@ Although the original career-driven incentive for this project changed after gai
 > - Multi-class driving behavior detection
 
 ### 3.3 Local Persistence (Required)
-- Store event metadata and upload queue state in **SQLite** on the device
+- Store event metadata in **SQLite** on the device
 - Follow proper db migration practices using Liquibase.
-- Ensure resilience to temporary network loss
+- Retain event clips on disk until a direct upload is performed when online
 
 ### 3.4 Cloud Storage (Required)
 - Store video clips in **AWS S3** private buckets
@@ -94,7 +94,7 @@ Although the original career-driven incentive for this project changed after gai
 ---
 
 ## Minimal Tech Stack (Deployed)
-- **Edge:** Raspberry Pi 5 running a Python service with TensorFlow Lite (`tflite-runtime`) and `pycoral` accelerated by a Google Coral USB TPU for real-time inference; OpenCV for continuous video capture and pre/post-event clip extraction; SQLite for offline-first local persistence and upload queuing; and `systemd` for reliable boot-time startup and recovery.
+- **Edge:** Raspberry Pi 5 running a Python service with TensorFlow Lite (`tflite-runtime`) and `pycoral` accelerated by a Google Coral USB TPU for real-time inference; OpenCV for continuous video capture and pre/post-event clip extraction; SQLite for local event metadata; and `systemd` for reliable boot-time startup and recovery. Cloud uploads are direct and one-at-a-time when connectivity is available (no offline upload queue).
 - **Cloud (Supabase + AWS):** Supabase PostgreSQL for structured event metadata and analytics, paired with AWS S3 for scalable, private video clip storage, keeping large media assets decoupled from relational data and served securely via time-limited signed URLs.
 - **Backend:** FastAPI service containerized with Docker and deployed on Render, responsible for ingesting authenticated edge device uploads, enforcing device-level API key authentication, generating signed URLs for secure clip playback from AWS S3, and exposing read-only analytics endpoints. SQLLite will be used to store the data locally.
 - **Frontend:** React web application styled with Tailwind CSS and deployed on Vercel, using Recharts for analytics visualizations (event frequency, session distributions), with support for secure clip playback and a public demo mode.

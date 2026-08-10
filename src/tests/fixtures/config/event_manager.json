@@ -1,0 +1,6 @@
+{
+  "trigger_labels": [
+    "stop sign"
+  ],
+  "area_history_seconds": 20.0
+}

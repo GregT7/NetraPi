@@ -1,0 +1,10 @@
+{
+  "gpio_pin": 18,
+  "volume": 50,
+  "pitch": 1000,
+  "duration_seconds": 0.3,
+  "play_on": {
+    "unsafe": true,
+    "safe": false
+  }
+}

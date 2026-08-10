@@ -1,24 +1,27 @@
 # NetraPi Test Plan (Updated for Full MVS Coverage)
 
 ## 1. Purpose
-Verify that NetraPi satisfies the full MVS through staged, repeatable tests across the edge device, local persistence layer, cloud storage, backend API, database, frontend, and deployment pipeline.
+Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, and deployment. Frontend and later evaluation UI tests are deferred until those layers exist.
 
 ## 2. How to Use This Plan
-This document is ordered by **sprint** (see `project_journal/sprint.md`), not just by subsystem. Earlier tests should be executable before later layers exist.
+This document is ordered by **sprint section** in this file (Sprint 1 through E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
 
 Each test includes:
 - **Reqs**: the requirement IDs covered
 - **Prerequisites**: what must already be implemented before the test is valid
 - **Pass criteria**: what counts as success
 
+**TP-xx** tests are the baseline verification items defined at project start. **AT-xx** ad-hoc tests are added during development; see [§7 Ad-hoc tests](#7-ad-hoc-tests-at-xx).
+
 ## 3. System Definitions
 - **Edge runtime**: Raspberry Pi 5, Coral USB TPU, camera, local scripts/services, local file storage, and local SQLite database
-- **Cloud storage**: private AWS S3 bucket used for baseline footage and event clips
-- **Backend API**: deployed cloud API that authenticates the edge device, stores metadata in Postgres, and returns signed URLs
-- **Database**: cloud-hosted PostgreSQL storing structured metadata and S3 paths, local SQLite db running on pi for immediate storage and cloud upload safety
-- **Frontend / UI**: deployed React web app / interactive portfolio used to browse events, view metrics, filter data, view playback, and review project documentation
-- **Processing job**: batch or offline logic that computes baseline/post-baseline metrics from stored footage/events
-- **Collection phase**: either **baseline** or **post-baseline**
+- **Cloud storage**: private AWS S3 bucket used for full-session footage and event clips
+- **Backend API**: deployed cloud API that authenticates the edge device, issues temporary S3 upload URLs (presigned PUT), persists metadata to Postgres, and returns signed playback URLs
+- **Database**: cloud-hosted PostgreSQL (via backend) storing structured metadata and S3 paths; local SQLite on the Pi for offline event metadata until an online upload completes
+- **Upload path**: when online, Pi authenticates to the backend → backend issues a short-lived S3 PUT URL and later writes Postgres metadata; Pi does not hold permanent AWS or Postgres credentials
+- **Frontend / UI**: deferred — portfolio tests will be added when frontend work starts
+- **Ground-truth labeling**: manual review of collected footage to assign run-through, rolling stop, and complete stop categories for accuracy evaluation
+- **Event type**: one of **run-through**, **rolling stop**, or **complete stop** (model prediction or manual label)
 
 ## 4. Evidence Recording
 Record execution results in a separate verification matrix or spreadsheet. Acceptable evidence includes:
@@ -43,6 +46,21 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 - **Demonstration**: observed runtime behavior
 - **Test**: instrumented execution with measurable pass/fail criteria
 - **Analysis**: reasoning over collected data or outputs
+
+## 7. Ad-hoc tests (AT-xx)
+
+**TP-xx** tests were written when the test plan was first defined. Their numbers stay fixed so prerequisites, the test matrix, and cross-references do not change when new verification is added later.
+
+**AT-xx** (**A**d-hoc **T**est) is the ID pattern for tests added **during the project** as gaps or risks show up. Use **`AT-{sprint}.{n}`** (for example **AT-2.3**, **AT-3.3**). An AT test can use any **test level** in §5 (Unit, Integration, System, etc.) — the prefix only marks *when* the test entered the plan, not how many components it touches.
+
+Run AT tests after the relevant sprint **TP** prerequisites unless a specific AT entry says otherwise. Each AT uses the same fields as TP tests (**Description**, **Test level**, **Verification approach**, **Reqs**, **Prerequisites**, **Steps**, **Pass criteria**). Record evidence in the verification matrix / spreadsheet like any other test.
+
+| Sprint | Section in this doc | Ad-hoc tests |
+|--------|---------------------|--------------|
+| 2 | [Sprint 2 ad-hoc tests](#sprint-2-ad-hoc-tests-non-tp) | AT-2.1–AT-2.5 — recording pipeline resilience, policy, boundaries, preview parity, long-run stability |
+| 3 | [Sprint 3 ad-hoc tests](#sprint-3-ad-hoc-tests-non-tp) | AT-3.1, AT-3.3, AT-3.4 — buzzer enclosure wiring, continuous approach Pi bench, live motion + kNN bench (**AT-3.2** withdrawn) |
+
+Some AT tests reference scripted entry points under `src/tests/integration/` (same convention as TP integration tests where applicable).
 
 ---
 
@@ -340,7 +358,7 @@ Record execution results in a separate verification matrix or spreadsheet. Accep
 
 # Sprint 2 — Recording System, Detector, and RecordingManager
 
-*Tests: TP-16 to TP-24. Aligns with Sprint 2 backlogs in `sprint.md`. Prerequisites: Sprint 1 (TP-01–TP-15) where noted.*
+*Tests: TP-16 to TP-24*
 
 Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-20), **RecordingManager** (TP-21–TP-24).
 
@@ -368,7 +386,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Verification approach**: Test
 - **Reqs**: M-2.14
 - **Prerequisites**
-  - Config files under `src/config/`
+  - Config files under `src/main/edge/config/`
   - Config loader implemented
 - **Steps**
   1. Run unit tests for loading valid config fixtures (camera, buffer, detector, etc. as implemented).
@@ -388,43 +406,45 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Classes implemented per UML
 - **Steps**
   1. Run unit tests for `FrameRecord` (`raw`, `display`, `patch_classifications`).
-  2. Run unit tests for `FrameBuffer` (`push`, `latest`, `pre_roll_frames` returns display).
-  3. Run unit tests for `DetectorConfig` load/parse from fixture JSON.
+  2. Run unit tests for `FrameBuffer` (`push`, `latest`, `display_frames` returns display).
+  3. Run unit tests for `Detector` in `src/tests/unit/edge/netrapi/detection/test_detector.py` (mocked `_invoke`; no Coral).
 - **Pass criteria**
   - All unit tests pass without TPU or camera.
-  - `pre_roll_frames()` exposes processed (`display`) frames, not `raw`.
+  - `display_frames()` exposes processed (`display`) frames, not `raw`.
 
 ### TP-19: Detector inference unit tests (mocked TPU)
-- **Description**: Verifies `Detector` wiring with mocked `_invoke` (no Coral required).
+- **Description**: Verifies `Detector.classify(raw)` wiring with mocked `_invoke` (no Coral required).
 - **Test level**: Unit
 - **Verification approach**: Test
 - **Reqs**: M-3.10, M-3.11, M-3.12
 - **Prerequisites**
-  - `Detector` stub with `update(pre_buffer)`
-  - Mock or fake `_invoke` in tests
+  - `Detector` with mocked `_invoke` / `_preprocess`
 - **Steps**
-  1. Run unit test: `update(pre_buffer)` patches `classifications` on the latest entry.
-  2. Run unit test: empty or sub-threshold mock output yields expected list behavior.
+  1. Run unit test: `classify(raw)` returns filtered `list[Classification]`.
+  2. Run unit test: `_filter_detections` drops sub-threshold, non-allowed, and excess detections (`top_k`).
+  3. Run unit test: **RecordingManager** patches latest `FrameRecord` after `classify`.
 - **Pass criteria**
-  - `update` mutates the latest `FrameRecord` in the buffer passed in.
+  - `classify` returns filtered detections without mutating buffers.
+  - **RecordingManager** owns `patch_classifications` on the latest pre-buffer entry.
   - Tests pass without Edge TPU hardware.
 
 ### TP-20: Detector on-device smoke
-- **Description**: Verifies `load()`, `verify_tpu()`, and one real `update(pre_buffer)` on the Pi with Coral attached.
+- **Description**: Verifies `load()`, `verify_tpu()`, and one real `classify(raw)` on the Pi with Coral attached.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-3.10, M-3.11, M-3.12
 - **Prerequisites**
   - TP-10 passed
-  - `Detector` implemented through `update`
+  - `Detector` implemented through `classify`
   - Test entry point or script with stub/real `detector.json`
 - **Steps**
   1. On the Pi, call `load()` then `verify_tpu()`.
-  2. Push at least one `FrameRecord` with real `raw` from camera (or test fixture frame) into `pre_buffer`.
-  3. Call `update(pre_buffer)` and inspect latest entry `classifications`.
+  2. Capture one frame (`raw`) from camera (or test fixture).
+  3. Call `classify(raw)` and inspect returned `classifications`.
+  4. Optionally: push a `FrameRecord` into `pre_buffer`, patch from `classify` result, confirm **EventManager** path.
 - **Pass criteria**
   - `verify_tpu()` succeeds.
-  - Latest record has a `classifications` list after `update` (may be empty if scene has no allowed classes).
+  - `classify` returns a `list[Classification]` (may be empty if scene has no allowed classes).
   - No crash; load/invoke errors are logged or raised clearly.
 
 ## RecordingManager
@@ -454,12 +474,14 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - USB camera available on Pi
 - **Steps**
   1. Start the test wrapper that runs `RecordingManager.run_loop()` for a short bounded duration (or N laps).
-  2. Confirm frames enter `pre_buffer` while `clip_active` is false.
-  3. Stop the run cleanly via test harness timeout or documented stop method.
+  2. Confirm ``run_loop`` enters the main lap loop immediately (no FPS warmup phase).
+  3. Confirm frames enter `pre_buffer` while `clip_active` is false.
+  4. Stop the run cleanly via test harness timeout or documented stop method.
 - **Pass criteria**
   - Loop runs without crash for the test duration.
   - `pre_buffer` receives `FrameRecord` entries with populated `display`.
   - No clip file written during idle-only run.
+  - When full-trip recording is enabled, trip segment playback duration matches wall time (encoding FPS = frame count / segment elapsed).
 
 ### TP-23: RecordingManager clip-active path and MP4 output
 - **Description**: Verifies `clip_active` post-roll, `ClipPackage.build`, and `Recorder.write_clip` produce a playable MP4 from buffer `display` frames.
@@ -480,160 +502,318 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Buffers cleared and `clip_active` false after save (per design).
 
 ### TP-24: RecordingManager Ctrl+C and preview controls
-- **Description**: Verifies clean shutdown on Ctrl+C and preview show/hide per config.
+- **Description**: Verifies live preview of processed `display` frames and clean shutdown on Ctrl+C (scheduled SIGINT and manual terminal interrupt) with camera release.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
 - **Reqs**: M-2.10
 - **Prerequisites**
   - TP-22 passed
-  - Preview enabled in test config
+  - Test entry point: `src/tests/integration/tp_24/tp_24_preview_ctrl_c_integration.py`
+  - USB camera on Pi; interactive terminal (TTY) for manual Ctrl+C; preview and trip recording forced on by the test harness
 - **Steps**
-  1. Start run loop with preview on; confirm preview window shows `display` frames.
-  2. Toggle preview off/on if config supports toggle (or verify disabled mode).
-  3. Send Ctrl+C; confirm process exits and camera/resources release without hang.
+  1. Run bounded loop with preview and full trip recording on; confirm preview shows `display` frames and `pre_buffer` holds valid display data; confirm a trip segment is written.
+  2. Start loop again; after a short delay send SIGINT (automated, same signal as Ctrl+C); confirm `run_loop` returns and camera/resources release without hang.
+  3. Start loop again; press Ctrl+C in the terminal during the live run; confirm the same clean shutdown as step 2.
 - **Pass criteria**
-  - Preview shows live processed frames when enabled.
-  - Ctrl+C ends the loop without orphaned process or device lock.
+  - Preview shows live processed frames in the OpenCV window while enabled.
+  - Ctrl+C / SIGINT ends the loop without orphaned process or device lock; camera can reopen after shutdown.
   - Evidence captured for test matrix (screenshot or short video optional).
 
----
+## Sprint 2 ad-hoc tests (non-TP)
 
-# Sprint A — Unsafe Event Detection Core
-
-*Tests: TP-25 to TP-30. Stop-sign lifecycle, classification, clips, and audible feedback. Prerequisites: Sprint 2 (TP-16–TP-24) and Sprint 1 as applicable.*
-
-### TP-25: Rolling-stop classification
-- **Description**: Verifies the system classifies an encounter as a rolling stop when the vehicle slows but does not remain below the stop threshold long enough.
+### AT-2.1: Recorder write failure and recovery
+- **Description**: Verifies `RecordingManager` handles `Recorder.write_clip(...)` failures safely (writer open fail, mid-write exception, output path issue) and recovers for subsequent clips.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-3.13, M-4.21, M-4.41
-- **Prerequisites**
-  - TP-20, TP-21 passed
-  - Rolling-stop classification logic implemented
-- **Steps**
-  1. Run the system on footage where the vehicle slows at the stop sign but does not fully stop for the required duration.
-  2. Allow the encounter to complete.
-- **Pass criteria**
-  - The encounter is classified as a rolling stop.
-  - An unsafe event is generated.
-
-### TP-26: Stop-sign bypass classification
-- **Description**: Verifies the system classifies an encounter as a stop-sign bypass when the vehicle does not meaningfully slow while passing the sign.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-3.13, M-4.21, M-4.41
-- **Prerequisites**
-  - TP-20, TP-21 passed
-  - Bypass classification logic implemented
-- **Steps**
-  1. Run the system on footage where the vehicle passes a relevant stop sign without adequately slowing.
-  2. Allow the encounter to complete.
-- **Pass criteria**
-  - The encounter is classified as a stop-sign bypass.
-  - An unsafe event is generated.
-
-### TP-27: Unsafe event clip extraction for stop-sign violation
-- **Description**: Verifies the system saves the appropriate video evidence clip when an unsafe stop-sign event is detected.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-2.13, M-3.20, M-4.32
+- **Reqs**: M-2.10, M-2.13, M-3.20
 - **Prerequisites**
   - TP-23 passed
-  - EventManager / unsafe trigger implemented
+  - Failure injection hook (or mocked writer) available
 - **Steps**
-  1. Trigger a rolling-stop or stop-sign bypass event.
-  2. Inspect the saved clip.
+  1. Trigger a clip and force a write failure before/during encode.
+  2. Verify failure is surfaced clearly (error/log) and process does not hang.
+  3. Trigger another clip with normal writer path.
 - **Pass criteria**
-  - A clip is saved for the unsafe event.
-  - The clip contains the relevant stop-sign encounter footage.
+  - Failure does not crash the run loop permanently or deadlock resources.
+  - Subsequent clip can still be written after recovery.
 
-### TP-28: Audible feedback on unsafe stop-sign event
-- **Description**: Verifies the system emits audible feedback when a rolling stop or stop-sign bypass event is detected, within timing constraints.
-- **Test level**: System
-- **Verification approach**: Demonstration
-- **Reqs**: M-3.30, M-3.31
-- **Prerequisites**
-  - Audible feedback mechanism implemented.
-- **Steps**
-  1. Trigger a rolling-stop event.
-  2. Trigger a stop-sign bypass event.
-  3. Record event time and audible feedback time for at least one trigger.
-- **Pass criteria**
-  - Audible feedback is produced for each unsafe event type.
-  - Feedback occurs within 10 seconds of the detected event.
-
-### TP-29: No false unsafe event for compliant stop
-- **Description**: Verifies the system does not generate a stop-sign violation event when the driver performs an adequate stop.
-- **Test level**: System
-- **Verification approach**: Test
-- **Reqs**: M-3.13, M-4.21, M-4.41
-- **Prerequisites**
-  - Full stop-sign detection and classification pipeline operational.
-- **Steps**
-  1. Run the system on footage containing a clearly compliant stop at a relevant stop sign.
-  2. Review event outputs and logs.
-- **Pass criteria**
-  - No rolling-stop or bypass event is generated.
-  - Encounter is recorded as compliant or ignored without error.
-
-### TP-30: Stop-sign Beep Test
-- **Description**: Verifies speaker will integrate with ai inference detection by driving past stop sign, having stop sign be recognized, and then activating the speaker.
+### AT-2.2: Event gate policy matrix (unsafe vs safe)
+- **Description**: Verifies clip-start policy exactly matches design: unsafe events always record; safe events record only when `record_safe_events = true`. Fast gate-only check (`clip_active`); full MP4 matrix is **TP-26**.
 - **Test level**: Integration
-- **Verification approach**: Demonstration + Test
-- **Reqs**: M-3.10, M-3.13, M-3.30, M-3.31 
+- **Verification approach**: Test
+- **Reqs**: M-2.13, M-2.14, M-4.20
 - **Prerequisites**
-  - TP-10, TP-08, TP-15, TP-20 passed
-  - EventManager / stop-sign pipeline implemented
+  - TP-23 passed
+  - Triggerable safe and unsafe `DrivingEvent` fixtures/stubs
 - **Steps**
-  1. Setup system in car (raspberry pi secured and powered on, camera mounted, tpu plugged in)
-  2. Run script that records the experience until 3 beeps occurs (and waits 10 seconds afterwards)
-  3. Start recording audio on phone immediately after running script
-  3. Drive past three different stop signs and listen for speaker activation
+  1. Set `record_safe_events = false`; trigger unsafe event, then safe event.
+  2. Set `record_safe_events = true`; trigger safe event.
+  3. Check `clip_active` transitions (full clip write optional; prefer TP-26).
 - **Pass criteria**
-  - Speaker activates three times for 1.5 seconds each time
-  - Exactly three different stop signs are approached
+  - Unsafe events always start clips.
+  - Safe events start clips only when config enables them.
+  - No unexpected clip starts occur.
+
+### AT-2.3: Post-roll completion boundary precision
+- **Description**: Verifies post-roll finalization gate is correct at wall-clock threshold boundaries and avoids off-by-one behavior.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-2.13, M-3.20
+- **Prerequisites**
+  - TP-23 passed
+- **Steps**
+  1. Run clip capture with post-roll elapsed time just below `post_roll_seconds`.
+  2. Run clip capture with post-roll elapsed time exactly at `post_roll_seconds`.
+  3. Validate save timing and `ClipResult` coverage for both cases.
+- **Pass criteria**
+  - Save does not occur below `post_roll_seconds` elapsed.
+  - Save occurs at threshold and only once per trigger.
+
+### AT-2.4: Deterministic preview-to-file parity
+- **Description**: Verifies `PreviewUI` and saved MP4 carry the same processed `display` frames using deterministic frame markers (not subjective visual comparison).
+- **Test level**: Integration
+- **Verification approach**: Demonstration + Inspection
+- **Reqs**: M-2.10, M-2.13, M-3.20
+- **Prerequisites**
+  - TP-23 passed
+  - Preview enabled
+- **Steps**
+  1. Run one clip with deterministic visual markers (frame id/timestamp overlay) in `display`.
+  2. Capture preview evidence at known marker points.
+  3. Compare the same marker points in saved MP4.
+- **Pass criteria**
+  - Marker sequence and visual processing match between preview and MP4.
+  - No transform appears exclusively in one path.
+
+### AT-2.5: Long-run multi-cycle stability and resource hygiene
+- **Description**: Verifies repeated `idle -> clip_active -> idle` cycles remain stable over an extended run without state/resource leakage.
+- **Test level**: Integration
+- **Verification approach**: Soak test
+- **Reqs**: M-2.10, M-2.13, M-3.20
+- **Prerequisites**
+  - TP-22 and TP-23 passed
+  - Test entry point: `src/tests/integration/at_2_5/at_2_5_long_run_multi_cycle_integration.py`
+- **Steps**
+  1. Execute a long session with multiple clip triggers in one process.
+  2. Track cycle outcomes, memory trend, writer release behavior, and camera availability.
+  3. Confirm each cycle returns cleanly to idle before the next trigger.
+- **Pass criteria**
+  - Multiple consecutive cycles complete successfully without restart.
+  - No sustained memory/resource growth or stale `clip_active`/buffer state across cycles.
 
 ---
 
-# Sprint B — Offline-First Operation and Local Persistence
+# Sprint 3 — Unsafe Event Detection Core
 
-*Tests: TP-31 to TP-42*
-### TP-31: Local database schema validation
-- **Description**: Verifies the local SQLite schema is structured correctly for event storage and queued uploads.
+*Tests: TP-25 to TP-28*
+
+### TP-25: Stop-sign event classification (recorded clips)
+- **Description**: Verifies the classification pipeline assigns the correct stop-sign event type (or no event) across a fixed labeled clip set spanning all four categories: rolling stop, run-through, complete stop, and unrelated stop-sign encounter—and meets a minimum overall accuracy threshold before field testing.
+- **Test level**: Integration
+- **Verification approach**: Test + Analysis
+- **Reqs**: M-3.13, M-4.20, M-4.21, M-4.30
+- **Prerequisites**
+  - TP-20, TP-21 passed
+  - Stop-sign approach + motion classification logic implemented
+  - Recorded-footage runner available
+  - **~100** labeled clips available: **~25** per category (complete stop, rolling stop, run-through, no event)
+- **Steps**
+  1. Prepare (or confirm) labeled clips: **~25** per category (**~100** clips total) covering rolling stop, run-through, complete stop, and unrelated stop sign.
+  2. Run the classification pipeline on the full labeled set.
+  3. Compare predicted event type (or no event) to ground-truth label per clip.
+  4. Compute overall accuracy: correct / N (N = clip count in the batch, typically ~100).
+  5. Record per-category results for the test matrix (optional breakdown).
+- **Pass criteria**
+  - Overall classification accuracy is **≥ 75%** across the full batch.
+  - Pipeline completes without error on all clips.
+  - Per-category counts (correct / total) are recorded for review.
+
+### TP-26: Stubbed event gate — all stop-sign types + `record_safe_events`
+- **Description**: Verifies `RecordingManager` clip extraction for every stop-sign `DrivingEvent` type when events are **stub-injected** (real `EventManager.evaluate` not required). Covers unsafe always-record and safe gated by `recording_manager.json` → `record_safe_events`.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-2.13, M-3.20
+- **Prerequisites**
+  - TP-23 passed
+  - Stub / mock that returns a fixed `DrivingEvent` from `evaluate` (same pattern as AT-2.2); no real EventManager classification required
+  - Test entry point: `src/tests/integration/tp_26/tp_26_stubbed_event_gate_clips_integration.py`
+  - Camera + ffmpeg available for a short live session (or equivalent harness used for TP-23)
+- **Steps**
+  1. Build the pipeline; replace `EventManager` with a stub that returns a chosen `DrivingEvent` on idle `evaluate`.
+  2. With `record_safe_events = false`: for each of **`ROLLING_STOP`** and **`RUN_THROUGH`**, fill pre-roll, stub that event, run until post-roll completes, confirm an MP4 is written under `clips_dir`.
+  3. With `record_safe_events = false`: stub **`COMPLETE_STOP`**, run one idle lap (or short loop); confirm **no** clip starts (`clip_active` stays false; no new MP4).
+  4. With `record_safe_events = true`: stub **`COMPLETE_STOP`**, fill pre-roll, run until post-roll completes; confirm an MP4 is written.
+  5. Open each saved MP4 and confirm it is playable with pre-roll + post-roll content (same bar as TP-23).
+- **Pass criteria**
+  - **`ROLLING_STOP`** and **`RUN_THROUGH`** always produce a saved clip (independent of `record_safe_events`).
+  - **`COMPLETE_STOP`** produces a clip **only** when `record_safe_events = true`; otherwise no clip.
+  - Each saved clip is a playable MP4 with pre/post footage; buffers clear and `clip_active` is false after write.
+
+### TP-27: Audible feedback on unsafe stop-sign event
+- **Description**: Verifies the real edge pipeline emits audible feedback when a stubbed rolling-stop or run-through `DrivingEvent` is evaluated, within timing constraints (camera and EventManager mocked; real `Buzzer` only).
+- **Test level**: System
+- **Verification approach**: Demonstration + Test
+- **Reqs**: M-3.30, M-3.31
+- **Prerequisites**
+  - TP-15 passed (buzzer tones validated on GPIO)
+  - Buzzer wired (BCM **18**); `buzzer.json` with `play_on.unsafe=true`
+  - Coral USB TPU plugged in — `build_pipeline` loads the edgetpu `.tflite` via `Detector.load()` even though EventManager is stubbed (`needs_detection=False`; no live inference)
+  - No USB camera required (harness mocks the camera)
+  - Test entry point: `src/tests/integration/tp_27/tp_27_stubbed_event_buzzer_integration.py`
+- **Steps**
+  1. On the Pi (Coral attached), run `python src/tests/integration/tp_27/tp_27_stubbed_event_buzzer_integration.py` (builds real pipeline + real `Buzzer`; mocks camera; stubs `EventManager`).
+  2. Confirm an audible beep for stubbed **`ROLLING_STOP`**; note evaluate→beep latency printed by the harness.
+  3. Confirm an audible beep for stubbed **`RUN_THROUGH`**; note latency.
+  4. Confirm **no** beep for stubbed **`COMPLETE_STOP`** (default `play_on.safe=false`).
+- **Pass criteria**
+  - Audible feedback is produced for **`ROLLING_STOP`** and **`RUN_THROUGH`**.
+  - Each unsafe beep occurs within **10 seconds** of the stubbed `evaluate`.
+  - No beep for **`COMPLETE_STOP`** under default `play_on`.
+
+### TP-28: In-car E2E classify + beep + clip (edge pipeline)
+- **Description**: End-to-end in-vehicle soak on the **fully integrated edge pipeline** (not the AT-3.4 bench, not stubbed events): one complete stop, one rolling stop, and one run-through at stop signs. Confirms classification labels match operator intent, the buzzer fires for unsafe events only, and evidence clips are saved for unsafe events.
+- **Test level**: System
+- **Verification approach**: Demonstration + Test
+- **Reqs**: M-3.13, M-3.20, M-3.30, M-3.31, M-4.12, M-4.20
+- **Prerequisites**
+  - AT-3.1, AT-3.4 passed (buzzer secured; motion + classification path proven on Pi)
+  - TP-26 / TP-27 passed (clip gate + stubbed beep path proven)
+  - Edge EventManager classification path implemented and wired (ap_050 / AT-3.4 recipe ported)
+  - TP-23 path available (clip write on unsafe); Pi + camera + Coral + buzzer installed in car
+  - Test entry point: `src/tests/integration/tp_28/tp_28_e2e_classify_beep_clip_integration.py`
+- **Steps**
+  1. Mount and power the system in the vehicle; clips land under `clips_dir/tp_28/`.
+  2. On the Pi, run `python src/tests/integration/tp_28/tp_28_e2e_classify_beep_clip_integration.py` (real Detector + EventManager + Buzzer + Recorder; no stubs / no CLI flags).
+  3. For each of three fixed phases, focus the preview window and press **SPACE** to arm, then perform **complete stop**, **rolling stop**, and **run-through** in that order. Classifications before SPACE are ignored (no beep/clip).
+  4. Confirm console classification matches the intended maneuver; listen for beep on unsafe phases.
+  5. Inspect saved clips under `clips_dir/tp_28/` after unsafe encounters.
+- **Pass criteria**
+  - All three encounters complete without crash or camera/TPU stall.
+  - Classification labels match operator intent for complete stop, rolling stop, and run-through.
+  - Buzzer activates for **rolling stop** and **run-through** within **10 seconds** of each unsafe event; **no** beep for the complete stop (`play_on.safe=false`).
+  - An evidence clip is saved for each unsafe event (rolling stop and run-through); no clip for the complete stop (`record_safe_events=false`).
+  - Evidence: harness console log (classify / latency / clip paths), clips directory listing (or clip files).
+
+## Sprint 3 ad-hoc tests (non-TP)
+
+### AT-3.1: Buzzer secured in Pi enclosure (GPIO wiring)
+- **Description**: Verifies the buzzer module is physically secured inside the Pi container/enclosure, wired to the documented GPIO pin without loose leads or pin strain, and safe for in-vehicle use.
+- **Test level**: Integration
+- **Verification approach**: Inspection + Demonstration
+- **Reqs**: M-1.11, C-1.13, M-3.30
+- **Prerequisites**
+  - TP-15 passed (buzzer wiring validated on bench)
+  - Pi enclosure / container selected for in-vehicle install
+  - Documented buzzer pin assignment (BCM **18**, common GND — same as TP-15 scripts)
+- **Steps**
+  1. Mount the buzzer inside the Pi container so it cannot shift during normal handling or light vehicle vibration.
+  2. Connect buzzer to the GPIO header using a secure connector or soldered lead with strain relief; confirm **BCM 18** and GND match TP-15 wiring.
+  3. Route leads so they do not block airflow, cover ports, or contact the TPU/camera cables.
+  4. Close the enclosure; confirm the buzzer remains reachable for sound (case opening, vent, or grille as designed).
+  5. Apply light hand shake / tap to the mounted assembly; re-open if needed and confirm pins and leads did not loosen.
+  6. Capture photo evidence of internal wiring and external mounted unit.
+- **Pass criteria**
+  - Buzzer and wiring are physically secured inside the Pi container with no obvious loose components.
+  - GPIO connection matches the documented pin map (**BCM 18**).
+  - No pinched, frayed, or short-risk wiring; install satisfies **M-1.11** and does not create an obvious driving hazard (**C-1.13**).
+  - Buzzer can still be exercised with `src/tests/integration/tp_15/tp15_buzzer_smoke_test.py` after enclosure close-up.
+
+> **AT-3.2 withdrawn** (not renumbered): early-boot GPIO idle service for active-buzzer startup noise. Superseded by switching to a **passive** buzzer (PWM-driven; silent until intentional tones). IDs **AT-3.3** / **AT-3.4** stay unchanged.
+
+### AT-3.3: Continuous approach live benchmark (Pi FPS + overlay)
+- **Description**: Verifies the planned **continuous approach** path (one `diagnose_approach_drop` per lap on the growing area series) is fast enough for real-time use on the Pi, and that approach-then-drop is visible **in the car** via HDMI overlay without offline analysis.
+- **Test level**: Integration
+- **Verification approach**: Demonstration + Test (Pi soak)
+- **Reqs**: M-3.13, M-4.20 (approach detection path validation; informs edge port go/no-go)
+- **Prerequisites**
+  - TP-12 passed (camera + EdgeTPU inference loop stable)
+  - Pi deployed in vehicle or bench with USB camera + HDMI display
+  - Test entry point: `src/tests/integration/at_3_3/at_3_3_continuous_approach_live_benchmark.py`
+  - Approach thresholds: `motion_area_1` config with `min_peak_pct = 0.25` (pf_02 / `ex_per_frame.xlsx` winner)
+- **Steps**
+  1. On the Pi, run `python src/tests/integration/at_3_3/at_3_3_continuous_approach_live_benchmark.py --duration-seconds 120 --show-window --write-status`.
+  2. **Phase 1 (baseline):** confirm loop runs ~60s with capture + infer + area append only; note `loop_fps_baseline`.
+  3. **Phase 2 (with approach):** confirm loop runs ~60s with `diagnose_approach_drop` each lap; note `loop_fps_approach`, `approach_ms_p95`, and `fps_delta_pct`.
+  4. During phase 2, approach at least one real stop sign; confirm HDMI overlay shows **`APPROACH DETECTED @ t=…s`** and console prints the same event.
+  5. After parking, review `logs/last_bench_status.json` or `logs/at_3_3_summary_*.json` without transferring footage for apartment analysis.
+  6. *(Optional, dev machine)* `--replay-areas` on a `*.areas.json` file — logic sanity only, **not** a substitute for steps 1–5.
+- **Pass criteria**
+  - Both phases complete without crash or camera/TPU stall.
+  - `fps_delta_pct` ≤ **33%** (baseline → with_approach; fail if loop FPS drops more than this).
+  - `approach_ms_p95` ≤ **33 ms** at target lap rate.
+  - `approach_detected` = **true** (at least one live approach during phase 2; overlay + log).
+  - Evidence: `logs/at_3_3_summary_*.json` and optional photo of overlay.
+
+### AT-3.4: Live approach + motion + classification bench (Pi)
+- **Description**: Four keypress-started phases (~30s each) on the Pi: baseline drive with AT-3.3-style HUD (approach on, no motion), then three stop-sign maneuvers (complete stop, rolling stop, run-through) with per-frame approach detection, a **5s** post-drop motion window, sklearn two-stage kNN classification, and HDMI banners (blue = complete-stop, red = unsafe). Validates motion + classification path performance and in-car visibility before edge port.
+- **Test level**: Integration
+- **Verification approach**: Demonstration + Test (Pi soak)
+- **Reqs**: M-3.13, M-4.20 (motion + classification path validation; informs edge port go/no-go)
+- **Prerequisites**
+  - AT-3.3 prerequisites (TP-12, Pi + camera + Coral + HDMI)
+  - Laptop: `python src/tests/integration/at_3_4/prepare_at_3_4_config.py` (copies motion_area_2 training cache, bakes ap_050 literal configs, trains kNN joblib)
+  - Pi: `scikit-learn`, `joblib`; `at_3_4/config/` present on device (sync joblibs from prep)
+  - Test entry point: `src/tests/integration/at_3_4/at_3_4_live_motion_classification_benchmark.py`
+  - Frozen config provenance: ap_050 / `ex_motion.xlsx` run `20260705T174249Z` (see `at_3_4/README.md`)
+- **Steps**
+  1. On a laptop, run `prepare_at_3_4_config.py`; sync `at_3_4/config/` to the Pi if needed.
+  2. On the Pi, run `python src/tests/integration/at_3_4/at_3_4_live_motion_classification_benchmark.py --phase-seconds 30 --show-window --write-status`.
+  3. **Phase 1:** press SPACE; drive normally ~30s; note baseline HUD `loop_fps`.
+  4. **Phases 2–4:** press SPACE before each; perform **one** complete stop, rolling stop, and run-through at a stop sign (one maneuver per phase).
+  5. Confirm green approach banner and blue/red classification banners during phases 2–4; banners clear 10s after classification. Each of phases 2–4 must produce **exactly one** approach + classification cycle (no duplicate re-arm or second classification in the same phase).
+  6. After parking, review `logs/at_3_4_summary_*.json` and `run_data/<stamp>/events.jsonl`.
+  7. Manually compare classification labels in `events.jsonl` to intended maneuver per phase.
+- **Pass criteria**
+  - All four phases complete without crash or camera/TPU stall.
+  - Phases 2–4 each log **exactly one** `approach_detected` and **exactly one** `classification` event in `events.jsonl` (`approach_count` = `classification_count` = 1 per phase in summary JSON).
+  - Classification completes within **≤ 10 seconds** from the moment the stop sign leaves the frame (approach detect / drop end ≈ sign exit; T₀ → classify_at_s in `events.jsonl` must be ≤ **10.0 s**; expected ~5 s motion window).
+  - Motion-window **average** FPS loss ≤ **40%** vs phase-1 `baseline_fps` (uses `worst_motion_window_fps_avg` in summary JSON; per-lap min is diagnostic only).
+  - Phases 2–4 `approach_ms_p95` ≤ **33 ms** (baseline phase excluded).
+  - Evidence: `logs/at_3_4_summary_*.json`, `run_data/<stamp>/events.jsonl`, optional overlay photo.
+  - Label correctness vs operator intent: **manual** (not an automated fail).
+
+---
+
+# Sprint B — Offline Operation and Local Persistence
+
+*Tests: TP-29 to TP-33*
+### TP-29: Local database schema validation
+- **Description**: Verifies the local SQLite schema is structured correctly for event metadata storage (no upload-queue tables).
 - **Test level**: Inspection
 - **Verification approach**: Analysis
-- **Reqs**: M-5.20, M-5.21
+- **Reqs**: M-5.20
 - **Prerequisites**
   - SQLite schema defined.
 - **Steps**
-  1. Review the SQLite schema for event and queue-related tables.
+  1. Review the SQLite schema for event-related tables.
   2. Confirm tables, keys, and required fields exist.
 - **Pass criteria**
   - Schema is normalized to a reasonable level for the project.
-  - Event and queue tables contain all required fields for local persistence and upload tracking.
+  - Event tables contain required fields for local metadata (timestamp, event type, clip path/id, config reference as applicable).
+  - No upload-queue / retry-status tables are required.
 
-### TP-32: Local database write/read smoke test
-- **Description**: Verifies the application can persist and retrieve dummy records from SQLite.
+### TP-30: Local database write/read smoke test
+- **Description**: Verifies the application can persist and retrieve dummy event records from SQLite.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-5.20
 - **Prerequisites**
   - SQLite schema initialized.
 - **Steps**
-  1. Insert dummy event and queue records into SQLite.
+  1. Insert dummy event records into SQLite.
   2. Read the inserted records back.
 - **Pass criteria**
   - Records are inserted successfully.
   - Retrieved values match what was written.
 
-### TP-33: SQLite availability and connection verification
+### TP-31: SQLite availability and connection verification
 - **Description**: Verifies the application can successfully connect to the SQLite database file before performing any storage operations.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-5.20
 - **Prerequisites**
   - SQLite database path configured.
-  - Database initialization script already executed (TP-61 or TP-62 depending on flow).
+  - Database initialization script already executed.
 - **Steps**
   1. Start the application or a small test script.
   2. Attempt to open a connection to the SQLite database file.
@@ -643,104 +823,23 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Query executes without error.
   - Application confirms database is ready before continuing.
 
-### TP-34: Event metadata local storage verification
+### TP-32: Event metadata local storage verification
 - **Description**: Verifies unsafe stop-sign events are stored in SQLite with required metadata.
 - **Test level**: Integration
 - **Verification approach**: Demonstration + Inspection
-- **Reqs**: M-4.30, M-5.20
+- **Reqs**: M-3.21, M-5.20
 - **Prerequisites**
   - Stop-sign detection and classification pipeline implemented.
   - Local SQLite database initialized.
 - **Steps**
-  1. Run the system and trigger a rolling-stop or stop-sign bypass event.
+  1. Run the system and trigger a rolling-stop or run-through event.
   2. Query the most recent SQLite event row.
 - **Pass criteria**
   - Event row exists in SQLite.
   - Row contains valid timestamp, event type, and clip identifier or path.
   - Row contains stop-sign-related metadata such as stop duration, minimum motion, and detection confidence.
 
-### TP-35: Queue record creation verification
-- **Description**: Verifies that when an uploadable event is stored locally, a corresponding queued-upload record is created.
-- **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-5.20, M-5.21
-- **Prerequisites**
-  - Local event storage implemented.
-  - Queue table implemented.
-- **Steps**
-  1. Trigger an event that produces a saved clip and local metadata record.
-  2. Inspect SQLite for the corresponding queue row.
-- **Pass criteria**
-  - A queue row is created for the stored event.
-  - Queue row references the correct clip or event record.
-  - Initial upload state is set correctly (for example: pending).
-
-### TP-36: Queue schema completeness verification
-- **Description**: Verifies queued-upload records contain all required fields for upload tracking and retry handling.
-- **Test level**: Integration
-- **Verification approach**: Inspection
-- **Reqs**: M-5.20, M-5.21
-- **Prerequisites**
-  - Queue record creation implemented.
-- **Steps**
-  1. Trigger an event that creates a queued-upload row.
-  2. Inspect the queued row in SQLite.
-- **Pass criteria**
-  - Queue row includes clip identifier or event reference, local file path, upload status, retry count, and timestamps.
-
-### TP-37: Offline queue retention verification
-- **Description**: Verifies queued uploads remain stored locally when network connectivity is unavailable.
-- **Test level**: Integration
-- **Verification approach**: Demonstration + Inspection
-- **Reqs**: M-5.10, M-5.21
-- **Prerequisites**
-  - Queue creation implemented.
-  - Upload attempt logic implemented.
-- **Steps**
-  1. Disable network connectivity.
-  2. Trigger an uploadable event.
-  3. Inspect the queue record after the upload attempt window.
-- **Pass criteria**
-  - Capture and detection continue offline.
-  - Queue row remains stored locally.
-  - Upload is not marked as successful.
-  - No queued data is lost.
-
-### TP-38: Single queued upload processing verification
-- **Description**: Verifies the upload processor can successfully process one pending queued-upload record when connectivity is available.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-5.21
-- **Prerequisites**
-  - Queue processor implemented.
-  - One valid pending queue record exists.
-  - Connectivity available.
-- **Steps**
-  1. Insert or create one valid pending queue record.
-  2. Start the upload processor.
-  3. Observe upload result and resulting queue state.
-- **Pass criteria**
-  - Pending record is processed.
-  - Upload succeeds.
-  - Queue status updates correctly after success.
-
-### TP-39: Queue retry/status update verification
-- **Description**: Verifies failed upload attempts update queue status and retry metadata correctly.
-- **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-5.21
-- **Prerequisites**
-  - Queue processor implemented.
-  - Retry/status fields implemented.
-- **Steps**
-  1. Force an upload failure for a pending queued record.
-  2. Inspect the row after the failed attempt.
-- **Pass criteria**
-  - Queue record remains available for future retry.
-  - Retry count or failure metadata updates correctly.
-  - Record is not falsely marked as uploaded.
-
-### TP-40: Offline capture and detection verification
+### TP-33: Offline capture and detection verification
 - **Description**: Verifies capture and event detection continue without network connectivity.
 - **Test level**: Integration
 - **Verification approach**: Demonstration
@@ -752,931 +851,391 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   2. Run the system and manually trigger an event.
 - **Pass criteria**
   - Video capture and detection continue offline.
+  - Event clip and local metadata are retained on device (no upload queue required).
 
-### TP-41: Queue upload on connectivity restoration verification
-- **Description**: Verifies pending queued uploads are successfully processed after network connectivity returns.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-5.21, M-5.22
-- **Prerequisites**
-  - Pending queued uploads exist.
-  - Upload processor implemented.
-- **Steps**
-  1. Disable network connectivity and create one or more queued uploads.
-  2. Restore connectivity.
-  3. Start or observe the queue processor.
-- **Pass criteria**
-  - Previously pending uploads are processed after connectivity returns.
-  - Queue state updates correctly.
-  - No duplicate or corrupted uploads are observed.
-
-### TP-42: Queue reload and automatic resume after restart
-- **Description**: Confirms queued records reload from SQLite and uploads resume automatically after restart.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-5.22, M-10.20, M-10.21
-- **Prerequisites**
-  - SQLite queue implemented.
-  - Resume logic implemented.
-- **Steps**
-  1. Create queued uploads while offline.
-  2. Restart the system.
-  3. Restore connectivity.
-- **Pass criteria**
-  - Queue records are reloaded from SQLite after restart.
-  - Pending uploads resume automatically.
-  - No data corruption is observed.
 ---
 
-# Sprint C — Cloud Upload and Cloud Persistence
+# Sprint C — Cloud Foundations and Local Backend Setup
 
-*Tests: TP-43 to TP-55*
-### TP-43: S3 bucket connectivity and upload smoke test
-- **Description**: Verifies the Raspberry Pi can authenticate with AWS and upload a file to the S3 bucket.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-6.10
-- **Prerequisites**
-  - S3 bucket created.
-  - AWS credentials configured on Pi.
-- **Steps**
-  1. Connect Pi to internet.
-  2. Upload a small test file.
-  3. Verify file appears in bucket.
-- **Pass criteria**
-  - Upload succeeds.
-  - File appears at expected path.
+*Tests: TP-34 to TP-40*
 
-### TP-44: Direct-to-cloud upload over hotspot/mobile data
-- **Description**: Verifies uploads work over cellular/hotspot connection.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-6.10
-- **Prerequisites**
-  - TP-44 passed.
-- **Steps**
-  1. Connect Pi to hotspot/mobile data.
-  2. Upload a test file or clip.
-- **Pass criteria**
-  - Upload succeeds over mobile connection.
+> **Focus:** Provision S3 and Supabase, and get a **local** FastAPI backend running (`compose.yml` / Docker). Integration behavior (presigned upload, metadata writes) is Sprint D.
 
-### TP-45: Private bucket access control verification
-- **Description**: Ensures uploaded objects are not publicly accessible.
+### TP-34: Private S3 bucket provisioning
+- **Description**: Verifies a private AWS S3 bucket exists for NetraPi media.
 - **Test level**: Integration
-- **Verification approach**: Test
+- **Verification approach**: Inspection + Test
 - **Reqs**: M-6.20
 - **Prerequisites**
-  - At least one object in bucket.
+  - AWS account access.
 - **Steps**
-  1. Attempt to access object URL directly (unsigned).
-  2. Generate and access signed URL.
+  1. Create (or confirm) the project S3 bucket.
+  2. Confirm public access is blocked.
+  3. Confirm the edge device is not configured with permanent AWS credentials for this bucket.
 - **Pass criteria**
-  - Unsigned access fails.
-  - Signed access succeeds.
+  - Bucket exists and is private.
+  - Block Public Access (or equivalent) is enabled.
+  - Pi config does not store permanent cloud-storage credentials.
 
-### TP-46: S3 lifecycle retention configuration verification
-- **Description**: Verifies lifecycle rules are configured for storage management.
+### TP-35: S3 lifecycle retention configuration
+- **Description**: Verifies fixed time-based lifecycle rules are configured on the media bucket.
 - **Test level**: Integration
 - **Verification approach**: Inspection
 - **Reqs**: M-6.30, M-6.31
 - **Prerequisites**
-  - Lifecycle rules configured.
+  - TP-34 passed.
 - **Steps**
-  1. Inspect S3 lifecycle configuration.
+  1. Inspect S3 lifecycle configuration for the bucket.
 - **Pass criteria**
-  - Rules exist and match intended policy.
+  - Lifecycle rules exist and match the intended retention policy.
 
-### TP-47: Stable S3 object path generation verification
-- **Description**: Verifies consistent and stable object key generation.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-6.10, M-8.11
-- **Prerequisites**
-  - Upload logic implemented.
-- **Steps**
-  1. Upload multiple clips.
-  2. Inspect object keys.
-- **Pass criteria**
-  - Keys follow consistent structure.
-  - Keys are stable and deterministic.
-  - No reliance on signed URLs for storage.
-
-### TP-48: Supabase/Postgres connectivity smoke test
-- **Description**: Verifies connection to Supabase PostgreSQL instance.
+### TP-36: Supabase project and Postgres connectivity
+- **Description**: Verifies the Supabase (Postgres) project exists and accepts connections from the development machine / backend env.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-8.10
 - **Prerequisites**
   - Supabase project created.
+  - Database URL / credentials available to the backend env (not the Pi).
 - **Steps**
-  1. Connect and run `SELECT 1`.
+  1. Connect with the backend (or admin) credentials.
+  2. Run `SELECT 1`.
 - **Pass criteria**
   - Connection succeeds.
   - Query executes.
+  - The Pi is not given a direct cloud Postgres connection string for metadata writes.
 
-### TP-49: Supabase schema deployment verification
-- **Description**: Verifies schema is correctly deployed to Supabase.
+### TP-37: Cloud metadata schema deployment
+- **Description**: Verifies the event-metadata schema is deployed to Supabase Postgres.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
-- **Reqs**: M-8.10
+- **Reqs**: M-8.10, M-8.11
 - **Prerequisites**
-  - Schema defined.
+  - Schema / migration scripts defined under `src/main/db/cloud/` (or equivalent).
+  - TP-36 passed.
 - **Steps**
-  1. Deploy schema.
-  2. Inspect tables.
+  1. Apply migrations / deploy schema.
+  2. Inspect tables and required columns (including S3 object path fields).
 - **Pass criteria**
-  - Tables and fields exist as expected.
+  - Expected tables and fields exist.
+  - Schema can store event metadata plus an S3 object path.
 
-### TP-50: Cloud metadata write/read verification
-- **Description**: Verifies metadata persistence in Supabase.
+### TP-38: Local backend boots via Docker Compose
+- **Description**: Verifies the local FastAPI backend starts from the repo’s local Docker / Compose setup.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-8.10
+- **Reqs**: M-7.10
 - **Prerequisites**
-  - Schema deployed.
+  - `src/main/backend/` Dockerfile (and root `compose.yml` if used) present.
 - **Steps**
-  1. Insert dummy record.
-  2. Query record.
+  1. Build and start the local backend (`docker compose up` or equivalent).
+  2. Hit the health endpoint or API root.
+  3. Inspect container logs for clean startup.
 - **Pass criteria**
-  - Data persists and matches input.
+  - Image builds and container starts without crash.
+  - Health/root endpoint responds successfully on the local port.
 
-### TP-51: Pi-to-Supabase metadata transmission verification
-- **Description**: Verifies Pi can send metadata directly to Supabase.
+### TP-39: Local backend can reach S3
+- **Description**: Verifies the local backend process is configured with AWS credentials and can write a small test object to the private bucket.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-8.10
+- **Reqs**: M-6.20, M-7.15
 - **Prerequisites**
-  - Pi configured with Supabase connection.
+  - TP-34 and TP-38 passed.
+  - Backend env has AWS credentials (server-side only).
 - **Steps**
-  1. Send metadata from Pi.
-  2. Query Supabase.
+  1. From the local backend environment, upload a small test object (script or temporary admin route).
+  2. Confirm the object appears in the bucket.
 - **Pass criteria**
-  - Metadata successfully stored.
-  - Data integrity maintained.
+  - Upload from the backend environment succeeds.
+  - Object appears at the expected key.
 
-### TP-52: S3 and metadata linkage verification
-- **Description**: Verifies metadata correctly references S3 object keys.
-- **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-8.11
-- **Prerequisites**
-  - S3 upload working.
-  - Supabase metadata working.
-- **Steps**
-  1. Upload clip.
-  2. Store metadata with object key.
-  3. Verify linkage.
-- **Pass criteria**
-  - Metadata contains correct S3 object key.
-  - Key maps to valid object in S3.
-
-### TP-53: Mid-upload interruption queue retention verification
-- **Description**: Verifies uploads interrupted by connectivity loss remain recoverable locally.
-- **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-5.21, M-5.22, M-6.10
-- **Prerequisites**
-  - Upload queue implemented.
-- **Steps**
-  1. Start upload.
-  2. Disable connectivity mid-upload.
-  3. Inspect local queue/state.
-- **Pass criteria**
-  - Upload does not falsely succeed.
-  - Event remains queued locally.
-  - Retry state is correct.
-
-### TP-54: Queue recovery after connectivity restoration
-- **Description**: Verifies queued uploads complete after connectivity returns.
+### TP-40: Local backend can reach Supabase
+- **Description**: Verifies the local backend can open a Postgres session to Supabase using its configured credentials.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-5.22, M-6.10, M-8.10
+- **Reqs**: M-7.12, M-8.10
 - **Prerequisites**
-  - Pending queued upload exists.
+  - TP-36 and TP-38 passed.
+  - Backend DB URL configured.
 - **Steps**
-  1. Restore connectivity.
-  2. Allow retry processing.
+  1. From the running local backend, execute a trivial DB check (`SELECT 1` via app code or migration tooling).
 - **Pass criteria**
-  - Upload completes successfully.
-  - S3 and Supabase updated.
-  - Local state updated correctly.
-
-### TP-55: End-to-end driving event cloud persistence verification
-- **Description**: Verifies full pipeline from driving event to cloud persistence across SQLite, S3, and Supabase.
-- **Test level**: System
-- **Verification approach**: Demonstration + Test + Inspection
-- **Reqs**: M-4.30, M-5.20, M-6.10, M-8.10, M-8.11
-- **Prerequisites**
-  - Full pipeline implemented.
-- **Steps**
-  1. Drive and trigger stop-sign unsafe event.
-  2. Verify local SQLite record.
-  3. Verify S3 upload.
-  4. Verify Supabase metadata.
-- **Pass criteria**
-  - Event persists correctly across all layers.
-  - Records are consistent.
-
-### TP-56: End-to-end interrupted upload recovery during driving verification
-- **Description**: Verifies real-world recovery from connectivity loss during event upload.
-- **Test level**: System
-- **Verification approach**: Demonstration + Test + Inspection
-- **Reqs**: M-4.30, M-5.21, M-5.22, M-6.10, M-8.10, M-8.11
-- **Prerequisites**
-  - Queue and recovery logic implemented.
-- **Steps**
-  1. Drive and trigger event.
-  2. Disconnect connectivity during upload.
-  3. Verify local persistence.
-  4. Reconnect.
-  5. Verify final cloud persistence.
-- **Pass criteria**
-  - Event not lost during interruption.
-  - Upload completes after reconnection.
-  - Final state consistent across all systems.
+  - Backend connects to Supabase successfully.
+  - Query executes without error.
 
 ---
 
-# Sprint D — Secure Backend, Deployment, and CI/CD
+# Sprint D — Local Backend Integrations (S3 + Supabase)
 
-*Tests: TP-56 to TP-65 (see `sprint.md` for overlap with Sprints F, H, I)*
-### TP-57: Edge managed-service runtime verification
-- **Description**: Verifies the edge software runs as a managed service on the Raspberry Pi and can be monitored through the service manager.
-- **Test level**: System
-- **Verification approach**: Inspection + Demonstration
-- **Reqs**: M-10.10
-- **Prerequisites**
-  - Managed service configured, such as systemd.
-- **Steps**
-  1. Inspect the service definition.
-  2. Start the service through the service manager.
-  3. Check service status.
-  4. Confirm the edge runtime process is active.
-- **Pass criteria**
-  - Edge runtime runs under a managed service.
-  - Service status shows the runtime as active.
-  - Runtime can be started and monitored without manually launching the Python script.
+*Tests: TP-41 to TP-48*
 
-### TP-58: Backend Docker container build verification
-- **Description**: Verifies the backend can be containerized successfully using Docker and started from the built image.
+> **Focus:** Implement API-key auth, presigned PUT upload, and Postgres metadata persistence against the **local** backend. Cloud credentials stay on the backend; the edge client uses only the API key (+ temporary S3 URL).
+
+### TP-41: Edge API-key authentication
+- **Description**: Verifies the local backend authenticates edge clients with an API key and rejects unauthenticated requests.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-10.30, M-10.31
+- **Reqs**: M-7.10
+- **Prerequisites**
+  - Local backend running (Sprint C).
+  - API-key auth implemented.
+- **Steps**
+  1. Call a protected endpoint without an API key.
+  2. Call the same endpoint with a valid API key.
+- **Pass criteria**
+  - Unauthenticated request is rejected.
+  - Authenticated request is accepted.
+
+### TP-42: Presigned PUT issuance and upload
+- **Description**: Verifies the local backend issues a time-limited S3 PUT URL and a client can upload bytes with it.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-6.10, M-7.10, M-7.15
+- **Prerequisites**
+  - TP-39 and TP-41 passed.
+- **Steps**
+  1. Authenticated client requests an upload slot (event/clip identity).
+  2. Backend returns temporary PUT URL + object key.
+  3. Client PUTs a small file/clip to that URL.
+  4. Confirm the object exists at the returned key.
+- **Pass criteria**
+  - Temporary URL is issued only when authenticated.
+  - PUT succeeds while valid.
+  - Object lands at the backend-assigned key.
+  - Client does not use permanent AWS credentials.
+
+### TP-43: Stable S3 object key generation
+- **Description**: Verifies the backend assigns consistent, deterministic object keys.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-6.10, M-7.15, M-8.11
+- **Prerequisites**
+  - TP-42 path implemented.
+- **Steps**
+  1. Request upload slots / complete uploads for multiple clips.
+  2. Inspect assigned object keys.
+- **Pass criteria**
+  - Keys follow a consistent structure (e.g., device/date/event id).
+  - Keys are stable for a given event identity.
+  - Durable references are object keys, not expiring signed URLs.
+
+### TP-44: Backend metadata persist to Supabase
+- **Description**: Verifies the local backend accepts metadata from an authenticated edge client and writes it to Postgres.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.11, M-7.12, M-8.10
+- **Prerequisites**
+  - TP-37, TP-40, TP-41 passed.
+- **Steps**
+  1. Submit dummy event metadata with a valid API key.
+  2. Query Postgres for the inserted row.
+- **Pass criteria**
+  - Backend accepts the upload.
+  - Row persists and matches submitted fields.
+  - Metadata does not bypass the backend (no Pi→Postgres direct write).
+
+### TP-45: Private object access via signed GET
+- **Description**: Ensures uploaded objects are not public and are reachable via backend-issued signed GET URLs.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-6.20, M-7.13
+- **Prerequisites**
+  - At least one object in the bucket (from TP-42).
+  - Backend can mint signed GET URLs.
+- **Steps**
+  1. Attempt unsigned/public access to the object URL.
+  2. Request a signed GET URL from the backend and access it.
+- **Pass criteria**
+  - Unsigned access fails.
+  - Signed access succeeds.
+
+### TP-46: S3 object and Postgres metadata linkage
+- **Description**: Verifies backend-persisted metadata references the correct S3 object key.
+- **Test level**: Integration
+- **Verification approach**: Test + Inspection
+- **Reqs**: M-7.12, M-8.11, M-8.12
+- **Prerequisites**
+  - TP-42 and TP-44 passed.
+- **Steps**
+  1. Complete authenticated presigned upload of a clip.
+  2. Complete metadata handoff so Postgres stores the S3 key.
+  3. Confirm the row’s path matches the object in S3.
+  4. Retrieve via path / signed GET.
+- **Pass criteria**
+  - Metadata contains the correct S3 object key.
+  - Key maps to a valid private object.
+  - Path-based retrieval works.
+
+### TP-47: Presigned upload over hotspot/mobile data
+- **Description**: Verifies an edge client can complete a backend-orchestrated upload over cellular/hotspot connectivity.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-6.10, M-7.10, M-7.15
+- **Prerequisites**
+  - TP-42 passed.
+  - Backend reachable from the client network (local tunnel, LAN, or deployed preview if already available).
+- **Steps**
+  1. Connect the Pi (or laptop client) to hotspot/mobile data.
+  2. Authenticate, request presigned PUT, upload a small file.
+  3. Confirm the object in S3.
+- **Pass criteria**
+  - Upload succeeds over mobile/hotspot connectivity.
+  - Temporary backend-issued URL was used (no permanent AWS keys on device).
+
+### TP-48: Local end-to-end event persistence via backend
+- **Description**: Verifies a local event (SQLite + clip) uploads one-at-a-time through the local backend into S3 and Postgres.
+- **Test level**: System
+- **Verification approach**: Demonstration + Test + Inspection
+- **Reqs**: M-5.20, M-6.10, M-7.10, M-7.11, M-7.12, M-7.15, M-8.10, M-8.11
+- **Prerequisites**
+  - Sprint B local persistence available.
+  - Sprint D upload + metadata paths implemented.
+- **Steps**
+  1. Create or trigger a local event with SQLite row + clip.
+  2. Run the edge upload client against the local backend for that single event.
+  3. Inspect S3 and Postgres.
+- **Pass criteria**
+  - Single-event upload succeeds without an offline upload-queue state machine.
+  - S3 object and Postgres row exist and reference each other.
+  - Edge device used no permanent AWS or Postgres credentials.
+
+---
+
+# Sprint E — Backend Deploy + Edge ↔ Deployed Backend E2E (No Frontend)
+
+*Tests: TP-49 to TP-55*
+
+> **Focus:** Deploy the backend (Render), then verify the already-built edge path against that deployed backend. E2E portion is verification only — no new edge/feature work. Do **not** require frontend UI; confirm cloud outcomes via API responses, S3, and Postgres.
+
+### TP-49: Backend Docker image build
+- **Description**: Verifies the backend Docker image builds and runs locally from the production Dockerfile.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.20, M-10.21
 - **Prerequisites**
   - Backend Dockerfile implemented.
 - **Steps**
-  1. Build the backend Docker image.
-  2. Start a container from the image.
-  3. Inspect container logs and startup behavior.
+  1. Build the backend image.
+  2. Run a container from the image.
+  3. Hit health/root.
 - **Pass criteria**
-  - Docker image builds successfully.
-  - Backend container starts without crash.
-  - Backend service is reachable from its exposed port or health endpoint.
+  - Build succeeds.
+  - Container stays up and health/root responds.
 
-### TP-59: Frontend build and deployment artifact verification
-- **Description**: Verifies the frontend builds successfully into a deployable artifact for hosting.
+### TP-50: Backend deployment to hosting environment
+- **Description**: Verifies the backend deploys successfully to the target host (e.g., Render).
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-10.30, M-10.31
+- **Reqs**: M-10.21
 - **Prerequisites**
-  - Frontend build configuration implemented.
-- **Steps**
-  1. Execute the frontend production build.
-  2. Inspect build output.
-  3. Confirm the generated artifact is suitable for deployment.
-- **Pass criteria**
-  - Frontend build completes successfully.
-  - Static deployment artifacts are generated.
-  - Build output contains the expected application assets.
-
-### TP-60: Backend deployment verification
-- **Description**: Verifies the backend deploys successfully to the target hosting environment from the containerized build.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-10.31
-- **Prerequisites**
-  - Backend deployment target configured.
-  - Container deployment workflow implemented.
+  - Deployment target configured.
+  - TP-49 passed.
 - **Steps**
   1. Trigger a backend deployment.
-  2. Observe deployment logs and completion state.
-  3. Access the deployed backend health endpoint or API root.
+  2. Observe deployment completion.
+  3. Access the deployed health endpoint or API root.
 - **Pass criteria**
-  - Backend deployment completes successfully.
+  - Deployment completes successfully.
   - Deployed backend is reachable.
-  - Backend health endpoint or equivalent responds successfully.
 
-### TP-61: Frontend deployment verification
-- **Description**: Verifies the frontend deploys successfully to the target hosting environment.
+### TP-51: Post-deployment health check
+- **Description**: Verifies post-deploy health checks pass for the backend service.
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-10.31
+- **Reqs**: M-10.22, M-10.23
 - **Prerequisites**
-  - Frontend deployment target configured.
+  - TP-50 passed.
+  - Health checks configured (platform and/or pipeline).
 - **Steps**
-  1. Trigger a frontend deployment.
-  2. Observe deployment logs and completion state.
-  3. Open the deployed frontend in a browser.
+  1. Inspect post-deployment health-check results.
+  2. Confirm deployment is marked successful only when checks pass.
 - **Pass criteria**
-  - Frontend deployment completes successfully.
-  - Deployed frontend loads without crash.
-  - Production frontend assets are served correctly.
+  - Health checks run.
+  - Successful deploy requires passing health checks.
 
-### TP-62: Frontend-to-backend connectivity verification
-- **Description**: Verifies the deployed frontend can successfully communicate with the deployed backend using the intended production configuration.
+### TP-52: Unsafe event to cloud via deployed backend
+- **Description**: Verifies an unsafe stop-sign event is detected on the edge, alerts locally, and uploads through the deployed backend to S3 + Postgres.
 - **Test level**: System
 - **Verification approach**: Test + Demonstration
-- **Reqs**: M-10.31, M-10.32
+- **Reqs**: M-3.10, M-5.20, M-6.10, M-7.11, M-7.12, M-7.15
 - **Prerequisites**
-  - Frontend and backend both deployed.
-  - Environment variables and routes configured.
-- **Steps**
-  1. Open the deployed frontend.
-  2. Trigger a frontend action that requires backend communication.
-  3. Inspect network activity and frontend behavior.
-- **Pass criteria**
-  - Frontend sends requests to the correct backend endpoint.
-  - Backend responds successfully.
-  - Data or health information is rendered correctly in the frontend.
-  - No CORS or configuration errors block communication.
-
-### TP-63: CI pipeline gate verification
-- **Description**: Verifies automated CI pipelines execute required quality gates such as linting, builds, and tests on repository updates.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-10.30
-- **Prerequisites**
-  - CI pipeline configured.
-- **Steps**
-  1. Push a repository update or open a pull request.
-  2. Observe CI pipeline execution.
-  3. Inspect which checks are run.
-- **Pass criteria**
-  - Linting executes automatically.
-  - Required test suites execute automatically.
-  - Required build steps execute automatically.
-  - Pipeline reports pass/fail status clearly.
-
-### TP-64: Merge-gated continuous deployment verification
-- **Description**: Verifies backend and frontend deploy automatically on merge to main only when required CI checks pass.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-10.31
-- **Prerequisites**
-  - CD pipeline configured.
-  - CI status required before deployment.
-- **Steps**
-  1. Merge a change to main with passing CI checks.
-  2. Observe deployment behavior.
-  3. Attempt or inspect a case where required checks fail.
-- **Pass criteria**
-  - Deployment triggers automatically only after merge to main.
-  - Passing CI checks are required before deployment proceeds.
-  - Failed required checks prevent deployment.
-
-### TP-65: Post-deployment health check verification
-- **Description**: Verifies deployment workflows run post-deployment health checks and only mark deployment successful when those checks pass.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-10.32, M-10.33
-- **Prerequisites**
-  - Health checks implemented in deployment workflow.
-- **Steps**
-  1. Trigger a deployment.
-  2. Inspect post-deployment health-check execution.
-  3. Inspect resulting deployment status.
-- **Pass criteria**
-  - Post-deployment health checks run automatically.
-  - Deployment is considered successful only if health checks pass.
-  - Failed health checks cause the deployment to be flagged as failed or incomplete.
-
----
-
-# Sprint E — End-to-End System Integration
-
-*Tests: TP-66 to TP-71 (plus security/E2E tests noted in `sprint.md`)*
-### TP-66: End-to-end unsafe event pipeline with alert
-- **Description**: Verifies an unsafe event is detected on the edge device, triggers an audible alert, and propagates through the full system.
-- **Test level**: System
-- **Verification approach**: Test + Demonstration
-- **Reqs**: M-3.10, M-5.20, M-5.21, M-5.22, M-9.22
-- **Prerequisites**
-  - Edge runtime operational.
-  - Upload pipeline operational.
-  - Backend and frontend deployed.
+  - Edge runtime operational (existing bring-up; no new edge features in this sprint).
+  - Deployed backend upload path operational (TP-49–51).
   - Speaker/buzzer connected.
 - **Steps**
-  1. Run the edge system.
+  1. Run the edge system pointed at the deployed backend.
   2. Trigger an unsafe stop-sign event.
-  3. Observe local system behavior.
-  4. Observe cloud and frontend results.
+  3. Observe local alert + SQLite/clip.
+  4. Confirm S3 object and Postgres row via backend tooling or consoles (not frontend).
 - **Pass criteria**
-  - Unsafe event is detected.
-  - Speaker/buzzer activates immediately upon detection.
-  - Clip is saved locally.
-  - Metadata is stored locally.
-  - Event is uploaded to cloud storage and database.
-  - Event appears in the frontend.
+  - Unsafe event detected; buzzer activates.
+  - Local clip + SQLite row exist.
+  - Media in S3 via presigned PUT; metadata in Postgres via backend.
 
-### TP-67: End-to-end offline-first event handling with alert
-- **Description**: Verifies unsafe events are handled correctly while offline and later synchronized, including alert behavior.
-- **Test level**: System
-- **Verification approach**: Test
-- **Reqs**: M-5.20, M-5.21, M-5.22
-- **Prerequisites**
-  - Offline queue implemented.
-  - Speaker/buzzer connected.
-- **Steps**
-  1. Disable network connectivity.
-  2. Run the edge system.
-  3. Trigger an unsafe event.
-  4. Restore network connectivity.
-- **Pass criteria**
-  - Speaker/buzzer activates on event detection while offline.
-  - Clip and metadata are stored locally.
-  - Upload is queued while offline.
-  - Upload resumes automatically after reconnection.
-  - Event appears in the frontend after synchronization.
-
-### TP-68: End-to-end metadata consistency verification
-- **Description**: Verifies event metadata remains consistent across edge storage, backend, cloud database, and frontend.
+### TP-53: Cross-layer metadata consistency
+- **Description**: Verifies event identity and fields stay consistent across SQLite, backend, Postgres, and S3 object key (no frontend).
 - **Test level**: System
 - **Verification approach**: Inspection + Test
-- **Reqs**: M-5.20, M-5.21, M-9.23
+- **Reqs**: M-5.20, M-7.12, M-8.11
 - **Prerequisites**
-  - At least one completed end-to-end event.
+  - At least one completed edge→cloud event (TP-52).
 - **Steps**
-  1. Trigger and process an event through the full system.
-  2. Inspect the local event record.
-  3. Inspect the cloud database record.
-  4. Inspect the frontend display.
+  1. Inspect the local SQLite row.
+  2. Inspect the Postgres row.
+  3. Confirm the S3 key matches.
 - **Pass criteria**
-  - Event identifiers match across all layers.
-  - Timestamps and metadata values are consistent.
-  - Clip reference corresponds to the correct event.
+  - Identifiers and key fields match across layers.
+  - Clip reference points at the correct object.
 
-### TP-69: End-to-end frontend playback verification
-- **Description**: Verifies a captured event clip can be retrieved and played through the deployed frontend.
-- **Test level**: System
-- **Verification approach**: Demonstration
-- **Reqs**: M-9.22, M-10.31, M-10.32
-- **Prerequisites**
-  - At least one uploaded event clip exists.
-  - Frontend playback implemented.
-- **Steps**
-  1. Trigger and upload an event.
-  2. Open the deployed frontend.
-  3. Locate the event.
-  4. Start playback.
-- **Pass criteria**
-  - Event is visible in the frontend.
-  - Correct clip is retrieved.
-  - Clip plays successfully.
-
-### TP-70: End-to-end restart and recovery verification
-- **Description**: Verifies the system recovers from a restart without breaking the event pipeline.
+### TP-54: Restart recovery then upload
+- **Description**: Verifies local event data survives an edge restart and can upload later via the deployed backend.
 - **Test level**: System
 - **Verification approach**: Test
-- **Reqs**: M-10.10, M-5.22
+- **Reqs**: M-5.20, M-6.10, M-7.15
 - **Prerequisites**
-  - Managed runtime implemented.
-  - Queue persistence implemented.
+  - Edge runtime and upload path already implemented (no new runtime work in this sprint).
 - **Steps**
-  1. Run the system.
-  2. Trigger an event but interrupt before upload completes.
-  3. Restart the edge device.
-  4. Resume operation.
+  1. Trigger an event so local clip + SQLite row exist.
+  2. Restart the edge process/device before upload completes.
+  3. Confirm local data survives.
+  4. When online, complete backend-orchestrated upload.
 - **Pass criteria**
-  - Runtime restarts automatically.
-  - Local data is preserved.
-  - Pending uploads resume.
-  - Event completes full pipeline after restart.
+  - Local clip and metadata are preserved across restart.
+  - Upload succeeds afterward; S3 + Postgres reflect the event.
 
-### TP-71: End-to-end deployed system smoke test with alert
-- **Description**: Verifies a minimal real-world flow from event detection to frontend display, including alert behavior.
+### TP-55: Deployed system smoke (API/cloud evidence)
+- **Description**: Verifies a minimal real-world flow from detection through deployed-backend upload, confirmed without a frontend.
 - **Test level**: System
 - **Verification approach**: Demonstration
-- **Reqs**: M-10.31, M-10.32, M-9.10
+- **Reqs**: M-10.21, M-10.22, M-6.10
 - **Prerequisites**
-  - Fully deployed system.
+  - Fully deployed backend.
   - Speaker/buzzer connected.
 - **Steps**
   1. Trigger one unsafe event.
-  2. Allow system to process and upload.
-  3. Open frontend and inspect result.
+  2. Allow process + upload via deployed backend.
+  3. Confirm success via API and/or S3 + Postgres inspection.
 - **Pass criteria**
-  - Speaker/buzzer activates on detection.
-  - Event completes full pipeline without manual intervention.
-  - Event is visible and reviewable in frontend.
----
-
-# Sprint G — Frontend Visualization and Reviewer Experience
-
-*Tests: TP-72 to TP-85*
-### TP-72: Frontend application shell loads
-- **Description**: Verifies the frontend launches successfully and presents the base application shell for NetraPi.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-9.10
-- **Prerequisites**
-  - Frontend project initialized.
-  - Basic routing or single-page shell implemented.
-- **Steps**
-  1. Start the frontend application.
-  2. Open the application in the browser.
-- **Pass criteria**
-  - Application loads without crash.
-  - A recognizable NetraPi frontend shell is displayed.
-  - Core page regions or placeholders are visible.
-
-### TP-73: Event data retrieval from backend
-- **Description**: Verifies the frontend can retrieve event records from the backend data source.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-9.20, M-9.23
-- **Prerequisites**
-  - Backend API reachable.
-  - At least one event record available.
-- **Steps**
-  1. Open the frontend.
-  2. Trigger the event retrieval flow.
-  3. Inspect the returned data in the UI and browser network activity.
-- **Pass criteria**
-  - Frontend successfully requests event data.
-  - Event records are returned without frontend error.
-  - Retrieved data is available for rendering.
-
-### TP-74: Event list rendering
-- **Description**: Verifies retrieved event records are rendered into a visible event list or table.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-9.20, M-9.23
-- **Prerequisites**
-  - Event retrieval implemented.
-- **Steps**
-  1. Open the frontend with available event data.
-  2. Inspect the main event listing view.
-- **Pass criteria**
-  - Event records appear in the UI.
-  - Each rendered row or card corresponds to a backend event.
-  - Empty or missing data does not crash the page.
-
-### TP-75: Event metadata and timestamp display
-- **Description**: Verifies the frontend displays key event metadata and timestamps for each event.
-- **Test level**: Integration
-- **Verification approach**: Inspection
-- **Reqs**: M-9.23
-- **Prerequisites**
-  - Event list or event detail rendering implemented.
-- **Steps**
-  1. Open an event listing or detail view.
-  2. Inspect the displayed event fields.
-- **Pass criteria**
-  - Event metadata is visible.
-  - Event timestamps are visible.
-  - Displayed values match the stored event record.
-
-### TP-76: Event detail selection and inspection
-- **Description**: Verifies a user can select an event and inspect a more detailed event view.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-9.23
-- **Prerequisites**
-  - Event list implemented.
-  - Event detail view implemented.
-- **Steps**
-  1. Open the frontend event list.
-  2. Select one event.
-  3. Inspect the resulting detail view.
-- **Pass criteria**
-  - Selected event opens correctly.
-  - Detail view corresponds to the chosen event.
-  - Additional event information is visible without UI failure.
-
-### TP-77: Video playback via signed URL
-- **Description**: Verifies the frontend supports secure playback of an event clip using a signed URL.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-9.22
-- **Prerequisites**
-  - Signed URL playback integrated into frontend.
-  - At least one event has a valid stored clip.
-- **Steps**
-  1. Select an event with a stored clip.
-  2. Trigger video playback.
-- **Pass criteria**
-  - Frontend retrieves or receives a valid signed URL.
-  - Clip plays successfully in the frontend.
-  - Playback is associated with the selected event.
-
-### TP-78: Event filtering controls
-- **Description**: Verifies the frontend supports filtering displayed events by date range and collection phase.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-9.20
-- **Prerequisites**
-  - Filtering UI implemented.
-  - Data from both phases exists.
-- **Steps**
-  1. Apply a date-range filter.
-  2. Apply a collection-phase filter.
-  3. Clear or change the filters.
-- **Pass criteria**
-  - Displayed records update correctly by date range.
-  - Displayed records update correctly by collection phase.
-  - Filter changes do not require manual page recovery.
-
-### TP-79: Aggregate metrics display
-- **Description**: Verifies the frontend displays aggregate safety metrics derived from collected event data.
-- **Test level**: Integration
-- **Verification approach**: Inspection + Demonstration
-- **Reqs**: M-9.21
-- **Prerequisites**
-  - Metrics processing implemented.
-  - Metrics view implemented.
-- **Steps**
-  1. Open the metrics view.
-  2. Inspect displayed summary values.
-- **Pass criteria**
-  - Aggregate safety metrics are displayed.
-  - Displayed values correspond to available dataset content.
-  - Metrics view loads without crash or missing-state failure.
-
-### TP-80: Metrics-over-time charting
-- **Description**: Verifies the frontend displays charts illustrating safety metrics over time.
-- **Test level**: Integration
-- **Verification approach**: Inspection
-- **Reqs**: M-9.30
-- **Prerequisites**
-  - Charting implemented.
-  - Metrics data available.
-- **Steps**
-  1. Open the charts view.
-  2. Inspect at least one time-based visualization.
-- **Pass criteria**
-  - At least one chart visualizes safety metrics over time.
-  - Chart axes, labels, or legends are understandable.
-  - Chart renders without distortion or missing data failure.
-
-### TP-81: Baseline vs post-baseline comparison display
-- **Description**: Verifies the frontend displays baseline and post-baseline comparison summaries.
-- **Test level**: Integration
-- **Verification approach**: Inspection + Demonstration
-- **Reqs**: M-9.50, M-9.51, M-9.52
-- **Prerequisites**
-  - Baseline and post-baseline datasets available.
-  - Comparison view implemented.
-- **Steps**
-  1. Open the comparison or metrics summary view.
-  2. Review baseline and post-baseline values.
-- **Pass criteria**
-  - Baseline and post-baseline summaries are shown.
-  - Comparison content is understandable to a reviewer.
-  - UI frames results as evaluation of feedback and self-monitoring effects.
-
-### TP-82: Baseline vs post-baseline visual distinction
-- **Description**: Verifies visualizations clearly distinguish baseline and post-baseline data.
-- **Test level**: Integration
-- **Verification approach**: Inspection
-- **Reqs**: M-9.31
-- **Prerequisites**
-  - Comparison or chart views implemented.
-  - Both baseline and post-baseline data available.
-- **Steps**
-  1. Open comparison and chart views.
-  2. Inspect how each phase is visually represented.
-- **Pass criteria**
-  - Baseline and post-baseline data are visually distinguishable.
-  - Labels, legends, colors, or markers are consistent.
-  - A reviewer can tell which data belongs to which phase without ambiguity.
-
-### TP-83: Configuration parameter transparency
-- **Description**: Verifies the frontend displays the configuration parameters used during data collection or experimentation.
-- **Test level**: Acceptance
-- **Verification approach**: Inspection
-- **Reqs**: M-9.40
-- **Prerequisites**
-  - Configuration display implemented.
-- **Steps**
-  1. Open the configuration or experiment detail view.
-  2. Inspect the displayed parameter values.
-- **Pass criteria**
-  - Data-collection configuration parameters are shown.
-  - Displayed parameters are understandable to a reviewer.
-  - Values appear tied to the correct dataset, run, or phase.
-
-### TP-84: Source-code and documentation access
-- **Description**: Verifies the frontend provides access to source code and technical documentation for reviewer follow-up.
-- **Test level**: Acceptance
-- **Verification approach**: Inspection
-- **Reqs**: M-9.41
-- **Prerequisites**
-  - Links or references implemented in frontend.
-- **Steps**
-  1. Open the frontend.
-  2. Follow the source-code and documentation references.
-- **Pass criteria**
-  - Frontend provides access to source code and technical documentation.
-  - References are visible and understandable.
-  - Linked destinations are relevant to the project.
-
-### TP-85: Project overview page
-- **Description**: Verifies the frontend presents NetraPi as an interactive technical artifact with concise project overview content.
-- **Test level**: Acceptance
-- **Verification approach**: Inspection
-- **Reqs**: M-9.10, M-9.11
-- **Prerequisites**
-  - Frontend deployed.
-  - Overview content implemented.
-- **Steps**
-  1. Open the deployed frontend.
-  2. Inspect the overview and explanatory content.
-- **Pass criteria**
-  - Frontend presents the project clearly for reviewer use.
-  - Project goals, architecture, and constraints are described concisely.
-  - Overview content reflects the implemented frontend experience rather than placeholder text.
+  - Buzzer activates on detection.
+  - Pipeline completes without manual cloud console surgery.
+  - Event is present in cloud stores / queryable via backend API.
 
 ---
 
-# Sprint J — Experimentation and Impact Evaluation
+## 8. Coverage Notes
+This plan currently covers through **Sprint E** (edge + local persistence + backend-orchestrated cloud path + deploy + deployed E2E). Deferred for later test generation:
+- frontend / portfolio UI tests
+- full CI/CD matrix beyond backend deploy health
+- 10-hour collection and model-evaluation publication tests
+- dedicated edge managed-service (systemd) verification for M-10.10
 
-*Tests: TP-86 to TP-92*
-### TP-86: Baseline mode initialization and configuration verification
-- **Description**: Verifies that when baseline mode starts, the system uses full-session recording and saves the exact model and configuration being used for the experiment.
-- **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-4.10, M-4.11, M-4.42
-- **Prerequisites**
-  - Baseline mode implemented.
-  - System capable of storing configuration data (e.g., JSON file or database entry).
-- **Steps**
-  1. Start the system in baseline mode.
-  2. Run the system for a short period (e.g., 1–2 minutes).
-  3. Check the output directory or storage location:
-     - Confirm that a full video file is being recorded (not just clips).
-  4. Locate the stored configuration (e.g., config file, DB entry, or log):
-     - Identify model name (e.g., model file used).
-     - Identify key parameters (e.g., thresholds, buffer size, etc.).
-  5. Restart the system again in baseline mode.
-  6. Check the configuration again.
-- **Pass criteria**
-  - System records continuous/full-session video during baseline mode.
-  - A configuration record is created at the start of the run.
-  - The configuration includes at least:
-    - model identifier (e.g., model filename or version)
-    - key parameters used for detection
-  - Configuration values remain the same across restarts (no unexpected changes).
+Covered now:
+- constraints and edge bring-up (earlier sprints)
+- offline SQLite event metadata
+- S3 + Supabase provisioning
+- local backend setup and S3/Postgres integrations (presigned PUT + metadata)
+- backend deployment
+- edge ↔ deployed backend E2E (no frontend; verification only)
 
-### TP-87: Baseline collection minimum hours
-- **Description**: Validates baseline collection retains full-session video and reaches the required duration with fixed configuration.
-- **Test level**: Acceptance
-- **Verification approach**: Test + Analysis
-- **Reqs**: M-4.10, M-4.11, M-4.12, M-4.42
-- **Prerequisites**
-  - Baseline mode active.
-  - Full-session upload path implemented.
-- **Steps**
-  1. Run baseline drives until at least 10 hours of footage are recorded.
-  2. Confirm uploaded full-session footage exists in cloud storage.
-  3. Confirm model/configuration remain unchanged during collection.
-- **Pass criteria**
-  - At least 10 hours of baseline footage are recorded.
-  - Full-session video is retained and uploaded.
-  - Same model/configuration is used across the baseline phase.
-
-### TP-88: Baseline metrics computation and storage
-- **Description**: Verifies baseline footage is processed to produce concrete stop-sign safety metrics and that those metrics are stored correctly.
-- **Test level**: Acceptance
-- **Verification approach**: Analysis + Inspection
-- **Reqs**: M-4.20, M-4.21, M-4.42
-- **Prerequisites**
-  - Baseline footage exists in cloud storage.
-  - Event detection and classification (rolling stop vs full stop) implemented.
-  - Metrics computation logic implemented.
-  - Metrics persistence implemented.
-- **Steps**
-  1. Execute the baseline processing job on collected footage.
-  2. Inspect generated event records:
-     - Verify events are classified (e.g., rolling stop vs full stop).
-  3. Inspect computed metrics in storage (database or file):
-     - total_events
-     - rolling_stop_count
-     - full_stop_count
-     - rolling_stop_rate
-  4. Manually verify a small sample:
-     - Count events from raw data.
-     - Compare with computed metrics.
-- **Pass criteria**
-  - Baseline footage is processed using the same model/parameters used during collection.
-  - Each event is classified (e.g., rolling stop vs full stop).
-  - Metrics are computed correctly:
-    - total_events matches detected events
-    - rolling_stop_count + full_stop_count = total_events
-    - rolling_stop_rate is correctly calculated
-  - Metrics in a defined storage location.
-
-### TP-89: Post-baseline mode switch and behavior verification
-- **Description**: Verifies that switching from baseline mode to post-baseline mode changes storage behavior from full-session recording to clip-based recording, while keeping the same model and detection settings.
-- **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-4.30, M-4.31, M-4.42
-- **Prerequisites**
-  - System supports two modes: baseline and post-baseline.
-  - Mode can be changed via configuration (e.g., config file or flag).
-- **Steps**
-  1. Start the system in baseline mode.
-  2. Run briefly and confirm:
-     - A continuous/full video file is being recorded.
-  3. Stop the system.
-  4. Change mode to post-baseline (e.g., update config).
-  5. Restart the system.
-  6. Trigger or simulate at least one stop-sign event.
-  7. Inspect stored outputs:
-     - Check that only event clips are saved (not full-session video).
-  8. Inspect configuration used during both runs:
-     - Compare model name and key parameters.
-- **Pass criteria**
-  - In baseline mode:
-    - Continuous/full-session recording is used.
-  - In post-baseline mode:
-    - Only event-triggered clips are stored.
-    - No full-session recording is produced.
-  - Model and detection parameters are identical between both modes.
-
-### TP-90: Post-baseline clip-based collection
-- **Description**: Verifies the system performs clip-based storage during post-baseline operation under the same fixed configuration.
-- **Test level**: Acceptance
-- **Verification approach**: Test
-- **Reqs**: M-4.30, M-4.31, M-4.32, M-4.42
-- **Prerequisites**
-  - Post-baseline mode active.
-- **Steps**
-  1. Run at least 10 additional hours of driving in post-baseline mode.
-  2. Inspect stored outputs and metadata.
-- **Pass criteria**
-  - System uses clip-based retention.
-  - Event-triggered clips are stored.
-  - Associated metadata is retained.
-  - Configuration remains unchanged from baseline.
-
-### TP-91: Phase labeling and metrics separation
-- **Description**: Verifies baseline and post-baseline data and metrics are stored with correct phase labels and are not mixed.
-- **Test level**: Integration
-- **Verification approach**: Inspection + Analysis
-- **Reqs**: M-4.20, M-4.30, M-4.40
-- **Prerequisites**
-  - Baseline and post-baseline data both exist.
-  - Metrics persistence implemented.
-- **Steps**
-  1. Inspect stored event, clip, and metrics records.
-  2. Verify phase labels for each dataset.
-- **Pass criteria**
-  - Baseline records are labeled as baseline.
-  - Post-baseline records are labeled as post-baseline.
-  - Metrics are associated with the correct phase.
-  - No mixing of phase data is observed.
-
-### TP-92: Baseline vs post-baseline metrics comparison
-- **Description**: Verifies that baseline and post-baseline safety metrics are compared using the same definitions and that the comparison produces meaningful differences (e.g., change in rolling stop rate).
-- **Test level**: Acceptance
-- **Verification approach**: Analysis + Inspection
-- **Reqs**: M-4.40, M-4.41, M-4.42
-- **Prerequisites**
-  - Baseline metrics computed and stored.
-  - Post-baseline metrics computed and stored.
-  - Metrics include at least:
-    - total_events
-    - rolling_stop_count
-    - full_stop_count
-    - rolling_stop_rate
-- **Steps**
-  1. Retrieve baseline metrics from storage.
-  2. Retrieve post-baseline metrics from storage.
-  3. Compare the following values:
-     - rolling_stop_rate (baseline vs post-baseline)
-     - rolling_stop_count (baseline vs post-baseline)
-     - total_events (for context)
-  4. Manually verify calculations:
-     - rolling_stop_rate = rolling_stop_count / total_events for both phases
-  5. (Optional) Display results in frontend or summary output.
-- **Pass criteria**
-  - Baseline and post-baseline metrics are both present and labeled correctly.
-  - Metrics are computed using the same definitions in both phases.
-  - Comparison produces clear values (e.g., difference or percent change in rolling_stop_rate).
-  - No mixing of baseline and post-baseline data occurs.
-  - Results can be interpreted to assess whether driving behavior improved, worsened, or stayed the same.
-
---- 
-
-## 7. Coverage Notes
-This updated plan covers:
-- constraints
-- physical installation and endurance
-- capture/buffer configurability
-- local TPU inference and event handling
-- offline-first SQLite persistence
-- S3 upload and retention
-- backend authentication, persistence, and signed playback
-- frontend interactivity, transparency, and visualization
-- baseline and post-baseline experimentation
-- deployment and reliability
+**TP range:** TP-01 through TP-55.

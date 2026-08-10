@@ -1,7 +1,7 @@
 # Minimum Viable Specification (MVS) – NetraPi
 
 ## Goal
-Build a minimal, end-to-end smart dash cam system that monitors driving behavior using edge-based computer vision, captures and stores relevant video evidence, and presents safety insights through a deployed web interface. The system shall support controlled experimentation by enabling baseline data collection, real-time feedback during driving, and post-hoc analysis to evaluate whether self-monitoring and feedback influence driving behavior.
+Build a minimal, end-to-end smart dash cam system that detects stop-sign-related unsafe events using edge-based computer vision, captures and stores relevant video evidence, and presents results through a deployed web interface. The system shall support a single data-collection phase, manual ground-truth labeling of footage, and evaluation of model classification accuracy (run-through, rolling stop, complete stop).
 
 ## Constraints
 ### C-1 Resource Limitations
@@ -35,7 +35,7 @@ Build a minimal, end-to-end smart dash cam system that monitors driving behavior
 - M-3.10: Unsafe event detection shall be implemented using a machine learning approach.
 - M-3.11: Inference shall run locally on the Raspberry Pi using the Google Coral USB TPU.
 - M-3.12: The system shall use TensorFlow Lite models compiled for Edge TPU execution.
-- M-3.13: The system shall detect at least one type of unsafe event.
+- M-3.13: The system shall detect stop-sign-related unsafe events and classify them as run-through, rolling stop, or complete stop.
 
 ### R-3.2 Event Triggering and Clip Definition
 - M-3.20: When an unsafe event is detected, the system shall extract a video clip consisting of 5 to 10 seconds of footage before and 5 to 10 seconds of footage after the detected event, resulting in 10–20 second clips.
@@ -45,38 +45,30 @@ Build a minimal, end-to-end smart dash cam system that monitors driving behavior
 - M-3.30: The system shall provide real-time audible feedback when an unsafe event is detected.
 - M-3.31: Audible feedback shall occur within 10 seconds of the detected event.
 
-## R-4 Experimentation and Impact Evaluation
-### R-4.1 Baseline Data Collection
-- M-4.10: The system shall support an experimentation phase during which all captured video is retained.
-- M-4.11: Full-session video shall be uploaded from the edge device to cloud object storage during baseline collection.
-- M-4.12: The system shall record a minimum of 10 hours of driving footage during baseline collection using a fixed ML model and configuration.
+## R-4 Data Collection and Model Evaluation
+### R-4.1 Session Recording
+- M-4.10: After the edge system is operational, the system shall record a minimum of 10 hours of driving footage using a fixed ML model and configuration.
+- M-4.11: Full-session video shall be uploaded from the edge device to cloud object storage.
+- M-4.12: Event-triggered clips and associated metadata shall be retained alongside full-session footage.
 
-### R-4.2 Baseline Processing
-- M-4.20: Baseline driving footage shall be processed to detect unsafe events using the same ML model and parameters used during capture.
-- M-4.21: Baseline safety metrics shall be computed from detected events.
+### R-4.2 Stop Sign Event Scope
+- M-4.20: Unsafe event detection shall be limited to stop-sign-related events (run-through, rolling stop, complete stop).
+- M-4.21: Configuration parameters shall remain fixed for the duration of data collection.
 
-### R-4.3 Post-Baseline Collection
-- M-4.30: After baseline collection, the system shall transition to clip-based storage.
-- M-4.31: The system shall record a minimum of 10 additional hours of driving using the same configuration parameters.
-- M-4.32: Event-triggered clips and associated metadata shall be retained during this phase.
+### R-4.3 Manual Review and Ground Truth
+- M-4.30: The operator (me) shall manually review all collected footage and assign ground-truth categories to events.
+- M-4.31: Manual categorization shall support evaluation of model classification accuracy.
 
-### R-4.4 Impact Evaluation
-- M-4.40: Post-baseline safety metrics shall be compared against baseline metrics.
-- M-4.41: The comparison shall be used to evaluate the impact of real-time feedback and self-monitoring on driving behavior.
-- M-4.42: Configuration parameters shall remain consistent across baseline and post-baseline phases.
-
-## R-5 Offline-First Operation and Local Persistence
+## R-5 Offline Operation and Local Persistence
 ### R-5.1 Offline Operation
 - M-5.10: The system shall continue video capture and event detection independently of network connectivity.
 
-### R-5.2 Upload Queue Persistence
-- M-5.20: Event metadata and upload state shall be stored locally using a SQLite database.
-- M-5.21: Each queued upload record shall include clip identifier, local file path, upload status, retry count, and timestamps.
-- M-5.22: On system restart, queued records shall be reloaded from SQLite and uploads shall resume automatically.
+### R-5.2 Local Event Metadata
+- M-5.20: Event metadata shall be stored locally on the edge device using a SQLite database.
 
 ## R-6 Media Upload and Cloud Storage
 ### R-6.1 Upload Path
-- M-6.10: Video clips and baseline footage shall be uploaded directly from the Raspberry Pi to cloud object storage using a cellular hotspot or mobile data connection.
+- M-6.10: When connectivity is available (cellular hotspot or mobile data), the edge device shall upload video clips and full-session footage one at a time to private cloud object storage using temporary upload credentials issued by the backend API (presigned PUT); the edge device shall not store permanent cloud-storage credentials, and the system shall not maintain an offline upload queue.
 
 ### R-6.2 Cloud Storage
 - M-6.20: Uploaded video assets shall be stored in a private AWS S3 storage bucket.
@@ -92,6 +84,7 @@ Build a minimal, end-to-end smart dash cam system that monitors driving behavior
 - M-7.12: The backend shall persist structured metadata in a cloud-hosted PostgreSQL database.
 - M-7.13: The backend shall generate time-limited signed URLs for secure video playback.
 - M-7.14: The backend shall serve the deployed frontend with event metadata from the database and selected video assets from cloud storage via signed URLs.
+- M-7.15: The backend shall issue time-limited signed URLs authorizing the edge device to upload media objects to cloud object storage (presigned PUT).
 
 ## R-8 Database
 ### R-8.1 Data Storage
@@ -105,34 +98,30 @@ Build a minimal, end-to-end smart dash cam system that monitors driving behavior
 - M-9.11: The interface shall include a concise project overview describing system goals, architecture, and constraints.
 
 ### R-9.2 Interactivity
-- M-9.20: The frontend shall allow filtering of events by date range and collection phase (baseline vs usage).
-- M-9.21: The frontend shall display aggregate safety metrics and comparisons.
+- M-9.20: The frontend shall allow filtering of events by date range and event type (run-through, rolling stop, complete stop).
+- M-9.21: The frontend shall display model classification accuracy metrics by comparing detected labels against manual ground-truth categories.
 - M-9.22: The frontend shall support video playback via signed URLs.
 - M-9.23: The frontend shall display event metadata and timestamps.
+- M-9.24: The frontend shall allow users to browse and select clips from the collected footage.
 
 ### R-9.3 Visualization
-- M-9.30: The frontend shall display charts illustrating safety metrics over time.
-- M-9.31: Visualizations shall clearly distinguish baseline and post-baseline data.
+- M-9.30: The frontend shall include at least one visualization of collected event or evaluation data.
 
 ### R-9.4 Transparency
 - M-9.40: The frontend shall display configuration parameters used during data collection.
 - M-9.41: The frontend shall provide access to source code and technical documentation.
 
-### R-9.5 Impact Analysis
-- M-9.50: The frontend shall present a comparison of baseline and post-baseline safety metrics.
-- M-9.51: The interface shall visually communicate changes in event frequency before and after system deployment.
-- M-9.52: The analysis shall frame results as an evaluation of real-time feedback and self-monitoring effects.
+### R-9.5 Model Evaluation
+- M-9.50: The frontend shall present per-class and overall classification accuracy for run-through, rolling stop, and complete stop.
+- M-9.51: The interface shall visually communicate agreement and disagreement between model predictions and manual labels.
+- M-9.52: The analysis shall frame results as an evaluation of stop-sign event detection performance, not driving-behavior change.
 
 ## R-10 Deployment and Reliability
 ### R-10.1 Edge Runtime
 - M-10.10: The edge software shall run as a managed service on the Raspberry Pi.
 
-### R-10.2 Power Loss Recovery
-- M-10.20: Pending upload records shall be reloaded from local storage.
-- M-10.21: Pending uploads shall continue without data corruption.
-
-### R-10.3 CI/CD
-- M-10.30: Automated CI pipelines shall execute on repository updates, including linting and test suites.
-- M-10.31: Backend and frontend deployments shall occur automatically on merge to the main branch only when all required tests pass.
-- M-10.32: Deployment pipelines shall include post-deployment health checks to verify service availability and basic functionality.
-- M-10.33: Deployments shall be considered successful only when health checks complete successfully.
+### R-10.2 CI/CD
+- M-10.20: Automated CI pipelines shall execute on repository updates, including linting and test suites.
+- M-10.21: Backend and frontend deployments shall occur automatically on merge to the main branch only when all required tests pass.
+- M-10.22: Deployment pipelines shall include post-deployment health checks to verify service availability and basic functionality.
+- M-10.23: Deployments shall be considered successful only when health checks complete successfully.

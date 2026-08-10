@@ -1,0 +1,12 @@
+{
+  "min_peak_pct": 0.25,
+  "min_approach_s": 0.35,
+  "max_approach_s": 12.0,
+  "approach_start_peak_ratio": 0.1,
+  "min_increasing_fraction": 0.5,
+  "min_log_linear_r2": 0.3,
+  "drop_within_s": 2.5,
+  "drop_to_peak_ratio": 0.12,
+  "post_drop_peak_ratio": 2.5,
+  "post_drop_hold_s": 0.05
+}

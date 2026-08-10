@@ -1,0 +1,14 @@
+{
+  "model_path": "src/main/edge/models/ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite",
+  "labels_path": "src/main/edge/models/coco_labels.txt",
+  "input_width": 320,
+  "input_height": 320,
+  "channels": 3,
+  "input_dtype": "uint8",
+  "score_threshold": 0.5,
+  "top_k": 5,
+  "allowed_classes": [
+    "stop sign"
+  ],
+  "note": "Paths relative to repo root (resolved in main.py). input_width/height/channels and input_dtype match ssdlite_mobiledet_coco Edge TPU model (uint8, RGB)."
+}

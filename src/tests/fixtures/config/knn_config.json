@@ -1,0 +1,15 @@
+{
+  "k_neighbors": 3,
+  "stage1_feature_names": [
+    "post_drop_mean_motion",
+    "post_drop_min_motion",
+    "post_drop_p95_motion",
+    "post_drop_stop_fraction"
+  ],
+  "stage2_feature_names": [
+    "post_drop_min_motion",
+    "approach_area_sum_pct"
+  ],
+  "stage1_model_path": "src/main/edge/models/knn_stage1.joblib",
+  "stage2_model_path": "src/main/edge/models/knn_stage2.joblib"
+}

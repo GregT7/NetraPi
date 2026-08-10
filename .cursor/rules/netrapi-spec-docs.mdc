@@ -1,0 +1,50 @@
+---
+description: NetraPi spec docs—keep mvs, test, resume, matrix, and decisions aligned
+globs: project_management/specs/**,project_management/project_journal/decisions.md
+alwaysApply: false
+---
+
+# NetraPi specification documents
+
+When editing files matched by this rule:
+
+1. Read and follow the **netrapi-spec-sync** skill (`.cursor/skills/netrapi-spec-sync/SKILL.md`).
+2. Treat **`mvs.md`** as requirements source of truth; propagate to `test.md` when requirements change.
+3. Treat **`test.md`** as source for test definitions **and** current sprint section groupings; when tests change, tell the user what to update in **`test_matrix.xlsx`** (never edit the xlsx in Cursor).
+4. **`resume.md`**: Section 1 = targets; Section 2 = evidence-backed work only.
+5. **`decisions.md`**: process and tooling choices—do not duplicate MVS requirements here.
+
+Before finishing, output a brief **Doc sync report** (what changed, what was reviewed, follow-ups).
+
+Do not bulk-edit unrelated docs for typo-only changes.
+
+## Documentation dependency map
+
+Agent-facing overview (not user-facing project docs). Full workflow: `.cursor/skills/netrapi-spec-sync/`.
+
+```mermaid
+flowchart LR
+  MVS[mvs.md]
+  TEST[test.md]
+  MATRIX[test_matrix.xlsx]
+  RESUME[resume.md]
+  DEC[decisions.md]
+
+  MVS --> TEST
+  TEST --> MATRIX
+  MVS -.-> RESUME
+  TEST -.-> RESUME
+  DEC -.-> TEST
+```
+
+| File | Role |
+|------|------|
+| `specs/mvs.md` | Requirements (M-x.xx) |
+| `specs/test.md` | Tests (TP-xx) + sprint section headers through E |
+| `specs/test_matrix.xlsx` | Test status tracker (rows 16+); **user edits in Excel**—Cursor only instructs what to change |
+| `specs/resume.md` | Resume bullets (S1 targets, S2 done) |
+| `project_journal/decisions.md` | Process decisions |
+
+**Removed:** `project_journal/sprint.md` — do not recreate unless the user asks.
+
+Propagation matrix: `.cursor/skills/netrapi-spec-sync/doc-map.md`.
