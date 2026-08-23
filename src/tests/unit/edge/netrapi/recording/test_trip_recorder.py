@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -46,6 +46,24 @@ def test_finalize_on_rotate_uses_frame_count_and_elapsed(tmp_path: Path) -> None
     encode.assert_called_once()
     assert encode.call_args.kwargs["fps"] == pytest.approx(2 / 1.5)
     assert len(recorder._segment_frames) == 1
+
+
+def test_stop_invokes_on_segment_saved(tmp_path: Path) -> None:
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    callback = MagicMock()
+    recorder = TripRecorder(_trip_config(tmp_path), on_segment_saved=callback)
+
+    with patch("netrapi.recording.trip_recorder.write_h264_mp4"):
+        with patch("netrapi.recording.trip_recorder.time.monotonic", side_effect=[0.0, 0.0, 1.0, 2.0]):
+            recorder.start(frame_shape=frame.shape)
+            recorder.append_frame(frame)
+            recorder.append_frame(frame)
+            recorder.stop()
+
+    callback.assert_called_once()
+    kwargs = callback.call_args.kwargs
+    assert kwargs["order_number"] == 1
+    assert kwargs["local_path"].name.endswith("_seg_0001.mp4")
 
 
 def test_stop_finalizes_open_segment(tmp_path: Path) -> None:

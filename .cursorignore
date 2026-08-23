@@ -1,0 +1,26 @@
+﻿# Secrets and local credentials — keep out of Cursor index/Agent context.
+# This is not a vault: an open editor tab or @ mention can still attach a file.
+
+*.env
+**/.env
+.env.*
+!.env.example
+!**/.env.example
+
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+serviceAccount.json
+
+# Local AWS / Cloud CLI creds if they ever land in the repo
+.aws/
+**/secrets/
+
+# Heavy local artifacts (also gitignored)
+venv/
+vids/
+research/
+data/
+metrics/

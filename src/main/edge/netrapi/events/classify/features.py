@@ -15,6 +15,11 @@ RUNTIME_STAGE1_FEATURES = (
     "post_drop_stop_fraction",
 )
 
+RUNTIME_STAGE2_FEATURES = (
+    "post_drop_min_motion",
+    "approach_area_sum_pct",
+)
+
 
 def _percentile(values: list[float], pct: float) -> float:
     if not values:

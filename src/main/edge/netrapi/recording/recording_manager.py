@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import signal
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -14,6 +15,7 @@ from netrapi.buzzer import Buzzer
 from netrapi.capture import Camera, PreviewUI
 from netrapi.detection import Detector
 from netrapi.events import EventManager
+from netrapi.events.driving_event import DrivingEvent
 from netrapi.recording.clip_package import ClipPackage
 from netrapi.recording.clip_result import ClipResult
 from netrapi.recording.util.encoding_fps import clip_encoding_fps
@@ -35,6 +37,8 @@ class RecordingManager:
         recorder: Recorder,
         trip_recorder: TripRecorder,
         buzzer: Buzzer,
+        local_store=None,
+        cloud_ingest=None,
     ) -> None:
         self._app_config = app_config
         self._camera = camera
@@ -46,12 +50,22 @@ class RecordingManager:
         self._recorder = recorder
         self._trip_recorder = trip_recorder
         self._buzzer = buzzer
+        self._local_store = local_store
+        self._cloud_ingest = cloud_ingest
 
         self._clip_active = False
         self._running = False
         self._post_roll_started_at: float | None = None
         self._triggered_at: datetime | None = None
         self._event_index = 0
+        self._driving_session_id: int | None = None
+        self._pending_event: DrivingEvent | None = None
+        self._open_trip_segment_id: int | None = None
+        self._open_trip_segment_start: datetime | None = None
+        if local_store is not None and hasattr(trip_recorder, "set_on_segment_saved"):
+            trip_recorder.set_on_segment_saved(self._persist_saved_segment)
+        if local_store is not None and hasattr(trip_recorder, "set_on_segment_opened"):
+            trip_recorder.set_on_segment_opened(self._prime_open_segment)
 
     @property
     def app_config(self) -> AppConfig:
@@ -113,6 +127,16 @@ class RecordingManager:
         self._camera.open()
         self._buzzer.open()
         try:
+            if self._local_store is not None:
+                master_config_id = self._local_store.ensure_config_snapshot(
+                    self._app_config.config_dir
+                )
+                self._try_ingest("sync_master_config", master_config_id)
+                self._driving_session_id = self._local_store.start_session(
+                    start_time=datetime.now(),
+                    master_config_id=master_config_id,
+                )
+                self._try_ingest("sync_session", self._driving_session_id)
             laps = 0
             while self._running:
                 if should_stop and should_stop():
@@ -121,12 +145,20 @@ class RecordingManager:
                     break
                 self.run_one_lap(full_record=trip_enabled)
                 laps += 1
+        except Exception as exc:
+            self._record_exception(str(exc), is_fatal=True)
+            raise
         finally:
             signal.signal(signal.SIGINT, previous_handler)
             self._buzzer.close()
             self._camera.close()
             self._recorder.release()
             self._trip_recorder.stop()
+            if self._local_store is not None and self._driving_session_id is not None:
+                self._local_store.end_session(
+                    self._driving_session_id, end_time=datetime.now()
+                )
+                self._try_ingest("sync_session", self._driving_session_id)
 
     def run_one_lap(self, *, full_record: bool = False) -> ClipResult | None:
         record = self._capture_frame_record()
@@ -148,6 +180,7 @@ class RecordingManager:
             self._event_manager.observe(self.pre_buffer)
             if self._event_manager.ready_to_evaluate:
                 event = self._event_manager.evaluate()
+                self._pending_event = event
                 self._buzzer.beep(event)
                 if event.is_unsafe or self._app_config.recording_manager.record_safe_events:
                     self.begin_clip()
@@ -195,9 +228,133 @@ class RecordingManager:
             event_index=self._event_index,
         )
         result = self._recorder.write_clip(package, fps=encoding_fps)
+        pending = self._pending_event
+        self._pending_event = None
+        if (
+            self._local_store is not None
+            and pending is not None
+            and self._driving_session_id is not None
+            and self._triggered_at is not None
+        ):
+            config = self._app_config.recording_manager
+            fps = max(1, int(round(encoding_fps)))
+            trip_segment_id, trip_offset = self._event_trip_location(self._triggered_at)
+            approach = None
+            if pending.approach is not None:
+                approach = {
+                    "peak_area_pct": pending.approach.peak_area_pct,
+                    "approach_duration_s": pending.approach.approach_duration_s,
+                    "increasing_fraction": pending.approach.increasing_fraction,
+                    "log_linear_r2": pending.approach.log_linear_r2,
+                    "drop_duration_s": pending.approach.drop_duration_s,
+                    "post_drop_holds": pending.approach.post_drop_holds,
+                    "fail_reasons": list(pending.approach.fail_reasons),
+                }
+            event_id = self._local_store.persist_event(
+                driving_session_id=self._driving_session_id,
+                time=self._triggered_at,
+                type_value=pending.type.model_label,
+                clip_path=result.clip_path,
+                fps=fps,
+                order_number=package.event_index,
+                num_frames=result.pre_frame_count + result.post_frame_count,
+                clip_start=self._triggered_at
+                - timedelta(seconds=config.pre_roll_seconds),
+                clip_end=self._triggered_at
+                + timedelta(seconds=config.post_roll_seconds),
+                knn_stage1=pending.knn_stage1,
+                knn_stage2=pending.knn_stage2,
+                approach=approach,
+                trip_segment_id=trip_segment_id,
+                trip_offset_seconds=trip_offset,
+            )
+            self._try_ingest("sync_event", event_id)
         self.pre_buffer.clear()
         self.post_buffer.clear()
         self._clip_active = False
         self._post_roll_started_at = None
         self._triggered_at = None
         return result
+
+    def _prime_open_segment(
+        self,
+        *,
+        local_path: Path,
+        order_number: int,
+        start_time: datetime,
+    ) -> None:
+        if self._local_store is None or self._driving_session_id is None:
+            return
+        self._open_trip_segment_id = self._local_store.persist_trip_segment(
+            driving_session_id=self._driving_session_id,
+            local_path=local_path,
+            start_time=start_time,
+            end_time=start_time,
+            order_number=order_number,
+            init_local_stored=None,
+        )
+        self._open_trip_segment_start = start_time
+        self._try_ingest("sync_trip_segment", self._open_trip_segment_id)
+
+    def _persist_saved_segment(
+        self,
+        *,
+        local_path: Path,
+        order_number: int,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> None:
+        if self._local_store is None or self._driving_session_id is None:
+            return
+        if self._open_trip_segment_id is not None:
+            self._local_store.update_trip_segment(
+                self._open_trip_segment_id,
+                local_path=local_path,
+                end_time=end_time,
+                init_local_stored=True,
+            )
+            self._try_ingest("sync_trip_segment", self._open_trip_segment_id)
+            return
+        segment_id = self._local_store.persist_trip_segment(
+            driving_session_id=self._driving_session_id,
+            local_path=local_path,
+            start_time=start_time,
+            end_time=end_time,
+            order_number=order_number,
+        )
+        self._try_ingest("sync_trip_segment", segment_id)
+
+    def _event_trip_location(
+        self, event_time: datetime
+    ) -> tuple[int | None, float | None]:
+        if self._open_trip_segment_id is None or self._open_trip_segment_start is None:
+            return None, None
+        offset = (event_time - self._open_trip_segment_start).total_seconds()
+        return self._open_trip_segment_id, max(0.0, offset)
+
+    def _record_exception(self, message: str, *, is_fatal: bool) -> None:
+        if self._local_store is None or self._driving_session_id is None:
+            return
+        try:
+            exception_id = self._local_store.persist_exception(
+                driving_session_id=self._driving_session_id,
+                message=message,
+                time=datetime.now(),
+                is_fatal=is_fatal,
+            )
+        except Exception as exc:
+            print(f"[exception] persist failed: {exc}", flush=True)
+            return
+        self._try_ingest("sync_operational_exception", exception_id)
+
+    def _try_ingest(self, method_name: str, *args) -> None:
+        if self._cloud_ingest is None:
+            return
+        try:
+            getattr(self._cloud_ingest, method_name)(*args)
+        except Exception as exc:
+            print(f"[ingest] {method_name} failed: {exc}", flush=True)
+            if method_name != "sync_operational_exception":
+                self._record_exception(
+                    f"ingest {method_name} failed: {exc}", is_fatal=False
+                )

@@ -15,6 +15,17 @@ research/
 venv/
 data/
 metrics/
+*clip.mp4
+
+# SQLite runtime DB (Python sources in src/main/db/ stay tracked)
+*.db
+*.db-journal
+*.db-journal
+*.db-wal
+*.db-shm
+
+# lgpio GPIO notify FIFOs (created in CWD when RPi.GPIO / rpi-lgpio opens pins)
+.lgd-nfy*
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

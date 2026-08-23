@@ -1,7 +1,7 @@
 # NetraPi — Target Directory Tree
 
 > **Purpose:** Planned layout for application code and runtime data.  
-> **Design ref:** [event_clip_pipeline.md](event_clip_pipeline.md) (single source of truth for the edge capture / clip pipeline)  
+> **Design ref:** [event_clip_pipeline.md](event_clip_pipeline.md) (edge capture / clip pipeline); [backend_api.md](backend_api.md) (Pi ingest FastAPI); [cloud_architecture.md](cloud_architecture.md) (three DBs: Pi SQLite prod, Compose Postgres test, Supabase prod; Compose vs Render)  
 > **Scope:** Runnable code and tests only — not `project_management/`, not `test_scripts/`.
 
 **Legend:** ✅ exists (implemented) · 📋 planned or stub only · 🏃 runtime-generated (gitignored; created when the app runs)
@@ -23,9 +23,8 @@ This repo is a **monorepo**: edge (Pi), backend (FastAPI), and frontend (React) 
 
 ```
 NetraPi/
-├── compose.yml                        📋  Local dev only — `docker compose up` (not deployed)
 └── src/
-    ├── create_env.sh                  ✅  Linux/Pi venv + deps (numpy, opencv, pillow, tflite, scikit-learn, joblib)
+    ├── create_env.sh                  ✅  Linux/Pi venv + deps (numpy, opencv, pillow, tflite, scikit-learn, joblib, sqlmodel, alembic, psycopg2-binary, fastapi, uvicorn, httpx)
     ├── create_env.bat                 ✅  Windows venv + deps (same; tflite may warn — expected)
     ├── main/                          📋  Application code — see full tree below
     └── tests/                         📋  Mirrors src/main/ — see full tree below
@@ -39,14 +38,22 @@ No test directories under **`src/main/`** — all tests live in **`src/tests/`**
 
 ```
 src/main/
-├── db/                                📋  Versioned SQL / migration scripts (in repo)
-│   ├── edge/
-│   │   └── migrations/                📋  SQLite on Pi (local event metadata)
-│   └── cloud/
-│       └── migrations/                📋  Postgres on Supabase (event metadata, S3 paths)
+├── db/                                ✅  Shared SQLModel package (Pi SQLite local prod; Compose Postgres test-only; same models for Supabase cloud prod)
+│   ├── __init__.py                    ✅
+│   ├── alembic.ini                    ✅  Alembic config (url always overridden in env.py)
+│   ├── database.py                    ✅  engine + session; loads edge/.env (SQLite PRAGMA foreign_keys=ON)
+│   ├── writes.py                      ✅  local session / event / clip / trip inserts
+│   ├── config_snapshot.py             ✅  fingerprint + find-or-create master_config from edge JSON
+│   ├── models.py                      ✅  operational + config tables
+│   ├── netrapi.db                     🏃  SQLite file (gitignored; created by alembic upgrade head)
+│   └── migrations/                    ✅  one Alembic tree; dialect from engine URL
+│       ├── env.py                     ✅  SQLModel metadata; loads edge/.env or process DATABASE_URL
+│       ├── script.py.mako             ✅
+│       └── versions/                  ✅  0001 schema + 0002 classification_type / edge-json snapshot + 0003 trip file_size_bytes
 │
 ├── edge/                              ✅  Raspberry Pi — capture, detect, clip
 │   ├── main.py                        ✅
+│   ├── .env                           🏃  gitignored; DATABASE_URL=sqlite:///netrapi.db (file lands in db/); NETRAPI_API_URL + NETRAPI_API_KEY for ingest
 │   ├── netrapi-edge.service           ✅  systemd unit for Pi (install to /etc/systemd/system/)
 │   │
 │   ├── config/                        ✅
@@ -73,6 +80,10 @@ src/main/
 │   └── netrapi/                       ✅
 │       ├── __init__.py                ✅
 │       ├── build.py                   ✅
+│       ├── backend_auth.py            ✅  apply_edge_env once; snapshot X-API-Key + URL from process env
+│       ├── cloud_ingest.py            ✅  SQLite row → FastAPI JSON; master-config before session; clip PUT on event; trip PUT on drain
+│       ├── local_cleanup.py           ✅  unlink local MP4s; confirm-local-delete
+│       ├── local_store.py             ✅  thin adapter: RecordingManager → db/writes.py + config snapshot
 │       ├── exceptions.py              ✅
 │       ├── capture/
 │       │   ├── __init__.py            ✅
@@ -120,15 +131,29 @@ src/main/
 │   └── trips/                         🏃  trip segments — `trip_recorder.json` → segments_dir
 │
 ├── backend/                           📋  FastAPI on Render; only service with Docker
-│   ├── Dockerfile                     📋
-│   ├── requirements.txt               📋
+│   ├── Dockerfile                     ✅  image for Render and local Compose
+│   ├── compose.yml                    ✅  local only — `docker compose up` from this dir (context `src/main`)
+│   ├── requirements.txt               ✅  fastapi / uvicorn / httpx / boto3 / db pins
+│   ├── .env                           🏃  gitignored; DATABASE_URL (Supabase URI) + NETRAPI_API_KEY + AWS
+│   ├── README.md                      ✅  local uvicorn / env keys (create `.env` by hand)
+│   ├── DOCKER.md                      ✅  Docker Desktop prereq; `docker build` + Compose (TP-37)
 │   └── app/
-│       ├── __init__.py                📋
-│       ├── main.py                    📋
-│       ├── auth/
-│       │   └── __init__.py            📋
-│       └── routes/
-│           └── __init__.py            📋
+│       ├── __init__.py                ✅  puts src/main on path for `db`
+│       ├── main.py                    ✅  lifespan + routers
+│       ├── config.py                  ✅  pydantic-settings: DATABASE_URL; NETRAPI_API_KEY; optional AWS + SUPABASE_DB_*
+│       ├── s3.py                      ✅  presign PUT/GET + HEAD; keys device-1/{date}/{clip|trip}-{id}.mp4
+│       ├── auth/                      ✅  device API key (TP-42)
+│       │   ├── __init__.py            ✅
+│       │   └── api_key.py             ✅  X-API-Key on /api/netrapi/*
+│       └── routes/                    ✅  Pi ingest — [backend_api.md](backend_api.md)
+│           ├── __init__.py            ✅
+│           ├── health.py              ✅  GET /health (TP-35)
+│           ├── master_config.py       ✅  POST /api/netrapi/master-config (find-or-create snapshot)
+│           ├── driving_session.py     ✅  POST /api/netrapi/driving-session (TP-34)
+│           ├── trip_segment.py        ✅  POST /api/netrapi/trip-segment (JSON prime)
+│           ├── driving_event.py       ✅  POST /api/netrapi/driving-event (TP-36 / nested children)
+│           ├── operational_exception.py ✅  POST /api/netrapi/operational-exception
+│           └── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
 │
 └── frontend/                          📋  React on Vercel; no Dockerfile
     ├── package.json                   📋
@@ -145,7 +170,7 @@ src/main/
 | Piece | Location | Deployed? |
 |-------|----------|-----------|
 | Backend Docker image | `src/main/backend/Dockerfile` | Yes → Render |
-| Local backend stack | `compose.yml` (repo root) | No — dev machine only |
+| Local backend stack | `src/main/backend/compose.yml` | No — dev machine only |
 | Edge on Pi | `src/main/edge/netrapi-edge.service` + `main.py` | Yes — Pi (systemd) |
 | Edge / test Python deps | `src/create_env.sh` (Pi) or `src/create_env.bat` (Windows) | Yes — creates `venv/` in cwd |
 | Frontend | `src/main/frontend/` | Yes → Vercel |
@@ -158,8 +183,10 @@ CI/CD (GitHub Actions) lives at repo root **`.github/workflows/`** when added.
 
 | What | Where |
 |------|--------|
-| SQL migrations / schema scripts | `src/main/db/edge/migrations/`, `src/main/db/cloud/migrations/` |
-| Backend Python DB code (session, models) | `src/main/backend/app/` when added — not mixed with SQL files |
+| Shared SQLModel models + engine | `src/main/db/models.py`, `src/main/db/database.py`, `src/main/db/writes.py`, `src/main/db/config_snapshot.py` |
+| Local / Pi database | SQLite — `src/main/db/netrapi.db` (gitignored); URL from `src/main/edge/.env` |
+| Cloud database | Postgres on Supabase (backend); same models; URI in `src/main/backend/.env` |
+| Migrations | `src/main/db/migrations/` (one Alembic tree; target is whichever `.env` that process loaded) |
 
 ---
 
@@ -182,8 +209,10 @@ CI/CD (GitHub Actions) lives at repo root **`.github/workflows/`** when added.
 | `StopClassifier` | `netrapi/events/classify/stop_classifier.py` |
 | `Buzzer` | `netrapi/buzzer/buzzer.py` |
 | `BuzzerConfig`, `BuzzerPlayOnConfig` | `config/types.py` |
-| `RecordingManager` | `netrapi/recording/recording_manager.py` || `ClipPackage`, `Recorder`, `ClipResult` | `netrapi/recording/` |
+| `RecordingManager` | `netrapi/recording/recording_manager.py` |
+| `ClipPackage`, `Recorder`, `ClipResult` | `netrapi/recording/` |
 | `TripRecorder` | `netrapi/recording/trip_recorder.py` |
+| `LocalStore` | `netrapi/local_store.py` |
 
 ---
 
@@ -219,6 +248,9 @@ src/tests/
 │   │   │
 │   │   └── netrapi/                   ✅  ↔ src/main/edge/netrapi/
 │   │       ├── test_build.py          ✅
+│   │       ├── test_cloud_ingest.py   ✅  ↔ cloud_ingest.py
+│   │       ├── test_local_cleanup.py  ✅  ↔ local_cleanup.py
+│   │       ├── test_backend_auth.py   ✅  ↔ backend_auth.py
 │   │       ├── test_exceptions.py     ✅
 │   │       ├── capture/
 │   │       │   ├── test_camera.py     ✅
@@ -244,9 +276,29 @@ src/tests/
 │   │           ├── test_recorder.py           ✅
 │   │           └── test_trip_recorder.py      ✅
 │   │
+│   ├── db/
+│   │   ├── conftest.py                ✅  sys.path + sqlite tmp file
+│   │   ├── test_database.py           ✅  ↔ db/database.py
+│   │   ├── test_writes.py             ✅  ↔ db/writes.py
+│   │   ├── test_config_snapshot.py    ✅  ↔ db/config_snapshot.py (fingerprint reuse + new snapshot)
+│   │   ├── test_models.py             ✅  ↔ db/models.py
+│   │   └── test_migrations.py         ✅  Alembic upgrade head + seed
+│   │
 │   ├── backend/
+│   │   ├── conftest.py                ✅  sys.path + in-memory DATABASE_URL
 │   │   └── app/
-│   │       └── test_main.py           📋  stub ↔ backend/app/main.py
+│   │       ├── test_main.py           ✅  ↔ backend/app/main.py
+│   │       ├── test_api_key.py        ✅  ↔ auth/api_key.py (401 vs /health open)
+│   │       ├── test_health.py         ✅  ↔ routes/health.py
+│   │       ├── test_config.py         ✅  ↔ config.py
+│   │       ├── test_s3.py             ✅  ↔ s3.py object keys
+│   │       └── routes/
+│   │           ├── test_driving_session.py ✅  ↔ driving_session.py (mocked session)
+│   │           ├── test_master_config.py   ✅  ↔ master_config.py (find-or-create)
+│   │           ├── test_driving_event.py   ✅  ↔ driving_event.py (nested children)
+│   │           ├── test_trip_segment.py    ✅  ↔ trip_segment.py
+│   │           ├── test_operational_exception.py ✅  ↔ operational_exception.py
+│   │           └── test_s3_upload.py       ✅  ↔ s3_upload.py
 │   │
 │   └── frontend/
 │       └── src/
@@ -256,6 +308,23 @@ src/tests/
     ├── tp_26/                         ✅  stubbed event gate + clips
     ├── tp_27/                         ✅  stubbed event → real buzzer
     ├── tp_28/                         ✅  in-car E2E classify + beep + clip (full pipeline)
+    ├── tp_31/                         ✅  pipeline persist rolling-stop → SQLite
+    ├── tp_34/                         ✅  FastAPI driving-session → SQLite
+    ├── tp_35/                         ✅  FastAPI GET /health
+    ├── tp_36/                         ✅  FastAPI driving-event → SQLite
+    ├── tp_37/                         ✅  Docker Compose boot (`src/main/backend/compose.yml`)
+    ├── tp_38/                         ✅  FastAPI → private S3 PUT/HEAD
+    ├── tp_39/                         ✅  FastAPI Settings → Supabase SELECT 1
+    ├── tp_40/                         ✅  Alembic upgrade head → Supabase schema inspect
+    ├── tp_41/                         ✅  trip_segment local insert
+    ├── tp_42/                         ✅  X-API-Key on /api/netrapi/*; /health open
+    ├── tp_43/                         ✅  s3-upload-url + client PUT (no AWS keys)
+    ├── tp_44/                         ✅  stable S3 object keys
+    ├── tp_45/                         ✅  driving-event → Supabase Postgres
+    ├── tp_46/                         ✅  unsigned GET denied; s3-download-url GET
+    ├── tp_47/                         ✅  confirm-s3-upload sets s3_key / s3_stored
+    ├── tp_48/                         ✅  presigned PUT+confirm from hotspot client
+    ├── tp_49/                         ✅  local SQLite event → FastAPI → S3 + Postgres
     ├── at_3_4/                        ✅  live motion + kNN bench
     └── edge/                          📋  Pi / hardware (optional, not default CI)
         └── .gitkeep                   📋
@@ -271,6 +340,6 @@ src/tests/
 4. `src/main/edge/netrapi/detection/` + `events/` stub ✅ (TP-18/TP-19 unit tests)  
 5. `src/main/edge/main.py` + `netrapi-edge.service` ✅  
 6. `src/main/data/clips/` and `src/main/data/trips/` — 🏃 created on first write; keep `src/main/data/` in `.gitignore`  
-7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300)  
+7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain-trips`. Local MP4 cleanup: `main.py --delete-uploaded-local` or `--delete-all-local`.  
 8. Event port ✅ — approach / motion / features / stop_classifier + approach/motion/knn JSON + joblib models (design: [event_detection.md](event_detection.md))  
 9. Buzzer ✅ — `netrapi/buzzer/` + `buzzer.json` (PWM beep on configured events; soft-fail GPIO)

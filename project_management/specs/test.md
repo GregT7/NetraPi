@@ -4,7 +4,7 @@
 Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, and deployment. Frontend and later evaluation UI tests are deferred until those layers exist.
 
 ## 2. How to Use This Plan
-This document is ordered by **sprint section** in this file (Sprint 1 through E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
+This document is ordered by **sprint section** in this file (Sprint 1–5, then D–E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
 
 Each test includes:
 - **Reqs**: the requirement IDs covered
@@ -774,9 +774,9 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
-# Sprint B — Offline Operation and Local Persistence
+# Sprint 4 — Offline Operation and Local Persistence
 
-*Tests: TP-29 to TP-33*
+*Tests: TP-29 to TP-31*
 ### TP-29: Local database schema validation
 - **Description**: Verifies the local SQLite schema is structured correctly for event metadata storage (no upload-queue tables).
 - **Test level**: Inspection
@@ -806,24 +806,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Records are inserted successfully.
   - Retrieved values match what was written.
 
-### TP-31: SQLite availability and connection verification
-- **Description**: Verifies the application can successfully connect to the SQLite database file before performing any storage operations.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-5.20
-- **Prerequisites**
-  - SQLite database path configured.
-  - Database initialization script already executed.
-- **Steps**
-  1. Start the application or a small test script.
-  2. Attempt to open a connection to the SQLite database file.
-  3. Execute a simple query (e.g., `SELECT 1` or query a known table).
-- **Pass criteria**
-  - Database connection is successfully established.
-  - Query executes without error.
-  - Application confirms database is ready before continuing.
-
-### TP-32: Event metadata local storage verification
+### TP-31: Event metadata local storage verification
 - **Description**: Verifies unsafe stop-sign events are stored in SQLite with required metadata.
 - **Test level**: Integration
 - **Verification approach**: Demonstration + Inspection
@@ -839,29 +822,15 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Row contains valid timestamp, event type, and clip identifier or path.
   - Row contains stop-sign-related metadata such as stop duration, minimum motion, and detection confidence.
 
-### TP-33: Offline capture and detection verification
-- **Description**: Verifies capture and event detection continue without network connectivity.
-- **Test level**: Integration
-- **Verification approach**: Demonstration
-- **Reqs**: M-5.10
-- **Prerequisites**
-  - Capture and detection pipeline operational.
-- **Steps**
-  1. Disable network connectivity.
-  2. Run the system and manually trigger an event.
-- **Pass criteria**
-  - Video capture and detection continue offline.
-  - Event clip and local metadata are retained on device (no upload queue required).
-
 ---
 
-# Sprint C — Cloud Foundations and Local Backend Setup
+# Sprint 5 — Cloud Foundations and Local Backend Setup
 
-*Tests: TP-34 to TP-40*
+*Tests: TP-32 to TP-41*
 
-> **Focus:** Provision S3 and Supabase, and get a **local** FastAPI backend running (`compose.yml` / Docker). Integration behavior (presigned upload, metadata writes) is Sprint D.
+> **Focus:** Provision S3 and Supabase from the laptop, prove FastAPI locally against SQLite (`/health`, `driving-session`, `driving-event`), boot Compose, confirm the backend can reach S3 and Supabase, then apply the metadata schema. Edge trip-segment persist to SQLite is TP-41. Integration against S3 upload URL + confirm is Sprint D.
 
-### TP-34: Private S3 bucket provisioning
+### TP-32: Private S3 bucket provisioning
 - **Description**: Verifies a private AWS S3 bucket exists for NetraPi media.
 - **Test level**: Integration
 - **Verification approach**: Inspection + Test
@@ -877,238 +846,307 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Block Public Access (or equivalent) is enabled.
   - Pi config does not store permanent cloud-storage credentials.
 
-### TP-35: S3 lifecycle retention configuration
-- **Description**: Verifies fixed time-based lifecycle rules are configured on the media bucket.
-- **Test level**: Integration
-- **Verification approach**: Inspection
-- **Reqs**: M-6.30, M-6.31
-- **Prerequisites**
-  - TP-34 passed.
-- **Steps**
-  1. Inspect S3 lifecycle configuration for the bucket.
-- **Pass criteria**
-  - Lifecycle rules exist and match the intended retention policy.
-
-### TP-36: Supabase project and Postgres connectivity
-- **Description**: Verifies the Supabase (Postgres) project exists and accepts connections from the development machine / backend env.
+### TP-33: Supabase project and Postgres connectivity
+- **Description**: Verifies the Supabase (Postgres) project exists and accepts connections from the development machine (admin / `psql` / SQL editor). This is not the FastAPI app connecting.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-8.10
 - **Prerequisites**
   - Supabase project created.
-  - Database URL / credentials available to the backend env (not the Pi).
+  - Database URL / admin credentials available on the development machine (not the Pi).
 - **Steps**
-  1. Connect with the backend (or admin) credentials.
+  1. From the development machine, connect using `DATABASE_URL` in `src/main/backend/.env` (`psql`, Supabase SQL editor, or the TP-33 harness).
   2. Run `SELECT 1`.
 - **Pass criteria**
-  - Connection succeeds.
+  - Connection succeeds from the development machine (not via the FastAPI app).
   - Query executes.
   - The Pi is not given a direct cloud Postgres connection string for metadata writes.
 
-### TP-37: Cloud metadata schema deployment
-- **Description**: Verifies the event-metadata schema is deployed to Supabase Postgres.
+### TP-34: Local FastAPI smoke insert (`driving-session`)
+- **Description**: Verifies a local FastAPI app (uvicorn, not Docker) can `POST /api/netrapi/driving-session` and insert one SQLite row. `driving_session` is the easiest operational insert: `master_config_id` (seeded) and `start_time`; no extra unique/check constraints. JSON only — no file body.
 - **Test level**: Integration
-- **Verification approach**: Test + Inspection
-- **Reqs**: M-8.10, M-8.11
+- **Verification approach**: Test
+- **Reqs**: M-7.11
 - **Prerequisites**
-  - Schema / migration scripts defined under `src/main/db/cloud/` (or equivalent).
-  - TP-36 passed.
+  - Local SQLite schema and seed applied (Alembic `0001`–`0002`), including at least one `master_config` row.
+  - FastAPI app runnable with uvicorn (Compose not required).
 - **Steps**
-  1. Apply migrations / deploy schema.
-  2. Inspect tables and required columns (including S3 object path fields).
+  1. Start FastAPI locally with uvicorn.
+  2. `POST /api/netrapi/driving-session` with a dummy JSON body (`master_config_id` from seed, `start_time`).
+  3. Confirm the row via the API response and/or a SQLite query.
 - **Pass criteria**
-  - Expected tables and fields exist.
-  - Schema can store event metadata plus an S3 object path.
+  - Endpoint returns success.
+  - A `driving_session` row exists with the submitted fields.
+  - Request has no file attachment.
+  - This test does not require Docker, S3, or Supabase.
 
-### TP-38: Local backend boots via Docker Compose
+### TP-35: Local FastAPI health
+- **Description**: Verifies `GET /health` on the local uvicorn app returns liveness and a UTC timestamp.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.10
+- **Prerequisites**
+  - FastAPI runnable with uvicorn (same app as TP-34).
+- **Steps**
+  1. Start FastAPI locally with uvicorn if it is not already running.
+  2. `GET /health`.
+- **Pass criteria**
+  - Response succeeds.
+  - Body includes a status (e.g. `ok`) and a UTC `time`.
+  - This test does not require Docker, S3, or Supabase.
+
+### TP-36: Local FastAPI smoke insert (`driving-event`)
+- **Description**: Verifies `POST /api/netrapi/driving-event` on local uvicorn inserts one event plus nested children into SQLite (clip local flags, auto classification). JSON only — no file body. Session from TP-34 must exist.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.11
+- **Prerequisites**
+  - TP-34 passed.
+  - Seeded `classification_type` rows (Alembic `0002`).
+- **Steps**
+  1. Start FastAPI locally with uvicorn.
+  2. `POST /api/netrapi/driving-event` with one event JSON (`driving_session_id` from TP-34, `time`, nested `clip` without `s3_key` / `s3_stored`, nested auto classification).
+  3. Query SQLite for the event and children.
+- **Pass criteria**
+  - Endpoint returns success.
+  - `event` row and nested children exist; `s3_key` / `s3_stored` remain null.
+  - Request has no file attachment.
+  - This test does not require Docker, S3, or Supabase.
+
+### TP-37: Local backend boots via Docker Compose
 - **Description**: Verifies the local FastAPI backend starts from the repo’s local Docker / Compose setup.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-7.10
 - **Prerequisites**
-  - `src/main/backend/` Dockerfile (and root `compose.yml` if used) present.
+  - TP-35 passed.
+  - `src/main/backend/Dockerfile` and `src/main/backend/compose.yml` present.
 - **Steps**
-  1. Build and start the local backend (`docker compose up` or equivalent).
+  1. Build and start the local backend (`docker compose up` from `src/main/backend`, or equivalent).
   2. Hit the health endpoint or API root.
   3. Inspect container logs for clean startup.
 - **Pass criteria**
   - Image builds and container starts without crash.
-  - Health/root endpoint responds successfully on the local port.
+  - `GET /health` responds successfully.
 
-### TP-39: Local backend can reach S3
+### TP-38: Local backend can reach S3
 - **Description**: Verifies the local backend process is configured with AWS credentials and can write a small test object to the private bucket.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.20, M-7.15
 - **Prerequisites**
-  - TP-34 and TP-38 passed.
+  - TP-32 and TP-37 passed.
   - Backend env has AWS credentials (server-side only).
 - **Steps**
-  1. From the local backend environment, upload a small test object (script or temporary admin route).
-  2. Confirm the object appears in the bucket.
+  1. From the local backend environment, upload a small test object using backend AWS settings (script; no extra HTTP route).
+  2. Confirm the object appears in the bucket (HEAD), then delete the smoke object.
 - **Pass criteria**
   - Upload from the backend environment succeeds.
   - Object appears at the expected key.
 
-### TP-40: Local backend can reach Supabase
+### TP-39: Local backend can reach Supabase
 - **Description**: Verifies the local backend can open a Postgres session to Supabase using its configured credentials.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-7.12, M-8.10
 - **Prerequisites**
-  - TP-36 and TP-38 passed.
-  - Backend DB URL configured.
+  - TP-33 and TP-37 passed.
+  - Backend DB URL configured in the backend env (not on the Pi).
 - **Steps**
-  1. From the running local backend, execute a trivial DB check (`SELECT 1` via app code or migration tooling).
+  1. From the local backend environment, load `DATABASE_URL` via backend Settings (not the Pi; not Compose test Postgres).
+  2. Execute `SELECT 1` through app settings / SQLAlchemy.
 - **Pass criteria**
   - Backend connects to Supabase successfully.
   - Query executes without error.
+
+### TP-40: Cloud metadata schema deployment
+- **Description**: Verifies the event-metadata schema is applied to Supabase Postgres from the running local backend.
+- **Test level**: Integration
+- **Verification approach**: Test + Inspection
+- **Reqs**: M-8.10, M-8.11
+- **Prerequisites**
+  - Schema / migration scripts defined under `src/main/db/migrations/`.
+  - TP-39 passed.
+- **Steps**
+  1. From the running local backend, apply migrations (Alembic or equivalent) against Supabase.
+  2. Inspect tables and required columns (including S3 object path fields).
+- **Pass criteria**
+  - Expected tables and fields exist.
+  - Schema can store event metadata plus an S3 object path.
+
+### TP-41: Trip-segment local insert
+- **Description**: Verifies full-session trip recording writes at least one `trip_segment` row with a local MP4 path after the loop stops.
+- **Test level**: Integration
+- **Verification approach**: Test + Inspection
+- **Reqs**: M-5.20, M-3.21, M-4.11
+- **Prerequisites**
+  - Trip recorder implemented.
+  - Local SQLite schema initialized.
+- **Steps**
+  1. Run the pipeline with full-session recording enabled (mocked camera; no events required).
+  2. Stop the loop so the open segment is finalized.
+  3. Query SQLite for `trip_segment`.
+- **Pass criteria**
+  - A `driving_session` row exists from loop start.
+  - At least one `trip_segment` with `local_path` on disk, `order_number` set, `s3_key` / `s3_stored` null, and FK to that session.
 
 ---
 
 # Sprint D — Local Backend Integrations (S3 + Supabase)
 
-*Tests: TP-41 to TP-48*
+*Tests: TP-42 to TP-49*
 
-> **Focus:** Implement API-key auth, presigned PUT upload, and Postgres metadata persistence against the **local** backend. Cloud credentials stay on the backend; the edge client uses only the API key (+ temporary S3 URL).
+> **Focus:** API-key auth on `/api/netrapi/*`, `POST /api/netrapi/driving-event` to Postgres, `POST /api/netrapi/s3-upload-url` + Pi PUT to S3, then `POST /api/netrapi/confirm-s3-upload`. JSON only on FastAPI — no file bodies. The edge client uses an API key plus a temporary S3 URL.
 
-### TP-41: Edge API-key authentication
+### TP-42: Edge API-key authentication
 - **Description**: Verifies the local backend authenticates edge clients with an API key and rejects unauthenticated requests.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-7.10
 - **Prerequisites**
-  - Local backend running (Sprint C).
-  - API-key auth implemented.
+  - API-key auth implemented (`X-API-Key` / `NETRAPI_API_KEY`).
 - **Steps**
-  1. Call a protected endpoint without an API key.
-  2. Call the same endpoint with a valid API key.
+  1. `GET /health` without `X-API-Key` (must still succeed).
+  2. `POST /api/netrapi/driving-session` without `X-API-Key`.
+  3. Call the same route with an invalid `X-API-Key`.
+  4. Call the same route with a valid `X-API-Key`.
 - **Pass criteria**
-  - Unauthenticated request is rejected.
+  - Unauthenticated `/api/netrapi/*` write is rejected.
   - Authenticated request is accepted.
+  - `GET /health` remains unauthenticated.
 
-### TP-42: Presigned PUT issuance and upload
-- **Description**: Verifies the local backend issues a time-limited S3 PUT URL and a client can upload bytes with it.
+### TP-43: `s3-upload-url` issuance and edge PUT
+- **Description**: Verifies `POST /api/netrapi/s3-upload-url` (JSON only) returns a time-limited S3 PUT URL and object key, and the **client** PUTs bytes to S3 — not to FastAPI. No file attachment on the API request.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.10, M-7.10, M-7.15
 - **Prerequisites**
-  - TP-39 and TP-41 passed.
+  - TP-38 and TP-42 passed.
+  - A `clip` (or `trip_segment`) row in Postgres — use `POST /api/netrapi/driving-event` as setup if TP-45 has not run yet.
 - **Steps**
-  1. Authenticated client requests an upload slot (event/clip identity).
-  2. Backend returns temporary PUT URL + object key.
-  3. Client PUTs a small file/clip to that URL.
+  1. Authenticated `POST /api/netrapi/s3-upload-url` with JSON `{ "clip_id": ... }` (no file).
+  2. Backend returns `url`, `object_key`, `method: PUT`.
+  3. Client PUTs a small file to that S3 URL (not to FastAPI).
   4. Confirm the object exists at the returned key.
 - **Pass criteria**
-  - Temporary URL is issued only when authenticated.
-  - PUT succeeds while valid.
+  - URL is issued only when authenticated.
+  - FastAPI request body has no file.
+  - PUT to S3 succeeds while the URL is valid.
   - Object lands at the backend-assigned key.
   - Client does not use permanent AWS credentials.
+  - Postgres `s3_stored` is still false/null until confirm (TP-47).
 
-### TP-43: Stable S3 object key generation
+### TP-44: Stable S3 object key generation
 - **Description**: Verifies the backend assigns consistent, deterministic object keys.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.10, M-7.15, M-8.11
 - **Prerequisites**
-  - TP-42 path implemented.
+  - TP-43 path implemented.
 - **Steps**
-  1. Request upload slots / complete uploads for multiple clips.
+  1. `POST /api/netrapi/s3-upload-url` for multiple clip identities.
   2. Inspect assigned object keys.
 - **Pass criteria**
   - Keys follow a consistent structure (e.g., device/date/event id).
   - Keys are stable for a given event identity.
   - Durable references are object keys, not expiring signed URLs.
 
-### TP-44: Backend metadata persist to Supabase
-- **Description**: Verifies the local backend accepts metadata from an authenticated edge client and writes it to Postgres.
+### TP-45: `driving-event` persist to Supabase
+- **Description**: Verifies authenticated `POST /api/netrapi/driving-event` writes one event plus nested children to Postgres. JSON only — no file body. Cloud counterpart of TP-36.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-7.11, M-7.12, M-8.10
 - **Prerequisites**
-  - TP-37, TP-40, TP-41 passed.
+  - TP-39, TP-40, and TP-42 passed.
+  - A `driving_session` row in Postgres (same shape as TP-34).
 - **Steps**
-  1. Submit dummy event metadata with a valid API key.
-  2. Query Postgres for the inserted row.
+  1. Authenticated `POST /api/netrapi/driving-event` with one event JSON (nested `clip` with `s3_key` / `s3_stored` omitted or null, auto classification).
+  2. Query Postgres for the event and children.
 - **Pass criteria**
-  - Backend accepts the upload.
-  - Row persists and matches submitted fields.
+  - Backend accepts the JSON (no file attachment).
+  - Rows persist and match submitted fields.
+  - `s3_key` / `s3_stored` remain null until TP-47.
   - Metadata does not bypass the backend (no Pi→Postgres direct write).
 
-### TP-45: Private object access via signed GET
+### TP-46: Private object access via signed GET
 - **Description**: Ensures uploaded objects are not public and are reachable via backend-issued signed GET URLs.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.20, M-7.13
 - **Prerequisites**
-  - At least one object in the bucket (from TP-42).
+  - At least one object in the bucket (from TP-43).
   - Backend can mint signed GET URLs.
 - **Steps**
   1. Attempt unsigned/public access to the object URL.
-  2. Request a signed GET URL from the backend and access it.
+  2. Authenticated `POST /api/netrapi/s3-download-url` (`clip_id` or `trip_segment_id`) and GET the returned URL.
 - **Pass criteria**
   - Unsigned access fails.
   - Signed access succeeds.
 
-### TP-46: S3 object and Postgres metadata linkage
-- **Description**: Verifies backend-persisted metadata references the correct S3 object key.
+### TP-47: `confirm-s3-upload` links S3 object to Postgres
+- **Description**: Verifies `POST /api/netrapi/confirm-s3-upload` (JSON only) sets `s3_key` / `s3_stored` after the edge PUT in TP-43.
 - **Test level**: Integration
 - **Verification approach**: Test + Inspection
 - **Reqs**: M-7.12, M-8.11, M-8.12
 - **Prerequisites**
-  - TP-42 and TP-44 passed.
+  - TP-43 and TP-45 passed.
 - **Steps**
-  1. Complete authenticated presigned upload of a clip.
-  2. Complete metadata handoff so Postgres stores the S3 key.
-  3. Confirm the row’s path matches the object in S3.
-  4. Retrieve via path / signed GET.
+  1. Complete TP-43 (JSON `s3-upload-url`, then client PUT to S3).
+  2. Authenticated `POST /api/netrapi/confirm-s3-upload` with `clip_id` and `object_key` (no file).
+  3. Confirm the Postgres row’s `s3_key` matches the object in S3.
+  4. Optional: retrieve via path / signed GET (TP-46).
 - **Pass criteria**
-  - Metadata contains the correct S3 object key.
+  - FastAPI request has no file attachment.
+  - Metadata contains the correct S3 object key and `s3_stored` is true.
   - Key maps to a valid private object.
-  - Path-based retrieval works.
 
-### TP-47: Presigned upload over hotspot/mobile data
+### TP-48: Presigned upload over hotspot/mobile data
 - **Description**: Verifies an edge client can complete a backend-orchestrated upload over cellular/hotspot connectivity.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.10, M-7.10, M-7.15
 - **Prerequisites**
-  - TP-42 passed.
+  - TP-43 passed.
   - Backend reachable from the client network (local tunnel, LAN, or deployed preview if already available).
 - **Steps**
   1. Connect the Pi (or laptop client) to hotspot/mobile data.
-  2. Authenticate, request presigned PUT, upload a small file.
+  2. Authenticate, `POST /api/netrapi/s3-upload-url` (JSON only), PUT a small file to the returned S3 URL, then `POST /api/netrapi/confirm-s3-upload`. Client uses `NETRAPI_API_URL` (not loopback) plus `X-API-Key`.
   3. Confirm the object in S3.
 - **Pass criteria**
   - Upload succeeds over mobile/hotspot connectivity.
   - Temporary backend-issued URL was used (no permanent AWS keys on device).
 
-### TP-48: Local end-to-end event persistence via backend
-- **Description**: Verifies a local event (SQLite + clip) uploads one-at-a-time through the local backend into S3 and Postgres.
+### TP-49: Local end-to-end event persistence via backend
+- **Description**: Verifies a local event (SQLite + clip) uploads one-at-a-time through the local backend into S3 and Postgres, then drains one primed trip segment the same way.
 - **Test level**: System
 - **Verification approach**: Demonstration + Test + Inspection
 - **Reqs**: M-5.20, M-6.10, M-7.10, M-7.11, M-7.12, M-7.15, M-8.10, M-8.11
 - **Prerequisites**
-  - Sprint B local persistence available.
-  - Sprint D upload + metadata paths implemented.
+  - Sprint 4 local persistence available (TP-31).
+  - TP-43 and TP-45 passed.
 - **Steps**
-  1. Create or trigger a local event with SQLite row + clip.
-  2. Run the edge upload client against the local backend for that single event.
-  3. Inspect S3 and Postgres.
+  1. Create or trigger a local event with SQLite row + clip (`LocalStore` / capture loop), and a primed `trip_segment`.
+  2. Edge `CloudIngest`: `driving-session` / `driving-event` JSON, clip `s3-upload-url`, PUT to S3, `confirm-s3-upload`.
+  3. `drain_trip_segments` (Wi‑Fi job): trip `s3-upload-url` + PUT + confirm.
+  4. Inspect S3, Postgres, and local SQLite clip/trip `s3_key` / `s3_stored` / `file_size_bytes`.
 - **Pass criteria**
   - Single-event upload succeeds without an offline upload-queue state machine.
-  - S3 object and Postgres row exist and reference each other.
+  - S3 clip object and Postgres row exist and reference each other.
+  - Local SQLite clip `s3_key` / `s3_stored` match the confirmed object (Pi writes its own row; FastAPI never writes Pi SQLite).
+  - `file_size_bytes` matches the uploaded clip and trip files on both SQLite and Postgres.
+  - Postgres has kNN parameters, approach parameters, `event_trip_location`, and an `operational_exception` row for the harnessed event/session.
+  - Local SQLite and Postgres `trip_segment.s3_key` / `s3_stored` match the drained trip object.
   - Edge device used no permanent AWS or Postgres credentials.
 
 ---
 
 # Sprint E — Backend Deploy + Edge ↔ Deployed Backend E2E (No Frontend)
 
-*Tests: TP-49 to TP-55*
+*Tests: TP-50 to TP-57*
 
-> **Focus:** Deploy the backend (Render), then verify the already-built edge path against that deployed backend. E2E portion is verification only — no new edge/feature work. Do **not** require frontend UI; confirm cloud outcomes via API responses, S3, and Postgres.
+> **Focus:** Deploy the backend (Render), confirm API-key auth still holds on that host, then verify the already-built edge path against the deployed backend. E2E portion is verification only — no new edge/feature work. Do **not** require frontend UI; confirm cloud outcomes via API responses, S3, and Postgres.
 
-### TP-49: Backend Docker image build
+### TP-50: Backend Docker image build
 - **Description**: Verifies the backend Docker image builds and runs locally from the production Dockerfile.
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1123,14 +1161,14 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Build succeeds.
   - Container stays up and health/root responds.
 
-### TP-50: Backend deployment to hosting environment
+### TP-51: Backend deployment to hosting environment
 - **Description**: Verifies the backend deploys successfully to the target host (e.g., Render).
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-10.21
 - **Prerequisites**
   - Deployment target configured.
-  - TP-49 passed.
+  - TP-50 passed.
 - **Steps**
   1. Trigger a backend deployment.
   2. Observe deployment completion.
@@ -1139,13 +1177,13 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Deployment completes successfully.
   - Deployed backend is reachable.
 
-### TP-51: Post-deployment health check
+### TP-52: Post-deployment health check
 - **Description**: Verifies post-deploy health checks pass for the backend service.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-10.22, M-10.23
 - **Prerequisites**
-  - TP-50 passed.
+  - TP-51 passed.
   - Health checks configured (platform and/or pipeline).
 - **Steps**
   1. Inspect post-deployment health-check results.
@@ -1154,14 +1192,31 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Health checks run.
   - Successful deploy requires passing health checks.
 
-### TP-52: Unsafe event to cloud via deployed backend
+### TP-53: Deployed backend API-key authentication
+- **Description**: Verifies the deployed backend authenticates edge clients with an API key, rejects unauthenticated requests, and still accepts a valid key (same contract as local TP-42).
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.10
+- **Prerequisites**
+  - TP-51 passed (deployed backend reachable).
+  - API-key auth already proven against the local backend (TP-42).
+- **Steps**
+  1. Call a protected endpoint on the deployed backend without an API key.
+  2. Call the same endpoint with an invalid API key.
+  3. Call the same endpoint with a valid API key.
+- **Pass criteria**
+  - Missing-key and invalid-key requests are rejected.
+  - Authenticated request is accepted.
+  - Deployed auth behavior matches the local backend; the public API is not left open.
+
+### TP-54: Unsafe event to cloud via deployed backend
 - **Description**: Verifies an unsafe stop-sign event is detected on the edge, alerts locally, and uploads through the deployed backend to S3 + Postgres.
 - **Test level**: System
 - **Verification approach**: Test + Demonstration
-- **Reqs**: M-3.10, M-5.20, M-6.10, M-7.11, M-7.12, M-7.15
+- **Reqs**: M-3.10, M-5.20, M-6.10, M-7.10, M-7.11, M-7.12, M-7.15
 - **Prerequisites**
   - Edge runtime operational (existing bring-up; no new edge features in this sprint).
-  - Deployed backend upload path operational (TP-49–51).
+  - Deployed backend upload path operational (TP-50–53).
   - Speaker/buzzer connected.
 - **Steps**
   1. Run the edge system pointed at the deployed backend.
@@ -1173,13 +1228,13 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Local clip + SQLite row exist.
   - Media in S3 via presigned PUT; metadata in Postgres via backend.
 
-### TP-53: Cross-layer metadata consistency
+### TP-55: Cross-layer metadata consistency
 - **Description**: Verifies event identity and fields stay consistent across SQLite, backend, Postgres, and S3 object key (no frontend).
 - **Test level**: System
 - **Verification approach**: Inspection + Test
 - **Reqs**: M-5.20, M-7.12, M-8.11
 - **Prerequisites**
-  - At least one completed edge→cloud event (TP-52).
+  - At least one completed edge→cloud event (TP-54).
 - **Steps**
   1. Inspect the local SQLite row.
   2. Inspect the Postgres row.
@@ -1188,7 +1243,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Identifiers and key fields match across layers.
   - Clip reference points at the correct object.
 
-### TP-54: Restart recovery then upload
+### TP-56: Restart recovery then upload
 - **Description**: Verifies local event data survives an edge restart and can upload later via the deployed backend.
 - **Test level**: System
 - **Verification approach**: Test
@@ -1204,7 +1259,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Local clip and metadata are preserved across restart.
   - Upload succeeds afterward; S3 + Postgres reflect the event.
 
-### TP-55: Deployed system smoke (API/cloud evidence)
+### TP-57: Deployed system smoke (API/cloud evidence)
 - **Description**: Verifies a minimal real-world flow from detection through deployed-backend upload, confirmed without a frontend.
 - **Test level**: System
 - **Verification approach**: Demonstration
@@ -1229,13 +1284,14 @@ This plan currently covers through **Sprint E** (edge + local persistence + back
 - full CI/CD matrix beyond backend deploy health
 - 10-hour collection and model-evaluation publication tests
 - dedicated edge managed-service (systemd) verification for M-10.10
+- dedicated offline capture/detection verification for M-5.10
 
 Covered now:
 - constraints and edge bring-up (earlier sprints)
-- offline SQLite event metadata
-- S3 + Supabase provisioning
-- local backend setup and S3/Postgres integrations (presigned PUT + metadata)
-- backend deployment
+- offline SQLite event metadata (TP-31) and trip-segment local persist (TP-41)
+- S3 + Supabase provisioning, local FastAPI ingest smokes (`/health`, `driving-session`, `driving-event`), Compose boot, backend reachability, then schema from the backend
+- local backend S3/Postgres integrations (`s3-upload-url` + edge PUT + `confirm-s3-upload` + `driving-event`)
+- backend deployment and deployed API-key authentication
 - edge ↔ deployed backend E2E (no frontend; verification only)
 
-**TP range:** TP-01 through TP-55.
+**TP range:** TP-01 through TP-57.

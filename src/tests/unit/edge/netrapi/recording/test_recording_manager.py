@@ -229,6 +229,8 @@ def _recording_manager(
     recorder: Recorder | MagicMock | None = None,
     trip_recorder: MagicMock | None = None,
     buzzer: MagicMock | None = None,
+    local_store=None,
+    cloud_ingest=None,
 ) -> RecordingManager:
     config = app_config.recording_manager
     return RecordingManager(
@@ -247,6 +249,8 @@ def _recording_manager(
             config=app_config.trip_recorder,
         ),
         buzzer=buzzer or MagicMock(),
+        local_store=local_store,
+        cloud_ingest=cloud_ingest,
     )
 
 
@@ -486,6 +490,92 @@ def test_run_loop_stops_trip_recorder(tmp_path: Path):
     trip_recorder.stop.assert_called_once()
     buzzer.open.assert_called_once()
     buzzer.close.assert_called_once()
+
+
+def test_run_loop_starts_and_ends_driving_session(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    store = MagicMock()
+    store.start_session.return_value = 7
+    store.ensure_config_snapshot.return_value = 1
+    manager = _recording_manager(_app_config(tmp_path), frame, local_store=store)
+
+    manager.run_loop(max_laps=0)
+
+    store.ensure_config_snapshot.assert_called_once()
+    store.start_session.assert_called_once()
+    assert store.start_session.call_args.kwargs["master_config_id"] == 1
+    store.end_session.assert_called_once()
+    assert store.end_session.call_args.args[0] == 7
+
+
+def test_run_loop_syncs_session_to_cloud(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    store = MagicMock()
+    store.start_session.return_value = 7
+    store.ensure_config_snapshot.return_value = 1
+    cloud = MagicMock()
+    manager = _recording_manager(
+        _app_config(tmp_path), frame, local_store=store, cloud_ingest=cloud
+    )
+
+    manager.run_loop(max_laps=0)
+
+    cloud.sync_master_config.assert_called_with(1)
+    assert cloud.sync_session.call_count == 2
+    cloud.sync_session.assert_any_call(7)
+
+
+def test_run_loop_cloud_failure_does_not_abort(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    store = MagicMock()
+    store.start_session.return_value = 7
+    store.ensure_config_snapshot.return_value = 1
+    cloud = MagicMock()
+    cloud.sync_session.side_effect = RuntimeError("backend down")
+    manager = _recording_manager(
+        _app_config(tmp_path), frame, local_store=store, cloud_ingest=cloud
+    )
+
+    manager.run_loop(max_laps=0)
+
+    store.end_session.assert_called_once()
+
+
+def test_finish_clip_syncs_event_to_cloud(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    config = _default_recording_manager_config(
+        tmp_path, pre_roll_seconds=0.1, post_roll_seconds=0.0
+    )
+    app_config = _app_config(tmp_path, recording_manager=config)
+    built_recorder = Recorder(config)
+    built_recorder.write_clip = MagicMock(
+        return_value=MagicMock(
+            clip_path=tmp_path / "clips" / "clip_1.mp4",
+            pre_frame_count=1,
+            post_frame_count=1,
+            pre_ok=True,
+            post_ok=True,
+            notes="",
+        )
+    )
+    store = MagicMock()
+    store.persist_event.return_value = 42
+    cloud = MagicMock()
+    manager = _recording_manager(
+        app_config,
+        frame,
+        recorder=built_recorder,
+        local_store=store,
+        cloud_ingest=cloud,
+    )
+    manager._driving_session_id = 7
+    manager._pending_event = DrivingEvent(type=StopSignEnum.ROLLING_STOP)
+    manager.pre_buffer.push(FrameRecord(raw=frame, display=frame), captured_at=0.0)
+    manager.begin_clip()
+    manager.run_one_lap()
+
+    store.persist_event.assert_called_once()
+    cloud.sync_event.assert_called_once_with(42)
 
 
 def test_run_loop_closes_buzzer_when_lap_raises(tmp_path: Path):

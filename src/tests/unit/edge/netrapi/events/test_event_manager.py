@@ -122,6 +122,10 @@ def test_forced_latch_then_window_elapse_emits(tmp_path: Path):
 
     assert isinstance(event, DrivingEvent)
     assert event.type is StopSignEnum.COMPLETE_STOP
+    assert event.knn_stage1 is not None
+    assert len(event.knn_stage1) == 4
+    assert event.knn_stage2 is not None
+    assert len(event.knn_stage2) == 2
     assert manager.phase_name == "WATCHING"
     assert manager.ready_to_evaluate is False
 

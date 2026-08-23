@@ -13,7 +13,10 @@ DEFAULT_CONFIG_DIR = EDGE_DIR / "config"
 
 
 def _configure_import_path() -> None:
+    main_str = str(EDGE_DIR.parent)
     edge_str = str(EDGE_DIR)
+    if main_str not in sys.path:
+        sys.path.insert(0, main_str)
     if edge_str not in sys.path:
         sys.path.insert(0, edge_str)
 
@@ -63,19 +66,77 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Enable segmented full-trip recording (default: config value)",
     )
+    jobs = parser.add_mutually_exclusive_group()
+    jobs.add_argument(
+        "--drain-trips",
+        action="store_true",
+        help="Upload pending trip segments to S3 (Wi-Fi). Does not run capture.",
+    )
+    jobs.add_argument(
+        "--delete-uploaded-local",
+        action="store_true",
+        help=(
+            "Delete local clip/trip MP4s already stored in S3. "
+            "Updates SQLite and cloud flags. Does not delete S3 objects."
+        ),
+    )
+    jobs.add_argument(
+        "--delete-all-local",
+        action="store_true",
+        help=(
+            "Delete all finished local clip/trip MP4s. "
+            "Updates SQLite and cloud flags. Does not delete S3 objects."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     _configure_import_path()
     from config.loader import AppConfig, ConfigError
+    from db.database import init_engine
     from netrapi import build_pipeline
+    from netrapi.backend_auth import apply_edge_env
     from netrapi.exceptions import NetraPiError
 
     args = parse_args(argv)
     try:
+        apply_edge_env()
+        if args.drain_trips or args.delete_uploaded_local or args.delete_all_local:
+            from netrapi.cloud_ingest import try_cloud_ingest
+
+            init_engine()
+            ingest = try_cloud_ingest()
+            if ingest is None:
+                print(
+                    "NETRAPI_API_URL / NETRAPI_API_KEY missing; cannot run maintenance",
+                    file=sys.stderr,
+                )
+                return 1
+            if args.drain_trips:
+                uploaded = ingest.drain_trip_segments()
+                print(f"drained {uploaded} trip segment(s)")
+                return 0
+            if args.delete_uploaded_local:
+                from netrapi.local_cleanup import delete_uploaded_local_media
+
+                cleaned = delete_uploaded_local_media(ingest)
+                print(f"deleted {cleaned} uploaded local file(s)")
+                return 0
+            app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
+            app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
+            from netrapi.local_cleanup import delete_all_local_media
+
+            cleaned = delete_all_local_media(
+                ingest,
+                clips_dir=app_config.recording_manager.clips_dir,
+                trips_dir=app_config.trip_recorder.segments_dir,
+            )
+            print(f"deleted {cleaned} local file(s)")
+            return 0
         app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
         app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
+        init_engine()
         pipeline = build_pipeline(app_config, verify_tpu=args.verify_tpu)
         run_kwargs = {}
         if args.max_laps is not None:

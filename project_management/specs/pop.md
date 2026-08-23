@@ -42,14 +42,13 @@ Although the original career-driven incentive for this project changed after gai
 
 ### 3.3 Local Persistence (Required)
 - Store event metadata in **SQLite** on the device
-- Follow proper db migration practices using Liquibase.
+- Follow proper db migration practices using Alembic.
 - Retain event clips on disk until a direct upload is performed when online
 
 ### 3.4 Cloud Storage (Required)
 - Store video clips in **AWS S3** private buckets
 - Prevent public access to raw media
 - Serve clips via **time-limited signed URLs**
-- Apply a simple, fixed retention policy (e.g., time-based TTL)
 
 ### 3.5 Backend API (Required)
 - Cloud-deployed **FastAPI** service
@@ -99,7 +98,7 @@ Although the original career-driven incentive for this project changed after gai
 - **Backend:** FastAPI service containerized with Docker and deployed on Render, responsible for ingesting authenticated edge device uploads, enforcing device-level API key authentication, generating signed URLs for secure clip playback from AWS S3, and exposing read-only analytics endpoints. SQLLite will be used to store the data locally.
 - **Frontend:** React web application styled with Tailwind CSS and deployed on Vercel, using Recharts for analytics visualizations (event frequency, session distributions), with support for secure clip playback and a public demo mode.
 - **CI/CD:** GitHub Actions for continuous integration (tests, linting, basic integration checks), automated Docker-based backend deployments to Render on merge to main, static frontend deployments to Vercel.
-- **Database**: SQLite for local data storage and Liquibase for db versioning.
+- **Database**: SQLite for local data storage and Alembic for db versioning.
 
 ---
 
