@@ -8,26 +8,46 @@ from botocore.exceptions import ClientError
 
 from app.config import Settings, get_settings
 
-DEVICE_ID = "device-1"
 CLIP_EXPIRES_SECONDS = 15 * 60
 TRIP_EXPIRES_SECONDS = 60 * 60
 DEFAULT_CONTENT_TYPE = "video/mp4"
+_MONTH_ABBREV = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
 
 
 class S3NotConfiguredError(RuntimeError):
     """Raised when AWS credentials or bucket are missing."""
 
 
-def utc_date_stamp(start_time: datetime) -> str:
+def month_year_stamp(start_time: datetime) -> str:
     if start_time.tzinfo is None:
         start_time = start_time.replace(tzinfo=timezone.utc)
-    return start_time.astimezone(timezone.utc).date().isoformat()
+    utc = start_time.astimezone(timezone.utc)
+    return f"{_MONTH_ABBREV[utc.month - 1]}-{utc.year}"
 
 
-def media_object_key(*, kind: str, row_id: int, start_time: datetime) -> str:
+def media_object_key(
+    *, kind: str, row_id: int, session_id: int, start_time: datetime
+) -> str:
     if kind not in ("clip", "trip"):
         raise ValueError(f"unknown media kind {kind!r}")
-    return f"{DEVICE_ID}/{utc_date_stamp(start_time)}/{kind}-{row_id}.mp4"
+    folder = "clips" if kind == "clip" else "trips"
+    return (
+        f"{month_year_stamp(start_time)}/driving_session_id_{session_id}/"
+        f"{folder}/{kind}-{row_id}.mp4"
+    )
 
 
 def s3_settings_or_raise(

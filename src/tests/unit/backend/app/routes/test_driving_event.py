@@ -217,7 +217,7 @@ def test_clip_upsert_keeps_existing_s3_flags(ingest_client: TestClient) -> None:
     with get_session() as session:
         clip = session.get(Clip, 10)
         assert clip is not None
-        clip.s3_key = "device-1/2026-08-16/clip-10.mp4"
+        clip.s3_key = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
         clip.s3_stored = True
         session.add(clip)
         session.commit()
@@ -228,7 +228,7 @@ def test_clip_upsert_keeps_existing_s3_flags(ingest_client: TestClient) -> None:
     with get_session() as session:
         clip = session.get(Clip, 10)
         assert clip is not None
-        assert clip.s3_key == "device-1/2026-08-16/clip-10.mp4"
+        assert clip.s3_key == "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
         assert clip.s3_stored is True
         assert clip.file_size_bytes == 42
 

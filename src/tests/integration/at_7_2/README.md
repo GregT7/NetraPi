@@ -98,7 +98,7 @@ ORDER BY e.id;
 
 Expect three rows in order: `complete-stop` with `clip_id` / `s3_stored` / `s3_key`
 null; `rolling-stop` and `run-through` with `s3_stored` true and keys like
-`device-1/YYYY-MM-DD/clip-<id>.mp4`.
+`MMM-YYYY/driving_session_id_<id>/clips/clip-<id>.mp4`.
 
 ### S3
 

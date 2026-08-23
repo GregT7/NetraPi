@@ -30,7 +30,7 @@ These commands use the **latest** event.
 python -c "import sqlite3; print(sqlite3.connect('src/tests/integration/at_7_1/netrapi.db').execute('SELECT e.id, c.s3_stored, c.s3_key FROM event e JOIN clip c ON c.event_id=e.id ORDER BY e.id DESC LIMIT 1').fetchall())"
 ```
 
-Expect one row, `s3_stored=1`, key like `device-1/YYYY-MM-DD/clip-<id>.mp4`.
+Expect one row, `s3_stored=1`, key like `MMM-YYYY/driving_session_id_<id>/clips/clip-<id>.mp4`.
 
 ### Postgres (Supabase SQL editor)
 

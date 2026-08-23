@@ -141,7 +141,7 @@ src/main/
 │       ├── __init__.py                ✅  puts src/main on path for `db`
 │       ├── main.py                    ✅  lifespan + routers
 │       ├── config.py                  ✅  pydantic-settings: DATABASE_URL; NETRAPI_API_KEY; optional AWS + SUPABASE_DB_*
-│       ├── s3.py                      ✅  presign PUT/GET + HEAD; keys device-1/{date}/{clip|trip}-{id}.mp4
+│       ├── s3.py                      ✅  presign PUT/GET + HEAD; keys MMM-YYYY/driving_session_id_{id}/{clips|trips}/{clip|trip}-{id}.mp4
 │       ├── auth/                      ✅  device API key (TP-42)
 │       │   ├── __init__.py            ✅
 │       │   └── api_key.py             ✅  X-API-Key on /api/netrapi/*

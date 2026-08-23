@@ -72,7 +72,7 @@ def test_delete_uploaded_local_only_removes_s3_rows(tmp_path: Path) -> None:
         session.commit()
         clip = session.exec(select(Clip).where(Clip.event_id == event.id)).first()
         assert clip is not None
-        clip.s3_key = "device-1/2026-08-16/clip-1.mp4"
+        clip.s3_key = "Aug-2026/driving_session_id_1/clips/clip-1.mp4"
         clip.s3_stored = True
         session.add(clip)
         insert_trip_segment(

@@ -232,7 +232,7 @@ Upsert by stable `id`s. `classification_type_id` values must already exist from 
 
 ### 5.6 `POST /api/netrapi/s3-upload-url`
 
-JSON only. FastAPI uses **server-side AWS credentials** to mint a time-limited S3 **PUT** URL and a stable object key `device-1/{UTC-date}/{clip|trip}-{id}.mp4` (TP-44). Clip URLs expire in 15 minutes; trip URLs in 60 minutes. It does **not** store `s3_key` yet and does **not** receive the video. Missing AWS settings → 503.
+JSON only. FastAPI uses **server-side AWS credentials** to mint a time-limited S3 **PUT** URL and a stable object key `{MMM-YYYY}/driving_session_id_{id}/clips|trips/{clip|trip}-{id}.mp4` (TP-44). Month is the English UTC abbreviation of **driving session `start_time`** (fixed `Jan`…`Dec` table, not locale `%b`). Clip URLs expire in 15 minutes; trip URLs in 60 minutes. It does **not** store `s3_key` yet and does **not** receive the video. Missing AWS settings → 503. Missing event or driving session for that clip/trip → 404.
 
 The clip or trip **row must already exist** (`driving-event` for clips, `trip-segment` for full-session files). Use `clip_id` during the drive after an event; use `trip_segment_id` **after the drive, on Wi‑Fi**.
 
@@ -251,7 +251,7 @@ The clip or trip **row must already exist** (`driving-event` for clips, `trip-se
 ```json
 {
   "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
-  "object_key": "device-1/2026-08-16/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
   "method": "PUT"
 }
 ```
@@ -267,7 +267,7 @@ JSON only. After the S3 PUT succeeds, the Pi tells FastAPI the object landed. Ba
 ```json
 {
   "clip_id": 10,
-  "object_key": "device-1/2026-08-16/clip-10.mp4"
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
 }
 ```
 
@@ -277,7 +277,7 @@ JSON only. After the S3 PUT succeeds, the Pi tells FastAPI the object landed. Ba
 
 ```json
 {
-  "object_key": "device-1/2026-08-16/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
   "s3_stored": true,
   "clip_id": 10,
   "file_size_bytes": 4096
@@ -307,7 +307,7 @@ JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true,
 ```json
 {
   "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
-  "object_key": "device-1/2026-08-16/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
   "method": "GET",
   "clip_id": 10
 }
