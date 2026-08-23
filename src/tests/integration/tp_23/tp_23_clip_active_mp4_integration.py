@@ -218,7 +218,7 @@ def main() -> int:
     print(f"  full_record: {FULL_RECORD}")
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
 
         phase = "prefill"

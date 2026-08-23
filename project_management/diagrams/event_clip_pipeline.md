@@ -37,7 +37,7 @@ Source: [`src/main/edge/main.py`](../../src/main/edge/main.py)
 flowchart TB
     MAIN["Edge app entry point; returns process exit code<br/>main(argv)"]
     PATH["Ensure edge package root is on sys.path before local imports<br/>_configure_import_path()"]
-    ARGS["Parse CLI: --verify-tpu, --max-laps, --full-record<br/>parse_args(argv)"]
+    ARGS["Parse CLI: --full-record, --drain-trips, --delete-after-drain<br/>parse_args(argv)"]
     LOAD["Load and validate all JSON configs from config/<br/>AppConfig.load(DEFAULT_CONFIG_DIR.resolve())"]
     CE{"ConfigError?"}
     RESOLVE["Resolve repo-relative clips, segments, and model paths<br/>_resolve_runtime_paths(app_config, REPO_ROOT)"]
@@ -45,7 +45,7 @@ flowchart TB
     VT{"verify_tpu?"}
     VERIFY["Inside build_detector: load model and smoke-test Edge TPU delegate<br/>detector.verify_tpu()"]
     NE{"NetraPiError?"}
-    RUN["Run capture loop until Ctrl+C, max_laps, or should_stop<br/>pipeline.run(**run_kwargs)"]
+    RUN["Run capture loop until Ctrl+C or should_stop<br/>pipeline.run(**run_kwargs)"]
     KI{"Stop?"}
     OK((exit 0))
     ERR1((exit 1))
@@ -64,9 +64,11 @@ flowchart TB
 
 | CLI flag | Default | Effect |
 |----------|---------|--------|
-| **`--verify-tpu`** / **`--no-verify-tpu`** | verify on | When **true**, **`build_detector`** runs **`verify_tpu()`**; failure raises **`DetectionError`** (caught as **`NetraPiError`**, exit **1**) |
-| **`--max-laps N`** | continuous | Passed to **`run_kwargs`**; stop after N **`run_one_lap`** iterations |
 | **`--full-record`** / **`--no-full-record`** | config value | Passed to **`run_kwargs`**; overrides **`trip_recorder.json`** **`enabled`** |
+| **`--drain-trips {clips,trips,both}`** | (off) | Maintenance upload; does not run capture |
+| **`--delete-after-drain {clips,trips,both}`** | (off) | After a successful drain, unlink local MP4s already in S3 |
+| **`--delete-uploaded-local`** | (off) | Unlink local MP4s already in S3 (no drain) |
+| **`--delete-all-local`** | (off) | Unlink finished local MP4s (does not delete S3) |
 
 **Happy path:** **`main`** → import path → **`parse_args`** → **`AppConfig.load`** → **`_resolve_runtime_paths`** → **`build_pipeline`** → (optional TPU verify) → **`pipeline.run`** → exit **0**.
 

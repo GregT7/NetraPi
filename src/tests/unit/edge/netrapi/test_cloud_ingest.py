@@ -448,6 +448,96 @@ def test_drain_trip_segments_uploads_finished_pending_only(tmp_path: Path) -> No
         )
 
 
+def test_drain_clips_uploads_pending(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
+    _upgrade(url)
+    clip_path = tmp_path / "clip.mp4"
+    clip_path.write_bytes(b"fake-mp4")
+    started = datetime(2026, 8, 16, 18, 0, 0)
+    put_ids: list[int] = []
+
+    def json_request(method: str, path: str, body):
+        if path.endswith("s3-upload-url"):
+            put_ids.append(body.get("event_id") or body.get("clip_id"))
+            return {
+                "url": "https://s3.example/clip-put",
+                "object_key": "Aug-2026/driving_session_id_1/clips/clip-pending.mp4",
+                "method": "PUT",
+            }
+        return {"ok": True}
+
+    def put_bytes(*_args) -> None:
+        return None
+
+    with get_session() as session:
+        driving = insert_driving_session(session, start_time=started)
+        pending = insert_local_event(
+            session,
+            driving_session_id=driving.id,
+            time=started + timedelta(seconds=12),
+            type_value="rolling-stop",
+            clip_path=clip_path,
+            fps=30,
+            order_number=1,
+            num_frames=60,
+            clip_start=started,
+            clip_end=started + timedelta(seconds=2),
+            knn_stage1=(0.4, 0.12, 0.9, 0.08),
+            knn_stage2=(0.12, 4.2),
+            approach={
+                "peak_area_pct": 1.1,
+                "approach_duration_s": 1.8,
+                "increasing_fraction": 0.7,
+                "log_linear_r2": 0.85,
+                "drop_duration_s": 0.4,
+                "post_drop_holds": False,
+                "fail_reasons": (),
+            },
+        )
+        stored = insert_local_event(
+            session,
+            driving_session_id=driving.id,
+            time=started + timedelta(seconds=20),
+            type_value="complete-stop",
+            clip_path=clip_path,
+            fps=30,
+            order_number=2,
+            num_frames=60,
+            clip_start=started,
+            clip_end=started + timedelta(seconds=2),
+            knn_stage1=(0.4, 0.12, 0.9, 0.08),
+            knn_stage2=(0.12, 4.2),
+            approach={
+                "peak_area_pct": 1.1,
+                "approach_duration_s": 1.8,
+                "increasing_fraction": 0.7,
+                "log_linear_r2": 0.85,
+                "drop_duration_s": 0.4,
+                "post_drop_holds": False,
+                "fail_reasons": (),
+            },
+        )
+        session.commit()
+        pending_id = pending.id
+        stored_id = stored.id
+        stored_clip = session.exec(select(Clip).where(Clip.event_id == stored_id)).first()
+        assert stored_clip is not None
+        stored_clip.s3_key = "Aug-2026/driving_session_id_1/clips/clip-already.mp4"
+        stored_clip.s3_stored = True
+        session.add(stored_clip)
+        session.commit()
+
+    uploaded = CloudIngest(
+        json_request=json_request, put_bytes=put_bytes
+    ).drain_clips()
+    assert uploaded == 1
+    with get_session() as session:
+        clip = session.exec(select(Clip).where(Clip.event_id == pending_id)).first()
+        assert clip is not None
+        assert clip.s3_stored is True
+        assert clip.s3_key == "Aug-2026/driving_session_id_1/clips/clip-pending.mp4"
+
+
 def test_sync_session_missing_row_raises(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
     _upgrade(url)

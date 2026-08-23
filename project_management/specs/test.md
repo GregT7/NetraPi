@@ -1338,8 +1338,115 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
+# Sprint 8 — Edge Boot Health, Online/Offline, Drain Catch-up
+
+*Tests: TP-57 to TP-62*
+
+> **Focus:** Synchronous edge boot health before capture; cheap `GET /health` vs authenticated `GET /api/netrapi/ready`; one-way online/offline; Render keep-alive; `--drain-trips {clips,trips,both}` and optional `--delete-after-drain {clips,trips,both}` after offline drives. Unit: `src/tests/unit/edge/netrapi/test_boot_health.py`, `src/tests/unit/backend/app/routes/test_ready.py`, drain/delete in `test_main.py` / `test_local_cleanup.py`. Integration: `src/tests/integration/tp_57`–`tp_62`.
+
+### TP-57: TPU smoke abort
+- **Description**: Verifies a failed Coral TFLite dummy invoke aborts `main.py` before capture.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.24, M-10.25, M-3.11
+- **Prerequisites**
+  - Boot health module exists.
+- **Steps**
+  1. Mock `Detector.verify_tpu` to return false (or raise).
+  2. Run `main()` capture path (`src/tests/integration/tp_57`).
+- **Pass criteria**
+  - Exit code is 1.
+  - `build_pipeline` / `run_loop` is not called.
+
+### TP-58: Offline when Wi-Fi is missing or internet fails
+- **Description**: Verifies no association is informational offline, and associated-but-no-internet is loud offline; both still start capture without cloud ingest.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.24, M-10.26, M-10.27, M-5.10
+- **Prerequisites**
+  - Boot health module exists.
+- **Steps**
+  1. Mock TPU pass + no Wi-Fi association.
+  2. Mock TPU pass + association + failed 8.8.8.8/public-host probe.
+  3. Confirm `cloud_enabled=False` and capture would start (`src/tests/integration/tp_58`).
+- **Pass criteria**
+  - No association: offline, no error-level exception row required.
+  - Associated but no internet: offline, loud log naming both facts.
+  - Capture is not aborted.
+
+### TP-59: Authenticated `/ready` (Postgres + S3)
+- **Description**: Verifies `GET /api/netrapi/ready` requires the API key, runs `SELECT 1` and S3 `HeadBucket`, and leaves `GET /health` cheap.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.28, M-7.10, M-7.12, M-6.20
+- **Prerequisites**
+  - Ready route implemented. Deployed Render for the live harness; unit 503 paths in `test_ready.py`.
+- **Steps**
+  1. Call `/ready` without a key (401).
+  2. Call `/ready` with a key when DB and S3 succeed (200, both layers ok).
+  3. Force DB or S3 failure (503 with per-layer status) — unit.
+  4. Call `GET /health` (200, no DB/S3).
+  5. Live: `src/tests/integration/tp_59`.
+- **Pass criteria**
+  - `/health` stays unauthenticated liveness.
+  - `/ready` is authenticated and reports which layer failed.
+
+### TP-60: Online boot and keep-alive drop to offline
+- **Description**: Verifies internet + `/health` + `/ready` selects online mode, keep-alive pings `/health`, and three consecutive failures disable cloud ingest for the rest of the process.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.28, M-10.29, M-6.10
+- **Prerequisites**
+  - Keep-alive implemented.
+- **Steps**
+  1. Mock association, internet, `/health`, `/ready` success.
+  2. Confirm online wires `CloudIngest`.
+  3. Fail three keep-alive pings (`src/tests/integration/tp_60`).
+- **Pass criteria**
+  - Mode starts online.
+  - After three failures, `cloud_ingest` is None, keep-alive stops, capture continues, mode does not return to online.
+
+### TP-61: Drain clips, trips, or both
+- **Description**: Verifies `--drain-trips` requires `clips`, `trips`, or `both`, wakes Render via `/health`, uploads the selected pending media, and may `--delete-after-drain {clips,trips,both}` after a successful drain.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-6.10, M-6.11
+- **Prerequisites**
+  - Drain target argument implemented.
+- **Steps**
+  1. Parse `--drain-trips` without a target (error).
+  2. `clips` drains pending event JSON + clip PUT.
+  3. `trips` drains trip segments.
+  4. `both` does clips then trips.
+  5. `--delete-after-drain` without `--drain-trips` (error).
+  6. After a successful drain, `--delete-after-drain clips|trips|both` unlinks only that local media already in S3.
+  7. Run `src/tests/integration/tp_61`.
+- **Pass criteria**
+  - Capture loop is not started.
+  - Counts print to stdout.
+  - `/health` is polled before upload.
+  - Delete runs only after a successful drain and honors clips/trips/both.
+
+### TP-62: Health settings snapshot
+- **Description**: Verifies `health.json` is loaded at runtime and snapshotted as `health_config` (Alembic 0004), included in the master-config fingerprint.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.24, M-3.21
+- **Prerequisites**
+  - Alembic 0004 and snapshot wiring.
+- **Steps**
+  1. Upgrade to head; seed id 1 has a `health_config` row.
+  2. Fingerprint live JSON including `health.json`.
+  3. Change a health timeout and confirm a new snapshot is inserted (`src/tests/integration/tp_62`).
+- **Pass criteria**
+  - Existing snapshots are backfilled.
+  - Unchanged JSON reuses id 1.
+  - A health.json change creates a new `master_config`.
+
+---
+
 ## 8. Coverage Notes
-This plan currently covers through **Sprint 7** (edge + local persistence + backend-orchestrated cloud path + deploy + deployed E2E). Deferred for later test generation:
+This plan currently covers through **Sprint 8** (edge boot health + online/offline + drain catch-up, plus Sprint 7 cloud E2E). Deferred for later test generation:
 - frontend / portfolio UI tests
 - full CI/CD matrix beyond backend deploy health
 - 10-hour collection and model-evaluation publication tests
@@ -1355,5 +1462,6 @@ Covered now:
 - edge ↔ deployed backend E2E (no frontend; verification only)
 - Sprint 7 harnesses under `src/tests/integration/tp_50`–`tp_56` against https://netrapi.onrender.com
 - Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
+- Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain-trips clips|trips|both` + `--delete-after-drain`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
 
-**TP range:** TP-01 through TP-56. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).
+**TP range:** TP-01 through TP-62. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

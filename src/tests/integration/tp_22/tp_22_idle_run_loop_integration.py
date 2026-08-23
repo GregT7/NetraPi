@@ -159,7 +159,7 @@ def main() -> int:
     print(f"  record_safe_events: {app_config.recording_manager.record_safe_events}")
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
 
         print(f"\nIdle run (max_laps={MAX_LAPS}, full_record={FULL_RECORD}) ...")

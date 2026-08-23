@@ -25,10 +25,9 @@ python src/tests/integration/at_7_3/at_7_3_incar_e2e_deployed_cloud.py
 4. **SPACE** → **run-through** (beep + clip + upload).
 
 Classifications before SPACE are ignored. Clips: `clips_dir/at_7_3/`.
-SQLite is the Pi file `src/main/db/netrapi.db` (not wiped). Schema must already
-be at Alembic head (`python -m alembic -c src/main/db/alembic.ini upgrade head`
-from repo root, or from `src/main/edge` with `../db/alembic.ini`). Script prints
-all three event types; unsafe rows include `s3_key`.
+SQLite is the Pi file from `DATABASE_URL` (usually `src/main/db/netrapi.db`).
+The harness runs `alembic upgrade head` on startup (does **not** wipe existing
+rows). Script prints all three event types; unsafe rows include `s3_key`.
 
 Optional trip files: this harness leaves `--full-record` off. To also record
 trip segments, run `python src/main/edge/main.py --full-record` as a separate

@@ -62,6 +62,8 @@ def test_app_config_loads_fixture_directory():
     assert app_config.buzzer.play_on.unsafe is True
     assert app_config.buzzer.play_on.safe is False
     assert app_config.buzzer.enabled is True
+    assert app_config.health.render_wait_s == 90
+    assert app_config.health.wlan_interface == "wlan0"
 
 
 def test_app_config_loads_production_directory():
@@ -125,6 +127,7 @@ def test_app_config_invalid_camera_mode_id(tmp_path):
         "recording_manager.json",
         "trip_recorder.json",
         "buzzer.json",
+        "health.json",
     ):
         (tmp_path / name).write_text((FIXTURES_DIR / name).read_text(encoding="utf-8"), encoding="utf-8")
 

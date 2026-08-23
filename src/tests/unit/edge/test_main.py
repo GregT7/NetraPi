@@ -28,21 +28,19 @@ def test_parse_args_defaults():
 
     args = parse_args([])
 
-    assert args.verify_tpu is True
-    assert args.max_laps is None
+    assert not hasattr(args, "max_laps")
     assert args.full_record is None
-    assert args.drain_trips is False
+    assert args.drain_trips is None
     assert args.delete_uploaded_local is False
     assert args.delete_all_local is False
+    assert args.delete_after_drain is None
 
 
-def test_parse_args_max_laps():
+def test_parse_args_rejects_max_laps():
     from main import parse_args
 
-    args = parse_args(["--max-laps", "5", "--no-verify-tpu"])
-
-    assert args.max_laps == 5
-    assert args.verify_tpu is False
+    with pytest.raises(SystemExit):
+        parse_args(["--max-laps", "5"])
 
 
 def test_parse_args_full_record():
@@ -57,24 +55,31 @@ def test_parse_args_full_record():
 
 def test_main_runs_pipeline():
     from main import main
+    from netrapi.health import HealthResult
 
     pipeline = MagicMock()
+    health = HealthResult(mode="online", abort=False, detector=MagicMock())
     with (
         patch("config.loader.AppConfig.load", return_value=MagicMock()) as load_config,
         patch("db.database.init_engine") as init_engine,
         patch("netrapi.build_pipeline", return_value=pipeline) as build,
         patch("netrapi.backend_auth.apply_edge_env") as apply_env,
+        patch("netrapi.health.run_boot_health", return_value=health),
+        patch("netrapi.health.KeepAlive") as keepalive_cls,
         patch("main._resolve_runtime_paths", side_effect=lambda cfg, _root: cfg),
     ):
-        exit_code = main(["--no-verify-tpu", "--max-laps", "2", "--full-record"])
+        keepalive_cls.return_value = MagicMock()
+        exit_code = main(["--full-record"])
 
     assert exit_code == 0
     apply_env.assert_called_once_with()
     load_config.assert_called_once_with((EDGE_DIR / "config").resolve())
     init_engine.assert_called_once_with()
     build.assert_called_once()
-    assert build.call_args.kwargs["verify_tpu"] is False
-    pipeline.run.assert_called_once_with(max_laps=2, full_record=True)
+    assert build.call_args.kwargs["cloud_enabled"] is True
+    pipeline.run.assert_called_once_with(full_record=True)
+    keepalive_cls.return_value.start.assert_called_once()
+    keepalive_cls.return_value.stop.assert_called_once()
 
 
 def test_main_drain_trips_skips_pipeline():
@@ -86,17 +91,17 @@ def test_main_drain_trips_skips_pipeline():
         patch("netrapi.backend_auth.apply_edge_env") as apply_env,
         patch("db.database.init_engine") as init_engine,
         patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
+        patch("netrapi.health.wake_render", return_value=True),
         patch("netrapi.build_pipeline") as build,
-        patch("config.loader.AppConfig.load") as load_config,
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
     ):
-        exit_code = main(["--drain-trips"])
+        exit_code = main(["--drain-trips", "trips"])
 
     assert exit_code == 0
     apply_env.assert_called_once_with()
     init_engine.assert_called_once_with()
     ingest.drain_trip_segments.assert_called_once_with()
     build.assert_not_called()
-    load_config.assert_not_called()
 
 
 def test_main_drain_trips_returns_1_without_auth():
@@ -108,7 +113,7 @@ def test_main_drain_trips_returns_1_without_auth():
         patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=None),
         patch("netrapi.build_pipeline") as build,
     ):
-        assert main(["--drain-trips"]) == 1
+        assert main(["--drain-trips", "trips"]) == 1
     build.assert_not_called()
 
 
@@ -116,7 +121,7 @@ def test_parse_args_maintenance_jobs_are_exclusive():
     from main import parse_args
 
     with pytest.raises(SystemExit):
-        parse_args(["--drain-trips", "--delete-uploaded-local"])
+        parse_args(["--drain-trips", "trips", "--delete-uploaded-local"])
 
 
 def test_main_delete_uploaded_local_skips_pipeline():
@@ -173,3 +178,170 @@ def test_main_returns_1_on_config_error():
         patch("config.loader.AppConfig.load", side_effect=ConfigError("broken")),
     ):
         assert main([]) == 1
+
+
+def test_main_tpu_abort_skips_pipeline():
+    from main import main
+    from netrapi.health import HealthResult
+
+    health = HealthResult(mode="offline", abort=True, detector=None)
+    with (
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+        patch("db.database.init_engine"),
+        patch("netrapi.build_pipeline") as build,
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("netrapi.health.run_boot_health", return_value=health),
+        patch("netrapi.health.KeepAlive") as keepalive_cls,
+        patch("main._resolve_runtime_paths", side_effect=lambda cfg, _root: cfg),
+    ):
+        assert main([]) == 1
+    build.assert_not_called()
+    keepalive_cls.assert_not_called()
+
+
+def test_main_offline_skips_keepalive():
+    from main import main
+    from netrapi.health import HealthResult
+
+    pipeline = MagicMock()
+    health = HealthResult(mode="offline", abort=False, detector=MagicMock())
+    with (
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+        patch("db.database.init_engine"),
+        patch("netrapi.build_pipeline", return_value=pipeline) as build,
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("netrapi.health.run_boot_health", return_value=health),
+        patch("netrapi.health.KeepAlive") as keepalive_cls,
+        patch("main._resolve_runtime_paths", side_effect=lambda cfg, _root: cfg),
+    ):
+        assert main([]) == 0
+    assert build.call_args.kwargs["cloud_enabled"] is False
+    keepalive_cls.assert_not_called()
+    pipeline.run.assert_called_once()
+
+
+def test_main_drain_clips():
+    from main import main
+
+    ingest = MagicMock()
+    ingest.drain_clips.return_value = 3
+    with (
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("db.database.init_engine"),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
+        patch("netrapi.health.wake_render", return_value=True),
+        patch("netrapi.build_pipeline") as build,
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+    ):
+        assert main(["--drain-trips", "clips"]) == 0
+    ingest.drain_clips.assert_called_once_with()
+    ingest.drain_trip_segments.assert_not_called()
+    build.assert_not_called()
+
+
+def test_main_drain_both_clips_then_trips():
+    from main import main
+
+    ingest = MagicMock()
+    ingest.drain_clips.return_value = 1
+    ingest.drain_trip_segments.return_value = 2
+    order: list[str] = []
+    ingest.drain_clips.side_effect = lambda: order.append("clips") or 1
+    ingest.drain_trip_segments.side_effect = lambda: order.append("trips") or 2
+    with (
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("db.database.init_engine"),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
+        patch("netrapi.health.wake_render", return_value=True),
+        patch("netrapi.build_pipeline") as build,
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+    ):
+        assert main(["--drain-trips", "both"]) == 0
+    assert order == ["clips", "trips"]
+    build.assert_not_called()
+
+
+def test_main_drain_aborts_when_render_wake_fails():
+    from main import main
+
+    ingest = MagicMock()
+    with (
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("db.database.init_engine"),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
+        patch("netrapi.health.wake_render", return_value=False),
+        patch("netrapi.build_pipeline") as build,
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+    ):
+        assert main(["--drain-trips", "trips"]) == 1
+    ingest.drain_clips.assert_not_called()
+    ingest.drain_trip_segments.assert_not_called()
+    build.assert_not_called()
+
+
+def test_parse_args_drain_trips_requires_choice():
+    from main import parse_args
+
+    with pytest.raises(SystemExit):
+        parse_args(["--drain-trips"])
+    args = parse_args(["--drain-trips", "clips"])
+    assert args.drain_trips == "clips"
+
+
+def test_parse_args_delete_after_drain_pairs_with_drain():
+    from main import parse_args
+
+    args = parse_args(["--drain-trips", "clips", "--delete-after-drain", "clips"])
+    assert args.drain_trips == "clips"
+    assert args.delete_after_drain == "clips"
+
+
+def test_main_delete_after_drain_requires_drain_trips():
+    from main import main
+
+    assert main(["--delete-after-drain", "both"]) == 1
+
+
+def test_main_drain_then_delete_after_drain():
+    from main import main
+
+    ingest = MagicMock()
+    order: list[str] = []
+    ingest.drain_clips.side_effect = lambda: order.append("clips") or 1
+    ingest.drain_trip_segments.side_effect = lambda: order.append("trips") or 2
+    with (
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("db.database.init_engine"),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
+        patch("netrapi.health.wake_render", return_value=True),
+        patch("netrapi.build_pipeline") as build,
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+        patch(
+            "netrapi.local_cleanup.delete_uploaded_local_media", return_value=3
+        ) as cleanup,
+    ):
+        cleanup.side_effect = lambda *_a, **_k: order.append("delete") or 3
+        assert main(["--drain-trips", "both", "--delete-after-drain", "clips"]) == 0
+    assert order == ["clips", "trips", "delete"]
+    cleanup.assert_called_once_with(ingest, target="clips")
+    build.assert_not_called()
+
+
+def test_main_drain_wake_fail_skips_delete_after_drain():
+    from main import main
+
+    ingest = MagicMock()
+    with (
+        patch("netrapi.backend_auth.apply_edge_env"),
+        patch("db.database.init_engine"),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
+        patch("netrapi.health.wake_render", return_value=False),
+        patch("netrapi.build_pipeline") as build,
+        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+        patch("netrapi.local_cleanup.delete_uploaded_local_media") as cleanup,
+    ):
+        assert main(["--drain-trips", "trips", "--delete-after-drain", "trips"]) == 1
+    ingest.drain_clips.assert_not_called()
+    ingest.drain_trip_segments.assert_not_called()
+    cleanup.assert_not_called()
+    build.assert_not_called()

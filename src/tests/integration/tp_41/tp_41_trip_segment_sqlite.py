@@ -192,7 +192,7 @@ def main() -> int:
             resolve_runtime_paths=_resolve_runtime_paths,
         )
         app_config.trip_recorder.segments_dir.mkdir(parents=True, exist_ok=True)
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
         cam = app_config.camera
         frame = np.zeros((cam.height, cam.width, cam.channels), dtype=np.uint8)

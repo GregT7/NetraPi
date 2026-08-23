@@ -123,7 +123,7 @@ def main() -> int:
                 resolve_runtime_paths=_resolve_runtime_paths,
                 record_safe_events=record_safe,
             )
-            pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+            pipeline = build_pipeline(app_config)
             manager = pipeline.manager
             manager._event_manager = _stub_event_manager(event)
 

@@ -244,7 +244,7 @@ def main() -> int:
             resolve_runtime_paths=_resolve_runtime_paths,
             clips_dir=clips_dir,
         )
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
         if manager._local_store is None:
             raise RuntimeError("LocalStore not wired; init_engine must run before build_pipeline")

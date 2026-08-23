@@ -6,7 +6,7 @@ from sqlmodel import select
 
 import db.database as database
 from db.database import get_session, init_engine
-from db.models import ClassificationType, MasterConfig
+from db.models import ClassificationType, HealthConfig, MasterConfig
 
 ALEMBIC_INI = Path(__file__).resolve().parents[3] / "main" / "db" / "alembic.ini"
 
@@ -33,6 +33,11 @@ def test_upgrade_head_seeds_master_config_and_types(sqlite_url: str) -> None:
         assert master is not None
         assert master.id == 1
         values = {row.value for row in session.exec(select(ClassificationType)).all()}
+        health = session.exec(
+            select(HealthConfig).where(HealthConfig.master_config_id == 1)
+        ).one()
     assert "complete-stop" in values
     assert "rolling-stop" in values
     assert "run-through" in values
+    assert health.render_wait_s == 90
+    assert health.wlan_interface == "wlan0"

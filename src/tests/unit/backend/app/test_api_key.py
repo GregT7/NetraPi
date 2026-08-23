@@ -5,11 +5,10 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
-def test_health_does_not_require_api_key(memory_database_url: str) -> None:
+def test_ready_without_api_key_returns_401(memory_database_url: str) -> None:
     with TestClient(create_app()) as client:
-        response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+        response = client.get("/api/netrapi/ready")
+    assert response.status_code == 401
 
 
 def test_ingest_without_api_key_returns_401(memory_database_url: str) -> None:

@@ -10,16 +10,13 @@ from netrapi.buzzer import Buzzer
 from netrapi.capture import Camera, PreviewUI
 from netrapi.detection import Detector
 from netrapi.events import EventManager
-from netrapi.exceptions import DetectionError
 from netrapi.recording import Recorder, TripRecorder
 from netrapi.recording.recording_manager import RecordingManager
 
 
-def build_detector(app_config: AppConfig, *, verify_tpu: bool) -> Detector:
+def build_detector(app_config: AppConfig) -> Detector:
     detector = Detector(app_config.detector)
     detector.load()
-    if verify_tpu and not detector.verify_tpu():
-        raise DetectionError("Edge TPU verification failed")
     return detector
 
 
@@ -88,7 +85,11 @@ class NetraPiPipeline:
 
 
 def build_pipeline(
-    app_config: AppConfig, *, verify_tpu: bool, persist: bool | None = None
+    app_config: AppConfig,
+    *,
+    persist: bool | None = None,
+    cloud_enabled: bool = True,
+    detector: Detector | None = None,
 ) -> NetraPiPipeline:
     import db.database as database
 
@@ -98,8 +99,9 @@ def build_pipeline(
     if persist is None:
         persist = database._engine is not None
     store = LocalStore() if persist else None
-    cloud = try_cloud_ingest() if persist else None
-    detector = build_detector(app_config, verify_tpu=verify_tpu)
+    cloud = try_cloud_ingest() if persist and cloud_enabled else None
+    if detector is None:
+        detector = build_detector(app_config)
     event_manager = build_event_manager(app_config)
     recorder = build_recorder(app_config)
     trip_recorder = build_trip_recorder(app_config)

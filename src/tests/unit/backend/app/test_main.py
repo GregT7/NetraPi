@@ -22,6 +22,7 @@ def test_create_app_registers_health_and_ingest_routes():
     application = create_app()
     paths = _route_paths(application)
     assert "/health" in paths
+    assert "/api/netrapi/ready" in paths
     assert "/api/netrapi/driving-session" in paths
     assert "/api/netrapi/master-config" in paths
     assert "/api/netrapi/trip-segment" in paths

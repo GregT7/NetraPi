@@ -121,3 +121,8 @@ def head_object(object_key: str, *, settings: Settings | None = None) -> dict | 
         if code in {"404", "NoSuchKey", "NotFound"}:
             return None
         raise
+
+
+def head_bucket(*, settings: Settings | None = None) -> None:
+    _key_id, _secret, _region, bucket = s3_settings_or_raise(settings)
+    _client(settings).head_bucket(Bucket=bucket)

@@ -184,7 +184,7 @@ def main() -> int:
     print(f"  marker_lap_limit: {MARKER_LAP_LIMIT}")
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
         _install_marker_hooks(manager, preview_frames=preview_markers)
 

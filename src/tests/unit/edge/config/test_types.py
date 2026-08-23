@@ -11,6 +11,7 @@ from config.types import (
     DetectorConfig,
     DisplayConfig,
     EventManagerConfig,
+    HealthConfig,
     KnnConfig,
     MotionConfig,
     PreviewConfig,
@@ -346,6 +347,31 @@ def test_buzzer_config_disabled_when_both_play_on_false():
     )
 
     assert config.enabled is False
+
+
+def test_health_config_from_json():
+    config = HealthConfig.from_json(
+        {
+            "render_wait_s": 90,
+            "render_poll_s": 2,
+            "render_request_timeout_s": 15,
+            "internet_probe_host": "8.8.8.8",
+            "internet_probe_port": 53,
+            "internet_probe_timeout_s": 3,
+            "public_https_host": "www.google.com",
+            "public_https_port": 443,
+            "wlan_interface": "wlan0",
+            "keepalive_interval_s": 300,
+            "keepalive_request_timeout_s": 15,
+            "keepalive_fail_limit": 3,
+            "log_path": "logs/health.log",
+        }
+    )
+
+    assert config.render_wait_s == 90
+    assert config.wlan_interface == "wlan0"
+    assert config.keepalive_fail_limit == 3
+    assert config.log_path == Path("logs/health.log")
 
 
 def test_buzzer_config_rejects_invalid_volume():

@@ -90,7 +90,10 @@ def main() -> int:
 
     try:
         print("\n[1/3] load() + verify_tpu() ...")
-        detector = build_detector(app_config, verify_tpu=True)
+        detector = build_detector(app_config)
+        if not detector.verify_tpu():
+            print("  verify_tpu(): failed", file=sys.stderr)
+            return 1
         print("  verify_tpu(): OK")
 
         print(f"\n[2/3] capture frame (warmup={WARMUP_FRAMES}) ...")

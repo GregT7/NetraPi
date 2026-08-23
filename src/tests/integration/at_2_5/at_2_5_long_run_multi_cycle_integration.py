@@ -252,7 +252,7 @@ def main() -> int:
     clips_before_cycle = clips_before_run
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
 
         def should_stop() -> bool:
