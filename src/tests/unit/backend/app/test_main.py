@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app, create_app
 from db import database as database
@@ -52,3 +53,19 @@ def test_health_through_app(memory_database_url: str) -> None:
     body = response.json()
     assert body["status"] == "ok"
     datetime.fromisoformat(body["time"].replace("Z", "+00:00"))
+
+
+def test_docs_enabled_locally(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENDER", raising=False)
+    paths = _route_paths(create_app())
+    assert "/docs" in paths
+    assert "/redoc" in paths
+    assert "/openapi.json" in paths
+
+
+def test_docs_disabled_on_render(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RENDER", "true")
+    paths = _route_paths(create_app())
+    assert "/docs" not in paths
+    assert "/redoc" not in paths
+    assert "/openapi.json" not in paths

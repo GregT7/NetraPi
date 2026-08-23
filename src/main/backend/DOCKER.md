@@ -21,6 +21,7 @@ docker compose up --build
 ```
 
 Health: http://127.0.0.1:8000/health
+Docs (Compose only, not Render): http://127.0.0.1:8000/docs
 
 Compose sets a dummy `NETRAPI_API_KEY` (`local-compose-netrapi-key`). Protected ingest routes need header `X-API-Key` with that value. `/health` does not.
 

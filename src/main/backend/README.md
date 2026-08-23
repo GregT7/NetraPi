@@ -16,7 +16,7 @@ AWS_REGION=us-east-2
 AWS_S3_BUCKET=
 ```
 
-`POST /api/netrapi/*` requires header `X-API-Key` matching `NETRAPI_API_KEY`. `GET /health` stays open.
+`POST /api/netrapi/*` requires header `X-API-Key` matching `NETRAPI_API_KEY`. `GET /health` stays open. Swagger (`/docs`, `/redoc`, `/openapi.json`) is on for local uvicorn / Compose and off on Render (decision 59).
 
 From repo root, integration venv (Alembic `0001`–`0002` must already be applied to that `DATABASE_URL`; `master_config` id 1 must exist):
 
