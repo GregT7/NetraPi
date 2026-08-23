@@ -6,6 +6,7 @@ from pathlib import Path
 from db.config_snapshot import ensure_snapshot_from_json_dir
 from db.database import get_session
 from db.writes import (
+    attach_local_clip,
     end_driving_session,
     insert_driving_session,
     insert_local_event,
@@ -47,12 +48,12 @@ class LocalStore:
         driving_session_id: int,
         time: datetime,
         type_value: str,
-        clip_path: Path,
-        fps: int,
-        order_number: int,
-        num_frames: int,
-        clip_start: datetime,
-        clip_end: datetime,
+        clip_path: Path | str | None = None,
+        fps: int | None = None,
+        order_number: int | None = None,
+        num_frames: int | None = None,
+        clip_start: datetime | None = None,
+        clip_end: datetime | None = None,
         event_id: int | None = None,
         clip_id: int | None = None,
         knn_stage1: tuple[float, ...] | None = None,
@@ -85,6 +86,35 @@ class LocalStore:
             if event.id is None:
                 raise RuntimeError("event insert did not assign an id")
             return event.id
+
+    def attach_clip(
+        self,
+        event_id: int,
+        *,
+        clip_path: Path,
+        fps: int,
+        order_number: int,
+        num_frames: int,
+        clip_start: datetime,
+        clip_end: datetime,
+        clip_id: int | None = None,
+    ) -> int:
+        with get_session() as session:
+            clip = attach_local_clip(
+                session,
+                event_id,
+                clip_path=clip_path,
+                fps=fps,
+                order_number=order_number,
+                num_frames=num_frames,
+                clip_start=clip_start,
+                clip_end=clip_end,
+                clip_id=clip_id,
+            )
+            session.commit()
+            if clip.id is None:
+                raise RuntimeError("clip attach did not assign an id")
+            return clip.id
 
     def persist_trip_segment(
         self,

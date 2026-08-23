@@ -541,7 +541,7 @@ def test_run_loop_cloud_failure_does_not_abort(tmp_path: Path):
     store.end_session.assert_called_once()
 
 
-def test_finish_clip_syncs_event_to_cloud(tmp_path: Path):
+def test_finish_clip_attaches_clip_and_syncs(tmp_path: Path):
     frame = np.zeros((48, 64, 3), dtype=np.uint8)
     config = _default_recording_manager_config(
         tmp_path, pre_roll_seconds=0.1, post_roll_seconds=0.0
@@ -559,7 +559,7 @@ def test_finish_clip_syncs_event_to_cloud(tmp_path: Path):
         )
     )
     store = MagicMock()
-    store.persist_event.return_value = 42
+    store.attach_clip.return_value = 99
     cloud = MagicMock()
     manager = _recording_manager(
         app_config,
@@ -569,13 +569,63 @@ def test_finish_clip_syncs_event_to_cloud(tmp_path: Path):
         cloud_ingest=cloud,
     )
     manager._driving_session_id = 7
-    manager._pending_event = DrivingEvent(type=StopSignEnum.ROLLING_STOP)
+    manager._pending_event_id = 42
     manager.pre_buffer.push(FrameRecord(raw=frame, display=frame), captured_at=0.0)
     manager.begin_clip()
     manager.run_one_lap()
 
-    store.persist_event.assert_called_once()
+    store.attach_clip.assert_called_once()
+    assert store.attach_clip.call_args.args[0] == 42
     cloud.sync_event.assert_called_once_with(42)
+
+
+def test_commit_evaluated_event_persists_metadata_without_clip(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    store = MagicMock()
+    store.persist_event.return_value = 11
+    cloud = MagicMock()
+    manager = _recording_manager(
+        _app_config(tmp_path), frame, local_store=store, cloud_ingest=cloud
+    )
+    manager._driving_session_id = 7
+    event = DrivingEvent(type=StopSignEnum.COMPLETE_STOP)
+
+    manager._commit_evaluated_event(event)
+
+    store.persist_event.assert_called_once()
+    kwargs = store.persist_event.call_args.kwargs
+    assert kwargs["type_value"] == StopSignEnum.COMPLETE_STOP.model_label
+    assert kwargs.get("clip_path") is None
+    cloud.sync_event.assert_called_once_with(11)
+    assert manager._pending_event_id == 11
+
+
+def test_safe_event_commits_without_begin_clip(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    store = MagicMock()
+    store.persist_event.return_value = 3
+    cloud = MagicMock()
+    event_manager = MagicMock()
+    event_manager.needs_detection = False
+    event_manager.ready_to_evaluate = True
+    event_manager.evaluate.return_value = DrivingEvent(type=StopSignEnum.COMPLETE_STOP)
+    manager = _recording_manager(
+        _app_config(tmp_path),
+        frame,
+        event_manager=event_manager,
+        local_store=store,
+        cloud_ingest=cloud,
+    )
+    manager._driving_session_id = 7
+
+    result = manager.run_one_lap()
+
+    assert result is None
+    assert manager.clip_active is False
+    store.persist_event.assert_called_once()
+    store.attach_clip.assert_not_called()
+    cloud.sync_event.assert_called_once_with(3)
+    assert manager._pending_event_id is None
 
 
 def test_run_loop_closes_buzzer_when_lap_raises(tmp_path: Path):

@@ -39,7 +39,7 @@ Use **Yes** = update in same session unless user says doc-only. **Maybe** = conf
 | New TP-xx only (existing M already in MVS) | No | — (source) | No | Instruct user (row 16+) | No |
 | Sprint section header wording only | No | — (source) | No | No | No |
 
-### C. Sprint ↔ test alignment (current plan through Sprint E)
+### C. Sprint ↔ test alignment (current plan through Sprint 7)
 
 | Sprint (test.md header) | TP range |
 |-------------------------|----------|
@@ -48,8 +48,8 @@ Use **Yes** = update in same session unless user says doc-only. **Maybe** = conf
 | Sprint 3 | TP-25–28 |
 | Sprint 4 | TP-29–31 |
 | Sprint 5 | TP-32–41 |
-| Sprint D | TP-42–49 |
-| Sprint E | TP-50–57 |
+| Sprint 6 | TP-42–49 |
+| Sprint 7 | TP-50–56; AT-7.1, AT-7.2, AT-7.3 |
 
 Frontend, full CI/CD, and collection/evaluation UI tests are **deferred** (generate later).
 
@@ -78,5 +78,5 @@ After structural changes:
 
 - M-4.10 through M-4.31 (not M-4.42)
 - M-10.10, M-10.20–23 (not M-10.30–33)
-- TP-01 through TP-57 (current active plan)
+- TP-01 through TP-56 (current active plan); AT-7.1, AT-7.2, AT-7.3
 - M-7.10 through M-7.15 (includes presigned upload URL issuance)

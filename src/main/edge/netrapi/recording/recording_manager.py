@@ -59,7 +59,7 @@ class RecordingManager:
         self._triggered_at: datetime | None = None
         self._event_index = 0
         self._driving_session_id: int | None = None
-        self._pending_event: DrivingEvent | None = None
+        self._pending_event_id: int | None = None
         self._open_trip_segment_id: int | None = None
         self._open_trip_segment_start: datetime | None = None
         if local_store is not None and hasattr(trip_recorder, "set_on_segment_saved"):
@@ -180,16 +180,52 @@ class RecordingManager:
             self._event_manager.observe(self.pre_buffer)
             if self._event_manager.ready_to_evaluate:
                 event = self._event_manager.evaluate()
-                self._pending_event = event
                 self._buzzer.beep(event)
-                if event.is_unsafe or self._app_config.recording_manager.record_safe_events:
+                self._commit_evaluated_event(event)
+                if (
+                    event.is_unsafe
+                    or self._app_config.recording_manager.record_safe_events
+                ):
                     self.begin_clip()
+                else:
+                    # Metadata already synced; no clip will call attach.
+                    self._pending_event_id = None
             return None
         else:
             self.post_buffer.append(record)
             if self._post_roll_complete():
                 return self._finish_clip()
             return None
+
+    def _commit_evaluated_event(self, event: DrivingEvent) -> None:
+        """Persist event metadata (and sync) immediately; clip attach is separate."""
+        if self._local_store is None or self._driving_session_id is None:
+            return
+        event_time = datetime.now()
+        trip_segment_id, trip_offset = self._event_trip_location(event_time)
+        approach = None
+        if event.approach is not None:
+            approach = {
+                "peak_area_pct": event.approach.peak_area_pct,
+                "approach_duration_s": event.approach.approach_duration_s,
+                "increasing_fraction": event.approach.increasing_fraction,
+                "log_linear_r2": event.approach.log_linear_r2,
+                "drop_duration_s": event.approach.drop_duration_s,
+                "post_drop_holds": event.approach.post_drop_holds,
+                "fail_reasons": list(event.approach.fail_reasons),
+            }
+        event_id = self._local_store.persist_event(
+            driving_session_id=self._driving_session_id,
+            time=event_time,
+            type_value=event.type.model_label,
+            knn_stage1=event.knn_stage1,
+            knn_stage2=event.knn_stage2,
+            approach=approach,
+            trip_segment_id=trip_segment_id,
+            trip_offset_seconds=trip_offset,
+        )
+        self._pending_event_id = event_id
+        self._try_ingest("sync_event", event_id)
 
     def _capture_frame_record(self) -> FrameRecord:
         raw = np.asarray(self._camera.read())
@@ -228,32 +264,17 @@ class RecordingManager:
             event_index=self._event_index,
         )
         result = self._recorder.write_clip(package, fps=encoding_fps)
-        pending = self._pending_event
-        self._pending_event = None
+        event_id = self._pending_event_id
+        self._pending_event_id = None
         if (
             self._local_store is not None
-            and pending is not None
-            and self._driving_session_id is not None
+            and event_id is not None
             and self._triggered_at is not None
         ):
             config = self._app_config.recording_manager
             fps = max(1, int(round(encoding_fps)))
-            trip_segment_id, trip_offset = self._event_trip_location(self._triggered_at)
-            approach = None
-            if pending.approach is not None:
-                approach = {
-                    "peak_area_pct": pending.approach.peak_area_pct,
-                    "approach_duration_s": pending.approach.approach_duration_s,
-                    "increasing_fraction": pending.approach.increasing_fraction,
-                    "log_linear_r2": pending.approach.log_linear_r2,
-                    "drop_duration_s": pending.approach.drop_duration_s,
-                    "post_drop_holds": pending.approach.post_drop_holds,
-                    "fail_reasons": list(pending.approach.fail_reasons),
-                }
-            event_id = self._local_store.persist_event(
-                driving_session_id=self._driving_session_id,
-                time=self._triggered_at,
-                type_value=pending.type.model_label,
+            self._local_store.attach_clip(
+                event_id,
                 clip_path=result.clip_path,
                 fps=fps,
                 order_number=package.event_index,
@@ -262,11 +283,6 @@ class RecordingManager:
                 - timedelta(seconds=config.pre_roll_seconds),
                 clip_end=self._triggered_at
                 + timedelta(seconds=config.post_roll_seconds),
-                knn_stage1=pending.knn_stage1,
-                knn_stage2=pending.knn_stage2,
-                approach=approach,
-                trip_segment_id=trip_segment_id,
-                trip_offset_seconds=trip_offset,
             )
             self._try_ingest("sync_event", event_id)
         self.pre_buffer.clear()

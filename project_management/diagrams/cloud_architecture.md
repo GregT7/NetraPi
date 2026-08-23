@@ -272,7 +272,7 @@ Env vars belong to a **process**, not to the `db` package.
 | `NETRAPI_API_URL` | yes (Render origin) | unused | unused | no |
 | `SUPABASE_DB_*` | never | unused for inserts | unused | unused (optional; TP-33/39/40/49 use `DATABASE_URL`) |
 | AWS keys + bucket | never | yes | yes | TP-38 |
-| Device API key | yes (Sprint D TP-42) | verifies it | verifies it | no |
+| Device API key | yes (Sprint 6 TP-42) | verifies it | verifies it | no |
 
 The Pi authenticates to FastAPI and receives a short-lived S3 PUT URL. It does not write Supabase and does not keep permanent AWS credentials.
 
@@ -309,6 +309,6 @@ Do not design these here (ingest and MVS cloud path stay as above):
 | TP-32–40 | Provision S3 + Supabase (cloud prod); Compose boot (test Postgres, not prod); backend reaches S3/Supabase; TP-40 Alembic on Supabase |
 | TP-41 | Edge pipeline persist: `trip_segment` rows in Pi SQLite |
 | TP-42–49 | API key; S3 PUT/GET; `driving-event` → Postgres; hotspot upload; local E2E |
-| TP-50–57 | Render deploy + edge ↔ deployed backend E2E (no frontend) |
+| TP-50–56 | Render deploy + edge ↔ deployed backend E2E (no frontend) |
 
 React UI / Vercel playback stay deferred. Backend signed GET is TP-46.

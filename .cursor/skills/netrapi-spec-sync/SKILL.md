@@ -16,7 +16,7 @@ description: >-
 | File | Role | Owns |
 |------|------|------|
 | `project_management/specs/mvs.md` | **Requirements truth** | Goal, constraints, M-x.xx IDs, scope |
-| `project_management/specs/test.md` | **Verification + sprint groupings** | TP-xx tests, steps, pass criteria, sprint section headers (through Sprint E for now) |
+| `project_management/specs/test.md` | **Verification + sprint groupings** | TP-xx tests, steps, pass criteria, sprint section headers (through Sprint 7) |
 | `project_management/project_journal/decisions.md` | **Process/architecture choices** | How you test, store evidence, stack choices—not duplicate MVS reqs |
 | `project_management/specs/resume.md` | **Outcomes narrative** | Section 1 = future targets; Section 2 = done/in progress with evidence |
 | `project_management/specs/test_matrix.xlsx` | **Tracking sheet** | Columns: `test_number`, `test_name`, `description`, `status` (rows from TP-16+) |
@@ -53,7 +53,7 @@ Run (or offer to run) a **consistency pass** when:
 Read [doc-map.md](doc-map.md) for the **Yes / Maybe / No** matrix per change type.
 
 **Always check after MVS changes:**
-- `test.md` — Reqs fields on affected TP-xx; add/remove tests; sprint section headers; coverage notes (TP-01–57 for current plan)
+- `test.md` — Reqs fields on affected TP-xx; add/remove tests; sprint section headers; coverage notes (TP-01–56 for current plan)
 
 **Usually check after test.md changes:**
 - `test_matrix.xlsx` — Tell the user what to change manually (never edit the file in Cursor)
@@ -72,7 +72,7 @@ Read [doc-map.md](doc-map.md) for the **Yes / Maybe / No** matrix per change typ
 - Match existing tone: shall-statements in MVS, test plan structure in test.md.
 - **resume.md Section 1** = targets from `pop.md`/MVS—not claims of done work.
 - **resume.md Section 2** = evidence-backed only (tests passed, hardware installed, diagrams written).
-- Do not invent frontend/collection tests beyond Sprint E until the user asks; those are deferred.
+- Do not invent frontend/collection tests beyond Sprint 7 until the user asks; those are deferred.
 
 ### 4. test_matrix.xlsx (manual only — do not edit in Cursor)
 
@@ -91,7 +91,7 @@ Optionally include a **copy-paste CSV block** in chat only (user pastes into Exc
 
 Schema: `test_number`, `test_name`, `description`, `status`
 
-- `test_number`: numeric only (`16` … `57`), not `TP-16`
+- `test_number`: numeric only (`16` … `56`), not `TP-16`
 - Do not restart numbering at 1 when the user keeps TP-01–15 elsewhere in the sheet
 - Remind the user to preserve existing **status** values when only name/description changed
 

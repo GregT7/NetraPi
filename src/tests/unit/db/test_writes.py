@@ -22,6 +22,7 @@ from db.models import (
 from db.writes import (
     COMPLETE_STOP,
     STAGE1_UNSAFE,
+    attach_local_clip,
     end_driving_session,
     insert_driving_session,
     insert_local_event,
@@ -40,6 +41,49 @@ def _upgrade(url: str) -> None:
 
     database.set_database_url_override(url)
     command.upgrade(Config(str(ALEMBIC_INI)), "head")
+
+
+def test_insert_local_event_metadata_only_then_attach_clip(
+    sqlite_url: str, tmp_path: Path
+) -> None:
+    _upgrade(sqlite_url)
+    init_engine(sqlite_url)
+    started = datetime(2026, 8, 22, 14, 0, 0)
+    clip_path = tmp_path / "later.mp4"
+    clip_path.write_bytes(b"mp4")
+    with get_session() as session:
+        driving = insert_driving_session(session, start_time=started)
+        event = insert_local_event(
+            session,
+            driving_session_id=driving.id,
+            time=started,
+            type_value=COMPLETE_STOP,
+        )
+        session.commit()
+        event_id = event.id
+    with get_session() as session:
+        assert (
+            session.exec(select(Clip).where(Clip.event_id == event_id)).first() is None
+        )
+        clip = attach_local_clip(
+            session,
+            event_id,
+            clip_path=clip_path,
+            fps=30,
+            order_number=1,
+            num_frames=60,
+            clip_start=started,
+            clip_end=started + timedelta(seconds=2),
+        )
+        session.commit()
+        clip_id = clip.id
+    with get_session() as session:
+        row = session.get(Clip, clip_id)
+        assert row is not None
+        assert row.event_id == event_id
+        assert row.local_path == str(clip_path)
+        assert row.init_local_stored is True
+        assert row.file_size_bytes == 3
 
 
 def test_insert_local_event_complete_stop(sqlite_url: str, tmp_path: Path) -> None:

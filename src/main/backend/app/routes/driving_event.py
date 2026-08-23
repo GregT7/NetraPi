@@ -78,7 +78,7 @@ class DrivingEventIn(SQLModel):
     id: int
     driving_session_id: int
     time: datetime
-    clip: ClipIn
+    clip: Optional[ClipIn] = None
     auto_classification: AutoClassificationIn
     knn_parameters: Optional[list[KnnParameterIn]] = None
     approach_parameters: Optional[ApproachParametersIn] = None
@@ -131,35 +131,38 @@ def upsert_driving_event(payload: DrivingEventIn):
             event.time = payload.time
         session.flush()
 
-        clip = session.get(Clip, payload.clip.id)
-        if clip is None:
-            clip = Clip(
-                id=payload.clip.id,
-                fps=payload.clip.fps,
-                order_number=payload.clip.order_number,
-                num_frames=payload.clip.num_frames,
-                start_time=payload.clip.start_time,
-                end_time=payload.clip.end_time,
-                s3_key=None,
-                s3_stored=None,
-                init_local_stored=payload.clip.init_local_stored,
-                local_path=payload.clip.local_path,
-                file_size_bytes=payload.clip.file_size_bytes,
-                event_id=payload.id,
-            )
-            session.add(clip)
-        else:
-            clip.fps = payload.clip.fps
-            clip.order_number = payload.clip.order_number
-            clip.num_frames = payload.clip.num_frames
-            clip.start_time = payload.clip.start_time
-            clip.end_time = payload.clip.end_time
-            clip.init_local_stored = payload.clip.init_local_stored
-            clip.event_id = payload.id
-            if clip.init_local_deleted is not True:
-                clip.local_path = payload.clip.local_path
-            if payload.clip.file_size_bytes is not None:
-                clip.file_size_bytes = payload.clip.file_size_bytes
+        clip_id: int | None = None
+        if payload.clip is not None:
+            clip_id = payload.clip.id
+            clip = session.get(Clip, payload.clip.id)
+            if clip is None:
+                clip = Clip(
+                    id=payload.clip.id,
+                    fps=payload.clip.fps,
+                    order_number=payload.clip.order_number,
+                    num_frames=payload.clip.num_frames,
+                    start_time=payload.clip.start_time,
+                    end_time=payload.clip.end_time,
+                    s3_key=None,
+                    s3_stored=None,
+                    init_local_stored=payload.clip.init_local_stored,
+                    local_path=payload.clip.local_path,
+                    file_size_bytes=payload.clip.file_size_bytes,
+                    event_id=payload.id,
+                )
+                session.add(clip)
+            else:
+                clip.fps = payload.clip.fps
+                clip.order_number = payload.clip.order_number
+                clip.num_frames = payload.clip.num_frames
+                clip.start_time = payload.clip.start_time
+                clip.end_time = payload.clip.end_time
+                clip.init_local_stored = payload.clip.init_local_stored
+                clip.event_id = payload.id
+                if clip.init_local_deleted is not True:
+                    clip.local_path = payload.clip.local_path
+                if payload.clip.file_size_bytes is not None:
+                    clip.file_size_bytes = payload.clip.file_size_bytes
 
         classification = session.exec(
             select(Classification).where(
@@ -343,5 +346,5 @@ def upsert_driving_event(payload: DrivingEventIn):
             "id": event.id,
             "driving_session_id": event.driving_session_id,
             "time": event.time.isoformat(),
-            "clip_id": payload.clip.id,
+            "clip_id": clip_id,
         }

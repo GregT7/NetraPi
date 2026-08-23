@@ -59,6 +59,7 @@ Run AT tests after the relevant sprint **TP** prerequisites unless a specific AT
 |--------|---------------------|--------------|
 | 2 | [Sprint 2 ad-hoc tests](#sprint-2-ad-hoc-tests-non-tp) | AT-2.1–AT-2.5 — recording pipeline resilience, policy, boundaries, preview parity, long-run stability |
 | 3 | [Sprint 3 ad-hoc tests](#sprint-3-ad-hoc-tests-non-tp) | AT-3.1, AT-3.3, AT-3.4 — buzzer enclosure wiring, continuous approach Pi bench, live motion + kNN bench (**AT-3.2** withdrawn) |
+| 7 | [Sprint 7 ad-hoc tests](#sprint-7-ad-hoc-tests-non-tp) | AT-7.1–AT-7.3 — mocked pipeline; camera + SPACE + stubbed events; in-car live three-maneuver E2E → cloud |
 
 Some AT tests reference scripted entry points under `src/tests/integration/` (same convention as TP integration tests where applicable).
 
@@ -828,7 +829,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 *Tests: TP-32 to TP-41*
 
-> **Focus:** Provision S3 and Supabase from the laptop, prove FastAPI locally against SQLite (`/health`, `driving-session`, `driving-event`), boot Compose, confirm the backend can reach S3 and Supabase, then apply the metadata schema. Edge trip-segment persist to SQLite is TP-41. Integration against S3 upload URL + confirm is Sprint D.
+> **Focus:** Provision S3 and Supabase from the laptop, prove FastAPI locally against SQLite (`/health`, `driving-session`, `driving-event`), boot Compose, confirm the backend can reach S3 and Supabase, then apply the metadata schema. Edge trip-segment persist to SQLite is TP-41. Integration against S3 upload URL + confirm is Sprint 6.
 
 ### TP-32: Private S3 bucket provisioning
 - **Description**: Verifies a private AWS S3 bucket exists for NetraPi media.
@@ -992,7 +993,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
-# Sprint D — Local Backend Integrations (S3 + Supabase)
+# Sprint 6 — Local Backend Integrations (S3 + Supabase)
 
 *Tests: TP-42 to TP-49*
 
@@ -1140,11 +1141,11 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
-# Sprint E — Backend Deploy + Edge ↔ Deployed Backend E2E (No Frontend)
+# Sprint 7 — Backend Deploy + Edge ↔ Deployed Backend E2E (No Frontend)
 
-*Tests: TP-50 to TP-57*
+*Tests: TP-50 to TP-56; AT-7.1, AT-7.2, AT-7.3*
 
-> **Focus:** Deploy the backend (Render), confirm API-key auth still holds on that host, then verify the already-built edge path against the deployed backend. E2E portion is verification only — no new edge/feature work. Do **not** require frontend UI; confirm cloud outcomes via API responses, S3, and Postgres.
+> **Focus:** Deploy the backend (Render), confirm API-key auth still holds on that host, then verify the already-built edge path against the deployed backend. E2E portion is verification only — no new edge/feature work. Do **not** require frontend UI; confirm cloud outcomes via Render API responses and local SQLite `s3_stored` / `s3_key` after `CloudIngest` confirm (optional live Postgres/S3 console check from a laptop). Deployed origin: [https://netrapi.onrender.com](https://netrapi.onrender.com) (override with `NETRAPI_API_URL` in `src/main/edge/.env`). Harnesses load **only** `src/main/edge/.env` — not `src/main/backend/.env` (Render already holds those secrets). Harnesses: `src/tests/integration/tp_50`–`tp_56`, plus Sprint 7 ad-hoc `at_7_1` / `at_7_2` / `at_7_3`. `GET /` is 404; liveness is `GET /health`.
 
 ### TP-50: Backend Docker image build
 - **Description**: Verifies the backend Docker image builds and runs locally from the production Dockerfile.
@@ -1156,43 +1157,29 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Steps**
   1. Build the backend image.
   2. Run a container from the image.
-  3. Hit health/root.
+  3. `GET /health` (there is no `/` route).
 - **Pass criteria**
   - Build succeeds.
-  - Container stays up and health/root responds.
+  - Container stays up and `GET /health` returns `{"status":"ok",...}`.
 
 ### TP-51: Backend deployment to hosting environment
 - **Description**: Verifies the backend deploys successfully to the target host (e.g., Render).
 - **Test level**: Integration
 - **Verification approach**: Test
-- **Reqs**: M-10.21
+- **Reqs**: M-10.21, M-10.22, M-10.23
 - **Prerequisites**
   - Deployment target configured.
   - TP-50 passed.
 - **Steps**
   1. Trigger a backend deployment.
   2. Observe deployment completion.
-  3. Access the deployed health endpoint or API root.
+  3. `GET https://netrapi.onrender.com/health` (or `NETRAPI_API_URL` from `src/main/edge/.env`).
 - **Pass criteria**
   - Deployment completes successfully.
-  - Deployed backend is reachable.
+  - Deployed backend is reachable (`/health` 200).
+  - Render health-check path is `/health` (failed health is not a successful deploy).
 
-### TP-52: Post-deployment health check
-- **Description**: Verifies post-deploy health checks pass for the backend service.
-- **Test level**: Integration
-- **Verification approach**: Test
-- **Reqs**: M-10.22, M-10.23
-- **Prerequisites**
-  - TP-51 passed.
-  - Health checks configured (platform and/or pipeline).
-- **Steps**
-  1. Inspect post-deployment health-check results.
-  2. Confirm deployment is marked successful only when checks pass.
-- **Pass criteria**
-  - Health checks run.
-  - Successful deploy requires passing health checks.
-
-### TP-53: Deployed backend API-key authentication
+### TP-52: Deployed backend API-key authentication
 - **Description**: Verifies the deployed backend authenticates edge clients with an API key, rejects unauthenticated requests, and still accepts a valid key (same contract as local TP-42).
 - **Test level**: Integration
 - **Verification approach**: Test
@@ -1200,86 +1187,159 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Prerequisites**
   - TP-51 passed (deployed backend reachable).
   - API-key auth already proven against the local backend (TP-42).
+  - `src/main/edge/.env` has `NETRAPI_API_KEY` matching Render (optional `NETRAPI_API_URL`).
 - **Steps**
-  1. Call a protected endpoint on the deployed backend without an API key.
-  2. Call the same endpoint with an invalid API key.
-  3. Call the same endpoint with a valid API key.
+  1. `POST /api/netrapi/driving-event` on the deployed backend without an API key.
+  2. Call the same route with an invalid `X-API-Key`.
+  3. `POST /api/netrapi/driving-session` then `POST /api/netrapi/driving-event` with a valid `X-API-Key`.
 - **Pass criteria**
-  - Missing-key and invalid-key requests are rejected.
+  - Missing-key and invalid-key requests are rejected (401).
   - Authenticated request is accepted.
+  - `GET /health` remains unauthenticated.
   - Deployed auth behavior matches the local backend; the public API is not left open.
 
-### TP-54: Unsafe event to cloud via deployed backend
+### TP-53: Unsafe event to cloud via deployed backend
 - **Description**: Verifies an unsafe stop-sign event is detected on the edge, alerts locally, and uploads through the deployed backend to S3 + Postgres.
 - **Test level**: System
 - **Verification approach**: Test + Demonstration
 - **Reqs**: M-3.10, M-5.20, M-6.10, M-7.10, M-7.11, M-7.12, M-7.15
 - **Prerequisites**
   - Edge runtime operational (existing bring-up; no new edge features in this sprint).
-  - Deployed backend upload path operational (TP-50–53).
+  - Deployed backend upload path operational (TP-50–52).
+  - `src/main/edge/.env` pointed at Render.
   - Speaker/buzzer connected.
 - **Steps**
-  1. Run the edge system pointed at the deployed backend.
-  2. Trigger an unsafe stop-sign event.
+  1. Run the edge harness / system pointed at the deployed backend (`src/main/edge/.env` only).
+  2. Trigger an unsafe stop-sign event (harness seeds LocalStore + CloudIngest, or live capture).
   3. Observe local alert + SQLite/clip.
-  4. Confirm S3 object and Postgres row via backend tooling or consoles (not frontend).
+  4. Confirm upload via local SQLite `s3_stored` / `s3_key` after Render confirm (optional Postgres/S3 console on a laptop).
 - **Pass criteria**
-  - Unsafe event detected; buzzer activates.
+  - Unsafe event detected; buzzer activates (live path) or harness completes CloudIngest.
   - Local clip + SQLite row exist.
-  - Media in S3 via presigned PUT; metadata in Postgres via backend.
+  - Clip/trip marked `s3_stored` with keys after backend-orchestrated confirm.
 
-### TP-55: Cross-layer metadata consistency
-- **Description**: Verifies event identity and fields stay consistent across SQLite, backend, Postgres, and S3 object key (no frontend).
+### TP-54: Cross-layer metadata consistency
+- **Description**: Verifies event identity and fields stay consistent across the TP-53 SQLite artifact (session / event / clip / trip / `s3_key`) after a successful CloudIngest confirm (no frontend; no backend `.env` on the Pi).
 - **Test level**: System
 - **Verification approach**: Inspection + Test
 - **Reqs**: M-5.20, M-7.12, M-8.11
 - **Prerequisites**
-  - At least one completed edge→cloud event (TP-54).
+  - At least one completed edge→cloud event (TP-53).
 - **Steps**
-  1. Inspect the local SQLite row.
-  2. Inspect the Postgres row.
-  3. Confirm the S3 key matches.
+  1. Inspect the TP-53 local SQLite row (event, clip, trip, `event_trip_location`).
+  2. Confirm `s3_stored`, keys, and sizes are present and internally consistent.
+  3. Optional: inspect Postgres/S3 from a laptop (AT-7.1 README).
 - **Pass criteria**
-  - Identifiers and key fields match across layers.
-  - Clip reference points at the correct object.
+  - Identifiers and key fields match across the local event graph.
+  - Clip and trip references point at distinct confirmed object keys.
 
-### TP-56: Restart recovery then upload
+### TP-55: Restart recovery then upload
 - **Description**: Verifies local event data survives an edge restart and can upload later via the deployed backend.
 - **Test level**: System
 - **Verification approach**: Test
 - **Reqs**: M-5.20, M-6.10, M-7.15
 - **Prerequisites**
   - Edge runtime and upload path already implemented (no new runtime work in this sprint).
+  - `src/main/edge/.env` pointed at Render.
 - **Steps**
   1. Trigger an event so local clip + SQLite row exist.
   2. Restart the edge process/device before upload completes.
   3. Confirm local data survives.
-  4. When online, complete backend-orchestrated upload.
+  4. When online, complete backend-orchestrated upload; confirm via local `s3_stored` / `s3_key`.
 - **Pass criteria**
   - Local clip and metadata are preserved across restart.
-  - Upload succeeds afterward; S3 + Postgres reflect the event.
+  - Upload succeeds afterward; local SQLite reflects confirmed S3 keys.
 
-### TP-57: Deployed system smoke (API/cloud evidence)
+### TP-56: Deployed system smoke (API/cloud evidence)
 - **Description**: Verifies a minimal real-world flow from detection through deployed-backend upload, confirmed without a frontend.
 - **Test level**: System
 - **Verification approach**: Demonstration
 - **Reqs**: M-10.21, M-10.22, M-6.10
 - **Prerequisites**
   - Fully deployed backend.
+  - `src/main/edge/.env` pointed at Render.
   - Speaker/buzzer connected.
 - **Steps**
-  1. Trigger one unsafe event.
+  1. Trigger one unsafe event (harness or live).
   2. Allow process + upload via deployed backend.
-  3. Confirm success via API and/or S3 + Postgres inspection.
+  3. Confirm success via `/health` + local SQLite `s3_stored` / `s3_key` after CloudIngest.
 - **Pass criteria**
-  - Buzzer activates on detection.
+  - Buzzer activates on detection (live path) or harness completes CloudIngest.
   - Pipeline completes without manual cloud console surgery.
-  - Event is present in cloud stores / queryable via backend API.
+  - Event is confirmed locally after backend upload (optional Postgres/S3 console).
+
+## Sprint 7 ad-hoc tests (non-TP)
+
+### AT-7.1: Mocked Pi pipeline to deployed cloud
+- **Description**: Verifies the **real** edge pipeline (`build_pipeline` → `RecordingManager.run_loop` → `LocalStore` persist → `CloudIngest`) can upload one unsafe event through Render to S3 + Postgres when the camera and EventManager are mocked. Unlike TP-53/TP-56, this does **not** seed rows or call ingest APIs from the harness.
+- **Test level**: System
+- **Verification approach**: Test + Inspection
+- **Reqs**: M-5.20, M-6.10, M-7.11, M-7.12, M-7.15
+- **Prerequisites**
+  - TP-51 / TP-52 passed (Render `/health` + API key).
+  - TP-27 / TP-31 path proven (stubbed event through `RecordingManager`).
+  - Pi edge venv; Coral USB TPU; buzzer on BCM 18; `src/main/edge/.env` has SQLite `DATABASE_URL` plus `NETRAPI_API_URL` / `NETRAPI_API_KEY` for Render.
+  - No USB camera required (harness mocks the camera).
+  - Test entry point: `src/tests/integration/at_7_1/at_7_1_mocked_pipeline_deployed_cloud.py`
+- **Steps**
+  1. On the Pi, run `python src/tests/integration/at_7_1/at_7_1_mocked_pipeline_deployed_cloud.py`.
+  2. Confirm the script builds `build_pipeline`, stubs camera + EventManager, and lets `run_loop` persist + ingest a stubbed **rolling-stop**.
+  3. Confirm local SQLite clip `s3_stored` is true (printed event id / `s3_key`).
+  4. From the laptop, inspect Postgres and S3 with the README `python -c` commands; check Render logs for `driving-session`, `driving-event`, `s3-upload-url`, `confirm-s3-upload`.
+- **Pass criteria**
+  - Harness does not insert events or call FastAPI except through `RecordingManager` / `CloudIngest`.
+  - SQLite has the event + clip; clip `s3_stored` is true and `s3_key` is set.
+  - Matching Postgres row and S3 object exist.
+  - Render logs show the ingest POSTs (not only `/health` probes).
+
+### AT-7.2: Camera + SPACE + stubbed events to deployed cloud
+- **Description**: Dry-run before live AT-7.3. Same three SPACE-armed phases as TP-28 / AT-7.3 (complete stop → rolling stop → run-through) with **real camera + preview**, but EventManager is **stubbed** so SPACE injects the intended event. Persist and upload still go through `RecordingManager` / `LocalStore` / `CloudIngest`.
+- **Test level**: System
+- **Verification approach**: Demonstration + Test
+- **Reqs**: M-3.13, M-5.20, M-6.10, M-7.11, M-7.12, M-7.15
+- **Prerequisites**
+  - AT-7.1 passed (mocked persist + ingest through the real pipeline).
+  - TP-27 / TP-28 path familiar (SPACE arming + buzzer/clip gating).
+  - Pi + camera + Coral + buzzer; `src/main/edge/.env` pointed at Render.
+  - Test entry point: `src/tests/integration/at_7_2/at_7_2_camera_stubbed_events_deployed_cloud.py`
+- **Steps**
+  1. On the Pi (parked / driveway is fine), run `python src/tests/integration/at_7_2/at_7_2_camera_stubbed_events_deployed_cloud.py`.
+  2. Click preview for focus. For each phase, press **SPACE**; the stub fires complete stop, then rolling stop, then run-through.
+  3. Confirm beep + clip for unsafe phases only; complete stop has neither (metadata still persists).
+  4. Confirm three SQLite event rows (complete-stop + two unsafe); unsafe clips have `s3_stored` true.
+- **Pass criteria**
+  - Preview runs; SPACE arms each phase; stub injects the intended event type.
+  - Beep + clip for rolling stop and run-through only (`play_on.safe=false`, `record_safe_events=false`).
+  - Complete stop has **no** clip; event metadata **is** persisted (local + cloud JSON, no S3).
+  - Rolling-stop and run-through rows exist in harness SQLite with `s3_stored` true and `s3_key` set.
+
+### AT-7.3: In-car three-maneuver E2E to deployed cloud
+- **Description**: Full in-vehicle E2E on the **fully integrated** edge pipeline (real camera, Detector, EventManager, Buzzer, Recorder, LocalStore, CloudIngest): one complete stop, one rolling stop, and one run-through, then confirm unsafe events in SQLite, S3, Postgres, and Render logs. Same SPACE-armed phases as TP-28; cloud path is the production ingest, not a seed harness.
+- **Test level**: System
+- **Verification approach**: Demonstration + Test + Inspection
+- **Reqs**: M-3.13, M-3.20, M-3.30, M-3.31, M-5.20, M-6.10, M-7.11, M-7.12, M-7.15
+- **Prerequisites**
+  - AT-7.2 passed (camera + SPACE + stubbed-events dry-run through the real pipeline).
+  - TP-28 passed (in-car classify + beep + clip).
+  - TP-51 / TP-52 passed.
+  - Pi + camera + Coral + buzzer installed in the car; `src/main/edge/.env` pointed at Render.
+  - Test entry point: `src/tests/integration/at_7_3/at_7_3_incar_e2e_deployed_cloud.py`
+- **Steps**
+  1. Mount and power the system; clips land under `clips_dir/at_7_3/`. Local SQLite is the Pi file (`src/main/db/netrapi.db`).
+  2. On the Pi, run `python src/tests/integration/at_7_3/at_7_3_incar_e2e_deployed_cloud.py`.
+  3. For each phase, focus preview and press **SPACE**, then perform **complete stop**, **rolling stop**, and **run-through** in that order. Classifications before SPACE are ignored.
+  4. Confirm console labels, beep on unsafe only, clips for unsafe only.
+  5. Confirm three SQLite event rows; unsafe clips have `s3_stored` true. Inspect Postgres + S3 with the README `python -c` commands; check Render logs.
+- **Pass criteria**
+  - All three encounters complete without crash.
+  - Classification matches operator intent; beep + clip for rolling stop and run-through only (`play_on.safe=false`, `record_safe_events=false`).
+  - Complete stop has **no** clip; event metadata **is** persisted (local + cloud JSON, no S3).
+  - Rolling-stop and run-through rows exist in Pi SQLite and Postgres with matching `s3_key`; S3 objects exist; Render logs show ingest POSTs for those events.
 
 ---
 
 ## 8. Coverage Notes
-This plan currently covers through **Sprint E** (edge + local persistence + backend-orchestrated cloud path + deploy + deployed E2E). Deferred for later test generation:
+This plan currently covers through **Sprint 7** (edge + local persistence + backend-orchestrated cloud path + deploy + deployed E2E). Deferred for later test generation:
 - frontend / portfolio UI tests
 - full CI/CD matrix beyond backend deploy health
 - 10-hour collection and model-evaluation publication tests
@@ -1293,5 +1353,7 @@ Covered now:
 - local backend S3/Postgres integrations (`s3-upload-url` + edge PUT + `confirm-s3-upload` + `driving-event`)
 - backend deployment and deployed API-key authentication
 - edge ↔ deployed backend E2E (no frontend; verification only)
+- Sprint 7 harnesses under `src/tests/integration/tp_50`–`tp_56` against https://netrapi.onrender.com
+- Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
 
-**TP range:** TP-01 through TP-57.
+**TP range:** TP-01 through TP-56. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

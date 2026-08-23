@@ -1,13 +1,13 @@
 """
-TP-28: In-car E2E classify + beep + clip (fully integrated edge pipeline).
+AT-7.3: In-car three-maneuver E2E to deployed cloud.
 
-Fixed three-phase soak like AT-3.4: complete stop → rolling stop → run-through.
-Real Detector + EventManager + Buzzer + Recorder (no stubs). Preview on;
-SPACE in the preview window arms each phase.
+Same SPACE-armed phases as TP-28 (complete stop → rolling stop → run-through)
+on the real pipeline (camera, Detector, EventManager, Buzzer, Recorder).
+LocalStore + CloudIngest are the production persist/upload path.
 
 Usage (from repo root, Pi in car — camera + Coral + buzzer on BCM 18):
 
-    python src/tests/integration/tp_28/tp_28_e2e_classify_beep_clip_integration.py
+    python src/tests/integration/at_7_3/at_7_3_incar_e2e_deployed_cloud.py
 
 1. Click the preview window for focus.
 2. When prompted, press SPACE to arm, then perform that maneuver at a stop sign.
@@ -24,7 +24,10 @@ from pathlib import Path
 from typing import Callable
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-EDGE_DIR = SCRIPT_DIR.parents[2] / "main" / "edge"
+INTEGRATION_DIR = SCRIPT_DIR.parent
+MAIN_DIR = SCRIPT_DIR.parents[2] / "main"
+EDGE_DIR = MAIN_DIR / "edge"
+SQLITE_PATH = MAIN_DIR / "db" / "netrapi.db"
 
 MAX_FEEDBACK_LATENCY_S = 10.0
 ENCOUNTER_TIMEOUT_S = 180.0
@@ -36,7 +39,9 @@ BEEP_DURATION_SECONDS = 0.5
 BEEP_VOLUME_PERCENT = 80.0
 PREVIEW_MAX_WIDTH = 1280
 PREVIEW_MAX_HEIGHT = 720
-CLIPS_SUBDIR = "tp_28"
+CLIPS_SUBDIR = "at_7_3"
+EXPECTED_CLOUD_TYPES = ("complete-stop", "rolling-stop", "run-through")
+TYPES_EXPECT_CLIP_UPLOAD = frozenset({"rolling-stop", "run-through"})
 
 
 @dataclass(frozen=True)
@@ -119,9 +124,10 @@ class _BeepProbe:
 
 
 def _configure_import_path() -> None:
-    edge_str = str(EDGE_DIR)
-    if edge_str not in sys.path:
-        sys.path.insert(0, edge_str)
+    for path in (MAIN_DIR, EDGE_DIR, INTEGRATION_DIR):
+        path_str = str(path)
+        if path_str not in sys.path:
+            sys.path.insert(0, path_str)
 
 
 def _clip_files(clips_dir: Path) -> set[Path]:
@@ -438,19 +444,80 @@ def _install_probes(
     manager._commit_evaluated_event = gated_commit  # type: ignore[method-assign]
 
 
+def _inspect_session_uploads(session_id: int) -> list[tuple[int, str, str | None]]:
+    from sqlmodel import select
+
+    from db.database import get_session
+    from db.models import Classification, ClassificationType, Clip, Event
+
+    rows: list[tuple[int, str, str | None]] = []
+    with get_session() as local:
+        events = local.exec(
+            select(Event)
+            .where(Event.driving_session_id == session_id)
+            .order_by(Event.id)
+        ).all()
+        for event in events:
+            if event.id is None:
+                continue
+            classification = local.exec(
+                select(Classification).where(
+                    Classification.event_id == event.id,
+                    Classification.kind == "auto",
+                )
+            ).first()
+            if classification is None:
+                raise RuntimeError(f"auto classification missing for event {event.id}")
+            type_row = local.get(ClassificationType, classification.classification_type_id)
+            if type_row is None:
+                raise RuntimeError(f"classification_type missing for event {event.id}")
+            clip = local.exec(select(Clip).where(Clip.event_id == event.id)).first()
+            if type_row.value in TYPES_EXPECT_CLIP_UPLOAD:
+                if clip is None:
+                    raise RuntimeError(f"clip missing for event {event.id}")
+                if clip.s3_stored is not True or not clip.s3_key:
+                    raise RuntimeError(
+                        f"event {event.id} ({type_row.value}) not uploaded "
+                        f"(s3_stored={clip.s3_stored!r} s3_key={clip.s3_key!r})"
+                    )
+                rows.append((event.id, type_row.value, clip.s3_key))
+            else:
+                if clip is not None and clip.init_local_stored and clip.local_path:
+                    raise RuntimeError(
+                        f"event {event.id} ({type_row.value}) unexpectedly has a "
+                        f"stored clip at {clip.local_path!r}"
+                    )
+                rows.append((event.id, type_row.value, None))
+    return rows
+
+
 def main() -> int:
     _configure_import_path()
     from config.loader import AppConfig, ConfigError
+    from db.database import init_engine
     from main import DEFAULT_CONFIG_DIR, REPO_ROOT, _resolve_runtime_paths
     from netrapi import build_pipeline
+    from netrapi.backend_auth import apply_edge_env, clear_ingest_auth
     from netrapi.exceptions import NetraPiError
+
+    from _render import api_origin, wait_health
 
     config_dir = DEFAULT_CONFIG_DIR.resolve()
 
     try:
+        apply_edge_env()
+        clear_ingest_auth()
+        origin = api_origin()
+        print("AT-7.3: In-car E2E → deployed cloud", flush=True)
+        print(f"  origin: {origin}", flush=True)
+        wait_health(origin)
+        init_engine()
         base_config = AppConfig.load(config_dir)
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
         return 1
 
     resolved = _resolve_runtime_paths(base_config, REPO_ROOT)
@@ -465,7 +532,9 @@ def main() -> int:
         clips_dir=clips_dir,
     )
 
-    print("TP-28: In-car E2E — complete stop → rolling → run-through")
+    print("  camera + EventManager: live (no stubs)")
+    print("  persist + ingest: RecordingManager / LocalStore / CloudIngest")
+    print(f"  sqlite: {SQLITE_PATH}")
     print(f"  clips_dir: {clips_dir}")
     print(f"  phases: {', '.join(s.event_type_name for s in SCENARIOS)}")
     print(
@@ -493,12 +562,19 @@ def main() -> int:
     try:
         pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
         manager = pipeline.manager
+        if manager._local_store is None:
+            raise RuntimeError("LocalStore not wired; init_engine must run before build_pipeline")
+        if manager._cloud_ingest is None:
+            raise RuntimeError(
+                "CloudIngest not wired; set NETRAPI_API_URL and NETRAPI_API_KEY in "
+                "src/main/edge/.env"
+            )
         _install_probes(manager, session=session, probe=probe)
         _install_preview_helpers(manager, session=session)
 
         worker = threading.Thread(
             target=_operator_thread,
-            name="tp28-operator",
+            name="at73-operator",
             kwargs={
                 "session": session,
                 "clips_dir": clips_dir,
@@ -529,6 +605,24 @@ def main() -> int:
             raise RuntimeError(
                 f"expected {len(SCENARIOS)} phases, got {len(results)}"
             )
+
+        driving_session_id = manager._driving_session_id
+        if driving_session_id is None:
+            raise RuntimeError("driving_session_id missing after run_loop")
+        uploaded = _inspect_session_uploads(driving_session_id)
+        got_types = tuple(type_value for _, type_value, _ in uploaded)
+        if got_types != EXPECTED_CLOUD_TYPES:
+            raise RuntimeError(
+                f"cloud types {got_types!r} != {EXPECTED_CLOUD_TYPES!r}"
+            )
+        for event_id, type_value, s3_key in uploaded:
+            if s3_key is None:
+                print(
+                    f"  sqlite/postgres {type_value} event {event_id} -> metadata only"
+                )
+            else:
+                print(f"  sqlite/postgres {type_value} event {event_id} -> {s3_key}")
+        clear_ingest_auth()
     except NetraPiError as exc:
         print(f"NetraPi error: {exc}", file=sys.stderr)
         return 1
@@ -551,7 +645,9 @@ def main() -> int:
             f"  [{item.scenario.event_type_name}] classified={item.classified_as}  "
             f"latency={latency}  clip={clip}"
         )
-    print("\nTP-28: PASS")
+    print("\nAT-7.3: PASS")
+    print(f"  inspect sqlite: {SQLITE_PATH}")
+    print("  inspect Postgres/S3/Render: see README")
     return 0
 
 
