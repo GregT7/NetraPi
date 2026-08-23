@@ -39,7 +39,7 @@ Do **not** design or implement these until frontend work starts:
 - Ingest routes under `/api/netrapi/*` require header `X-API-Key` (M-7.10, TP-42). `GET /health` stays open (TP-35 uvicorn, TP-37 Compose, Render). Swagger `/docs` `/redoc` `/openapi.json` are local/Compose only; off on Render (decision 59).
 - Same SQLModel tables locally (SQLite) and in cloud (Supabase Postgres). Alembic `0001`–`0002` seed `classification_type` / `object_label` / initial `master_config`. `POST /master-config` find-or-creates additional snapshots when live edge JSON differs (decision 56). `classification_type` / `object_label` are still not ingest APIs.
 - Paths are **singular** when the call creates or acts on one record.
-- Build order matches Sprint 5/D in [test.md](../specs/test.md): TP-34 `driving-session` → TP-35 `/health` → TP-36 `driving-event` (SQLite) → Compose (TP-37) → API key (TP-42) → `s3-upload-url` (TP-43) → Pi PUT to S3 → `confirm-s3-upload` (TP-47) → local E2E via `CloudIngest` (TP-49). `trip-segment` JSON prime matches TP-34/36 but has no dedicated TP yet.
+- Build order matches Sprint 5/6 in [test.md](../specs/test.md): TP-34 `driving-session` → TP-35 `/health` → TP-36 `driving-event` (SQLite) → Compose (TP-37) → API key (TP-42) → `s3-upload-url` (TP-43) → Pi PUT to S3 → `confirm-s3-upload` (TP-47) → local E2E via `CloudIngest` (TP-49). `trip-segment` JSON prime matches TP-34/36 but has no dedicated TP yet.
 - FastAPI never receives video. Render only handles JSON + URL signing.
 - **Trip S3 is post-drive / Wi‑Fi.** Event-clip S3 may run during the drive (hotspot/cellular OK — small, infrequent). JSON metadata may also go up during the drive.
 
@@ -290,7 +290,7 @@ Keep uploads **one at a time**. **Clips** may PUT during the drive when online. 
 
 ### 5.8 `POST /api/netrapi/s3-download-url`
 
-JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true, `s3_key` set). FastAPI mints a time-limited S3 **GET** URL (clip 15 min, trip 60 min). The object stays private; unsigned GETs to the bucket URL fail (TP-46). Frontend JWT playback can reuse this later; Sprint D authenticates with `X-API-Key`.
+JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true, `s3_key` set). FastAPI mints a time-limited S3 **GET** URL (clip 15 min, trip 60 min). The object stays private; unsigned GETs to the bucket URL fail (TP-46). Frontend JWT playback can reuse this later; Sprint 6 authenticates with `X-API-Key`.
 
 **Request**
 

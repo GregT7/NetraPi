@@ -6,7 +6,7 @@ import urllib.request
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 from sqlmodel import select
@@ -29,7 +29,8 @@ from db.models import (
 from netrapi.backend_auth import ingest_api_url, ingest_headers, load_ingest_auth
 from netrapi.exceptions import CloudIngestError, IngestAuthError
 
-JsonRequest = Callable[[str, str, dict[str, Any] | None], dict[str, Any]]
+# Optional[...] (not X | None): this alias is evaluated at import time on Python 3.9.
+JsonRequest = Callable[[str, str, Optional[dict[str, Any]]], dict[str, Any]]
 PutBytes = Callable[[str, bytes, str], None]
 
 JSON_TIMEOUT_S = 30.0
@@ -94,10 +95,11 @@ class CloudIngest:
     """POST local SQLite rows to FastAPI; PUT media via presigned URL.
 
     `sync_session` POSTs `master-config` first so `driving_session.master_config_id`
-    exists. Event clips PUT during the drive (`sync_event`). Trip segments are
-    JSON-primed only then (`sync_trip_segment`); `upload_trip_segment` /
-    `drain_trip_segments` PUT them later on Wi-Fi. After confirm, writes
-    `s3_key` / `s3_stored` on the matching local clip or trip_segment row.
+    exists. Event metadata POSTs on evaluate (`sync_event`); clip bytes PUT when a
+    local clip row exists with a file path. Trip segments are JSON-primed only then
+    (`sync_trip_segment`); `upload_trip_segment` / `drain_trip_segments` PUT them
+    later on Wi-Fi. After confirm, writes `s3_key` / `s3_stored` on the matching
+    local clip or trip_segment row.
     """
 
     def __init__(
@@ -261,8 +263,6 @@ class CloudIngest:
             if event is None:
                 raise CloudIngestError(f"event {event_id} not in local SQLite")
             clip = session.exec(select(Clip).where(Clip.event_id == event_id)).first()
-            if clip is None or clip.id is None:
-                raise CloudIngestError(f"clip for event {event_id} not in local SQLite")
             classification = session.exec(
                 select(Classification).where(
                     Classification.event_id == event_id,
@@ -286,7 +286,15 @@ class CloudIngest:
                 "id": event.id,
                 "driving_session_id": event.driving_session_id,
                 "time": _iso(event.time),
-                "clip": {
+                "auto_classification": {
+                    "kind": "auto",
+                    "classification_type_id": classification.classification_type_id,
+                    "stage1_classification_type_id": auto.stage1_classification_type_id,
+                    "stage2_classification_type_id": auto.stage2_classification_type_id,
+                },
+            }
+            if clip is not None and clip.id is not None:
+                payload["clip"] = {
                     "id": clip.id,
                     "fps": clip.fps,
                     "order_number": clip.order_number,
@@ -296,14 +304,7 @@ class CloudIngest:
                     "init_local_stored": clip.init_local_stored,
                     "local_path": clip.local_path,
                     "file_size_bytes": clip.file_size_bytes,
-                },
-                "auto_classification": {
-                    "kind": "auto",
-                    "classification_type_id": classification.classification_type_id,
-                    "stage1_classification_type_id": auto.stage1_classification_type_id,
-                    "stage2_classification_type_id": auto.stage2_classification_type_id,
-                },
-            }
+                }
             knn_rows = session.exec(
                 select(KnnParameter).where(
                     KnnParameter.auto_classification_id == auto.id
@@ -342,10 +343,20 @@ class CloudIngest:
                     "trip_segment_id": location.trip_segment_id,
                     "trip_offset_seconds": location.trip_offset_seconds,
                 }
-            clip_id = clip.id
-            clip_path = clip.local_path
-            already_stored = clip.s3_stored is True and bool(clip.s3_key)
+            clip_id = clip.id if clip is not None else None
+            clip_path = clip.local_path if clip is not None else None
+            already_stored = (
+                clip is not None
+                and clip.s3_stored is True
+                and bool(clip.s3_key)
+            )
         self._json_request("POST", "/api/netrapi/driving-event", payload)
+        if clip_id is None:
+            print(
+                f"[ingest] event {event_id} has no clip yet; skip S3",
+                flush=True,
+            )
+            return
         if already_stored:
             print(
                 f"[ingest] event {event_id} clip {clip_id} already uploaded; skip S3",

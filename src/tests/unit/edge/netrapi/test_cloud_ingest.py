@@ -197,6 +197,40 @@ def test_sync_event_skips_put_when_already_stored(tmp_path: Path) -> None:
     assert "/api/netrapi/confirm-s3-upload" not in calls
 
 
+def test_sync_event_metadata_only_skips_s3(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
+    _upgrade(url)
+    started = datetime(2026, 8, 16, 18, 0, 0)
+    calls: list[tuple[str, str, object]] = []
+
+    def json_request(method: str, path: str, body):
+        calls.append((method, path, body))
+        return {"ok": True}
+
+    def put_bytes(*_args):
+        raise AssertionError("metadata-only event must not PUT to S3")
+
+    with get_session() as session:
+        driving = insert_driving_session(session, start_time=started)
+        event = insert_local_event(
+            session,
+            driving_session_id=driving.id,
+            time=started + timedelta(seconds=12),
+            type_value="complete-stop",
+        )
+        session.commit()
+        event_id = event.id
+
+    CloudIngest(json_request=json_request, put_bytes=put_bytes).sync_event(event_id)
+    paths = [item[1] for item in calls]
+    assert "/api/netrapi/driving-event" in paths
+    assert "/api/netrapi/s3-upload-url" not in paths
+    event_body = next(
+        item[2] for item in calls if item[1] == "/api/netrapi/driving-event"
+    )
+    assert "clip" not in event_body
+
+
 def test_sync_trip_segment_does_not_put(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
     _upgrade(url)

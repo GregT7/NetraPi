@@ -120,12 +120,12 @@ def insert_local_event(
     driving_session_id: int,
     time: datetime,
     type_value: str,
-    clip_path: Path | str,
-    fps: int,
-    order_number: int,
-    num_frames: int,
-    clip_start: datetime,
-    clip_end: datetime,
+    clip_path: Path | str | None = None,
+    fps: int | None = None,
+    order_number: int | None = None,
+    num_frames: int | None = None,
+    clip_start: datetime | None = None,
+    clip_end: datetime | None = None,
     row_id: int | None = None,
     clip_id: int | None = None,
     knn_stage1: Sequence[float] | None = None,
@@ -180,7 +180,7 @@ def insert_local_event(
     if knn_stage1 is not None:
         if len(knn_stage1) != len(KNN_STAGE1_NAMES):
             raise RuntimeError("knn_stage1 must have 4 values")
-        for name, value in zip(KNN_STAGE1_NAMES, knn_stage1, strict=True):
+        for name, value in zip(KNN_STAGE1_NAMES, knn_stage1):
             key = (1, name)
             if key not in feature_ids:
                 raise RuntimeError(f"knn_feature missing for {key!r}")
@@ -194,7 +194,7 @@ def insert_local_event(
     if knn_stage2 is not None:
         if len(knn_stage2) != len(KNN_STAGE2_NAMES):
             raise RuntimeError("knn_stage2 must have 2 values")
-        for name, value in zip(KNN_STAGE2_NAMES, knn_stage2, strict=True):
+        for name, value in zip(KNN_STAGE2_NAMES, knn_stage2):
             key = (2, name)
             if key not in feature_ids:
                 raise RuntimeError(f"knn_feature missing for {key!r}")
@@ -243,22 +243,83 @@ def insert_local_event(
             )
         )
 
-    session.add(
-        Clip(
+    if clip_path is not None:
+        if (
+            fps is None
+            or order_number is None
+            or num_frames is None
+            or clip_start is None
+            or clip_end is None
+        ):
+            raise RuntimeError(
+                "fps, order_number, num_frames, clip_start, and clip_end are "
+                "required when clip_path is set"
+            )
+        session.add(
+            Clip(
+                id=clip_id,
+                event_id=event.id,
+                local_path=str(clip_path),
+                init_local_stored=True,
+                file_size_bytes=local_file_size_bytes(clip_path),
+                fps=fps,
+                order_number=order_number,
+                num_frames=num_frames,
+                start_time=clip_start,
+                end_time=clip_end,
+            )
+        )
+        session.flush()
+    return event
+
+
+def attach_local_clip(
+    session: Session,
+    event_id: int,
+    *,
+    clip_path: Path | str,
+    fps: int,
+    order_number: int,
+    num_frames: int,
+    clip_start: datetime,
+    clip_end: datetime,
+    clip_id: int | None = None,
+) -> Clip:
+    """Attach or update the clip row for an event that was persisted without media."""
+    if session.get(Event, event_id) is None:
+        raise RuntimeError(f"event {event_id} not found")
+    existing = session.exec(select(Clip).where(Clip.event_id == event_id)).first()
+    path_str = str(clip_path)
+    size = local_file_size_bytes(clip_path)
+    if existing is None:
+        clip = Clip(
             id=clip_id,
-            event_id=event.id,
-            local_path=str(clip_path),
+            event_id=event_id,
+            local_path=path_str,
             init_local_stored=True,
-            file_size_bytes=local_file_size_bytes(clip_path),
+            file_size_bytes=size,
             fps=fps,
             order_number=order_number,
             num_frames=num_frames,
             start_time=clip_start,
             end_time=clip_end,
         )
-    )
+        session.add(clip)
+        session.flush()
+        return clip
+    existing.local_path = path_str
+    existing.init_local_stored = True
+    existing.file_size_bytes = size
+    existing.fps = fps
+    existing.order_number = order_number
+    existing.num_frames = num_frames
+    existing.start_time = clip_start
+    existing.end_time = clip_end
+    if clip_id is not None:
+        existing.id = clip_id
+    session.add(existing)
     session.flush()
-    return event
+    return existing
 
 
 def insert_trip_segment(

@@ -325,6 +325,16 @@ src/tests/
     ├── tp_47/                         ✅  confirm-s3-upload sets s3_key / s3_stored
     ├── tp_48/                         ✅  presigned PUT+confirm from hotspot client
     ├── tp_49/                         ✅  local SQLite event → FastAPI → S3 + Postgres
+    ├── tp_50/                         ✅  production Dockerfile build + GET /health
+    ├── tp_51/                         ✅  Render deploy reachable (`/health`)
+    ├── tp_52/                         ✅  deployed X-API-Key on `driving-event`
+    ├── tp_53/                         ✅  SQLite event → Render CloudIngest → S3 + Postgres
+    ├── tp_54/                         ✅  TP-53 sqlite vs Postgres vs S3 keys
+    ├── tp_55/                         ✅  sqlite restart then Render upload
+    ├── tp_56/                         ✅  deployed smoke (`/health` + one event)
+    ├── at_7_1/                        ✅  mocked Pi pipeline → Render persist + ingest
+    ├── at_7_2/                        ✅  camera + SPACE + stubbed events → cloud (dry-run)
+    ├── at_7_3/                        ✅  in-car three-maneuver E2E → SQLite + S3 + Postgres
     ├── at_3_4/                        ✅  live motion + kNN bench
     └── edge/                          📋  Pi / hardware (optional, not default CI)
         └── .gitkeep                   📋
