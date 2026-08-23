@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -35,8 +36,8 @@ _EVENT = {
         "stage2_classification_type_id": 3,
     },
 }
-_EXPECTED_KEY = "device-1/2026-08-16/clip-10.mp4"
-_EXPECTED_TRIP_KEY = "device-1/2026-08-16/trip-3.mp4"
+_EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+_EXPECTED_TRIP_KEY = "Aug-2026/driving_session_id_1/trips/trip-3.mp4"
 _TRIP = {
     "id": 3,
     "driving_session_id": 1,
@@ -128,6 +129,28 @@ def test_s3_upload_url_returns_stable_key(ingest_client: TestClient) -> None:
         clip = session.get(Clip, 10)
         assert clip is not None
         assert clip.s3_stored is None
+
+
+def test_s3_upload_url_uses_session_start_not_clip_start(
+    ingest_client: TestClient,
+) -> None:
+    _prime_clip(ingest_client)
+    with get_session() as session:
+        clip = session.get(Clip, 10)
+        assert clip is not None
+        clip.start_time = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
+        session.add(clip)
+        session.commit()
+    with patch(
+        "app.routes.s3_upload.presign_put", return_value="https://s3.example/put"
+    ):
+        response = ingest_client.post(
+            "/api/netrapi/s3-upload-url",
+            json={"clip_id": 10},
+            headers=_HEADERS,
+        )
+    assert response.status_code == 200
+    assert response.json()["object_key"] == _EXPECTED_KEY
 
 
 def test_confirm_heads_then_updates(ingest_client: TestClient) -> None:

@@ -91,7 +91,7 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
         if path.endswith("s3-upload-url"):
             return {
                 "url": "https://s3.example/put",
-                "object_key": "device-1/2026-08-16/clip-1.mp4",
+                "object_key": "Aug-2026/driving_session_id_1/clips/clip-1.mp4",
                 "method": "PUT",
             }
         return {"ok": True}
@@ -148,7 +148,7 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
     with get_session() as session:
         clip = session.exec(select(Clip).where(Clip.event_id == event_id)).first()
         assert clip is not None
-        assert clip.s3_key == "device-1/2026-08-16/clip-1.mp4"
+        assert clip.s3_key == "Aug-2026/driving_session_id_1/clips/clip-1.mp4"
         assert clip.s3_stored is True
         assert clip.file_size_bytes == len(b"fake-mp4")
 
@@ -186,7 +186,7 @@ def test_sync_event_skips_put_when_already_stored(tmp_path: Path) -> None:
         event_id = event.id
         clip = session.exec(select(Clip).where(Clip.event_id == event_id)).first()
         assert clip is not None
-        clip.s3_key = "device-1/2026-08-16/clip-1.mp4"
+        clip.s3_key = "Aug-2026/driving_session_id_1/clips/clip-1.mp4"
         clip.s3_stored = True
         session.add(clip)
         session.commit()
@@ -277,7 +277,7 @@ def test_upload_trip_segment_puts_and_marks_local(tmp_path: Path) -> None:
             assert body["trip_segment_id"]
             return {
                 "url": "https://s3.example/trip-put",
-                "object_key": "device-1/2026-08-16/trip-1.mp4",
+                "object_key": "Aug-2026/driving_session_id_1/trips/trip-1.mp4",
                 "method": "PUT",
             }
         return {"ok": True}
@@ -322,7 +322,7 @@ def test_upload_trip_segment_puts_and_marks_local(tmp_path: Path) -> None:
     with get_session() as session:
         row = session.get(TripSegment, segment_id)
         assert row is not None
-        assert row.s3_key == "device-1/2026-08-16/trip-1.mp4"
+        assert row.s3_key == "Aug-2026/driving_session_id_1/trips/trip-1.mp4"
         assert row.s3_stored is True
         assert row.file_size_bytes == len(b"fake-trip")
 
@@ -356,7 +356,7 @@ def test_upload_trip_segment_skips_put_when_already_stored(tmp_path: Path) -> No
         segment_id = row.id
         stored = session.get(TripSegment, segment_id)
         assert stored is not None
-        stored.s3_key = "device-1/2026-08-16/trip-1.mp4"
+        stored.s3_key = "Aug-2026/driving_session_id_1/trips/trip-1.mp4"
         stored.s3_stored = True
         session.add(stored)
         session.commit()
@@ -385,7 +385,10 @@ def test_drain_trip_segments_uploads_finished_pending_only(tmp_path: Path) -> No
             put_ids.append(body["trip_segment_id"])
             return {
                 "url": "https://s3.example/trip-put",
-                "object_key": f"device-1/2026-08-16/trip-{body['trip_segment_id']}.mp4",
+                "object_key": (
+                    f"Aug-2026/driving_session_id_1/trips/"
+                    f"trip-{body['trip_segment_id']}.mp4"
+                ),
                 "method": "PUT",
             }
         return {"ok": True}
@@ -425,7 +428,7 @@ def test_drain_trip_segments_uploads_finished_pending_only(tmp_path: Path) -> No
         stored_id = stored.id
         stored_row = session.get(TripSegment, stored_id)
         assert stored_row is not None
-        stored_row.s3_key = "device-1/2026-08-16/trip-already.mp4"
+        stored_row.s3_key = "Aug-2026/driving_session_id_1/trips/trip-already.mp4"
         stored_row.s3_stored = True
         session.add(stored_row)
         session.commit()
@@ -439,7 +442,10 @@ def test_drain_trip_segments_uploads_finished_pending_only(tmp_path: Path) -> No
         row = session.get(TripSegment, pending_id)
         assert row is not None
         assert row.s3_stored is True
-        assert row.s3_key == f"device-1/2026-08-16/trip-{pending_id}.mp4"
+        assert (
+            row.s3_key
+            == f"Aug-2026/driving_session_id_1/trips/trip-{pending_id}.mp4"
+        )
 
 
 def test_sync_session_missing_row_raises(tmp_path: Path) -> None:

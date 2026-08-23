@@ -17,7 +17,7 @@ from app.s3 import (
     presign_put,
 )
 from db.database import get_session
-from db.models import Clip, TripSegment
+from db.models import Clip, DrivingSession, Event, TripSegment
 
 router = APIRouter(
     prefix="/api/netrapi",
@@ -70,15 +70,41 @@ def _xor_media(session, clip_id: int | None, trip_segment_id: int | None):
     return "trip", row
 
 
+def _driving_session_for_media(session, kind: str, row):
+    if kind == "clip":
+        event = session.get(Event, row.event_id)
+        if event is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"event {row.event_id} not found",
+            )
+        session_id = event.driving_session_id
+    else:
+        session_id = row.driving_session_id
+    driving = session.get(DrivingSession, session_id)
+    if driving is None or driving.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"driving_session {session_id} not found",
+        )
+    return driving
+
+
+def _assigned_object_key(session, kind: str, row) -> str:
+    driving = _driving_session_for_media(session, kind, row)
+    return media_object_key(
+        kind=kind,
+        row_id=row.id,
+        session_id=driving.id,
+        start_time=driving.start_time,
+    )
+
+
 @router.post("/s3-upload-url")
 def issue_s3_upload_url(payload: S3UploadUrlIn):
     with get_session() as session:
         kind, row = _xor_media(session, payload.clip_id, payload.trip_segment_id)
-        object_key = media_object_key(
-            kind=kind,
-            row_id=row.id,
-            start_time=row.start_time,
-        )
+        object_key = _assigned_object_key(session, kind, row)
         expires_in = (
             CLIP_EXPIRES_SECONDS if kind == "clip" else TRIP_EXPIRES_SECONDS
         )
@@ -100,11 +126,7 @@ def issue_s3_upload_url(payload: S3UploadUrlIn):
 def confirm_s3_upload(payload: ConfirmS3UploadIn):
     with get_session() as session:
         kind, row = _xor_media(session, payload.clip_id, payload.trip_segment_id)
-        expected = media_object_key(
-            kind=kind,
-            row_id=row.id,
-            start_time=row.start_time,
-        )
+        expected = _assigned_object_key(session, kind, row)
         if payload.object_key != expected:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

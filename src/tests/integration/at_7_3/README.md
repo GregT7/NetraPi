@@ -47,9 +47,89 @@ python -c "import sqlite3; print(sqlite3.connect('src/main/db/netrapi.db').execu
 Expect three rows including `complete-stop` (null clip/s3) plus two uploaded unsafe
 types. Clips only for rolling/run-through under default `record_safe_events=false`.
 
-### Postgres / S3 / Render
+### Postgres (Supabase SQL editor)
 
-Same optional laptop commands as [AT-7.1 README](../at_7_1/README.md).
+On the laptop (no backend `.env` on the Pi). Use the `driving_session_id` the
+script printed if you have it — Pi SQLite autoincrements, so this is **not**
+usually session 1:
+
+```sql
+SELECT
+  e.id AS event_id,
+  e.driving_session_id,
+  ct.value AS event_type,
+  c.id AS clip_id,
+  c.s3_stored,
+  c.s3_key,
+  c.file_size_bytes
+FROM event e
+JOIN classification cl
+  ON cl.event_id = e.id AND cl.kind = 'auto'
+JOIN classification_type ct
+  ON ct.id = cl.classification_type_id
+LEFT JOIN clip c
+  ON c.event_id = e.id
+WHERE e.driving_session_id = 1  -- replace with the printed session id
+ORDER BY e.id;
+```
+
+If you did not keep the session id, latest session that has all three types:
+
+```sql
+SELECT
+  e.id AS event_id,
+  e.driving_session_id,
+  ct.value AS event_type,
+  c.id AS clip_id,
+  c.s3_stored,
+  c.s3_key
+FROM event e
+JOIN classification cl
+  ON cl.event_id = e.id AND cl.kind = 'auto'
+JOIN classification_type ct
+  ON ct.id = cl.classification_type_id
+LEFT JOIN clip c
+  ON c.event_id = e.id
+WHERE e.driving_session_id = (
+  SELECT e2.driving_session_id
+  FROM event e2
+  JOIN classification cl2
+    ON cl2.event_id = e2.id AND cl2.kind = 'auto'
+  JOIN classification_type ct2
+    ON ct2.id = cl2.classification_type_id
+  GROUP BY e2.driving_session_id
+  HAVING COUNT(*) FILTER (WHERE ct2.value = 'complete-stop') >= 1
+     AND COUNT(*) FILTER (WHERE ct2.value = 'rolling-stop') >= 1
+     AND COUNT(*) FILTER (WHERE ct2.value = 'run-through') >= 1
+  ORDER BY e2.driving_session_id DESC
+  LIMIT 1
+)
+ORDER BY e.id;
+```
+
+Expect three rows: `complete-stop` with `clip_id` / `s3_stored` / `s3_key` null;
+`rolling-stop` and `run-through` with `s3_stored` true and keys like
+`MMM-YYYY/driving_session_id_<id>/clips/clip-<id>.mp4`. Types must match what you actually drove
+(live classifier, not a stub).
+
+### S3
+
+AWS console → bucket from `src/main/backend/.env` `AWS_S3_BUCKET` → the two
+unsafe `clip.s3_key` objects from the query. Complete stop has **no** object.
+Object sizes should match `file_size_bytes`. Do not need AWS keys on the Pi.
+
+### Render logs
+
+https://dashboard.render.com → `netrapi` → Logs for this drive:
+
+- `POST /api/netrapi/master-config` 200 (session start)
+- `POST /api/netrapi/driving-session` 200
+- `POST /api/netrapi/driving-event` 200 (**three** times: complete-stop JSON with
+  no clip, then two unsafe events)
+- `POST /api/netrapi/s3-upload-url` 200 and `confirm-s3-upload` 200 (**twice**;
+  rolling-stop and run-through only)
+
+`GET /health` is Render probes. `operational-exception` only if ingest failed.
 
 ### Local clips / buzzer
 

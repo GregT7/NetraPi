@@ -2,7 +2,7 @@
 TP-44: Stable S3 object key generation (integration).
 
 Two authenticated s3-upload-url calls for the same clip id return the same
-object_key (device/date/clip id). Durable reference is the key, not the URL.
+object_key (month/session/clips/clip id). Durable reference is the key, not the URL.
 
 Usage (from repo root, venv with fastapi + alembic):
 
@@ -31,7 +31,7 @@ SMOKE_SESSION_ID = 1
 SMOKE_EVENT_ID = 10
 SMOKE_CLIP_ID = 10
 SMOKE_START = datetime(2026, 8, 16, 18, 0, 0, tzinfo=timezone.utc)
-EXPECTED_KEY = "device-1/2026-08-16/clip-10.mp4"
+EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
 
 
 def _configure_import_path() -> None:
@@ -109,7 +109,10 @@ def main() -> int:
     _configure_import_path()
     print("TP-44: Stable S3 object key generation", flush=True)
     print("  1. POST s3-upload-url twice for the same clip id", flush=True)
-    print("  2. Keys match device-1/{date}/clip-{id}.mp4", flush=True)
+    print(
+        "  2. Keys match MMM-YYYY/driving_session_id_{id}/clips/clip-{id}.mp4",
+        flush=True,
+    )
 
     if OUTPUT_DB_PATH.exists():
         OUTPUT_DB_PATH.unlink()

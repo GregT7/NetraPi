@@ -1048,7 +1048,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   1. `POST /api/netrapi/s3-upload-url` for multiple clip identities.
   2. Inspect assigned object keys.
 - **Pass criteria**
-  - Keys follow a consistent structure (e.g., device/date/event id).
+  - Keys follow `{MMM-YYYY}/driving_session_id_{id}/clips|trips/{clip|trip}-{id}.mp4` (UTC English month from driving session `start_time`, session id, kind folder, clip/trip row id).
   - Keys are stable for a given event identity.
   - Durable references are object keys, not expiring signed URLs.
 
