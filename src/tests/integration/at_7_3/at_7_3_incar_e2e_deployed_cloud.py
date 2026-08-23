@@ -494,15 +494,16 @@ def _inspect_session_uploads(session_id: int) -> list[tuple[int, str, str | None
 def main() -> int:
     _configure_import_path()
     from config.loader import AppConfig, ConfigError
-    from db.database import init_engine
+    from db.database import DatabaseUrlError, load_database_url, resolve_sqlite_url
     from main import DEFAULT_CONFIG_DIR, REPO_ROOT, _resolve_runtime_paths
     from netrapi import build_pipeline
     from netrapi.backend_auth import apply_edge_env, clear_ingest_auth
     from netrapi.exceptions import NetraPiError
 
-    from _render import api_origin, wait_health
+    from _render import api_origin, init_sqlite, sqlite_url, wait_health
 
     config_dir = DEFAULT_CONFIG_DIR.resolve()
+    sqlite_path = SQLITE_PATH
 
     try:
         apply_edge_env()
@@ -511,7 +512,17 @@ def main() -> int:
         print("AT-7.3: In-car E2E → deployed cloud", flush=True)
         print(f"  origin: {origin}", flush=True)
         wait_health(origin)
-        init_engine()
+
+        # Production Pi DB (not wiped). Ensure Alembic head like edge bring-up.
+        try:
+            db_url = load_database_url(from_process_env=True)
+        except DatabaseUrlError:
+            db_url = sqlite_url(SQLITE_PATH)
+        db_url = resolve_sqlite_url(db_url)
+        init_sqlite(db_url)
+        if db_url.startswith("sqlite:///"):
+            sqlite_path = Path(db_url[len("sqlite:///") :])
+
         base_config = AppConfig.load(config_dir)
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
@@ -534,7 +545,7 @@ def main() -> int:
 
     print("  camera + EventManager: live (no stubs)")
     print("  persist + ingest: RecordingManager / LocalStore / CloudIngest")
-    print(f"  sqlite: {SQLITE_PATH}")
+    print(f"  sqlite: {sqlite_path}")
     print(f"  clips_dir: {clips_dir}")
     print(f"  phases: {', '.join(s.event_type_name for s in SCENARIOS)}")
     print(
@@ -550,6 +561,9 @@ def main() -> int:
         "SPACE to arm each phase"
     )
     print("\nCtrl+C aborts. Camera + Coral + buzzer required.")
+    print(
+        "Drive each phase after SPACE: complete stop, then rolling, then run-through."
+    )
 
     session = _Session()
     probe = _BeepProbe(
@@ -563,7 +577,9 @@ def main() -> int:
         pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
         manager = pipeline.manager
         if manager._local_store is None:
-            raise RuntimeError("LocalStore not wired; init_engine must run before build_pipeline")
+            raise RuntimeError(
+                "LocalStore not wired; init_sqlite/init_engine must run before build_pipeline"
+            )
         if manager._cloud_ingest is None:
             raise RuntimeError(
                 "CloudIngest not wired; set NETRAPI_API_URL and NETRAPI_API_KEY in "
@@ -646,7 +662,7 @@ def main() -> int:
             f"latency={latency}  clip={clip}"
         )
     print("\nAT-7.3: PASS")
-    print(f"  inspect sqlite: {SQLITE_PATH}")
+    print(f"  inspect sqlite: {sqlite_path}")
     print("  inspect Postgres/S3/Render: see README")
     return 0
 
