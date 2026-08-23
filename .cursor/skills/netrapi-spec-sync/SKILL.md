@@ -53,7 +53,7 @@ Run (or offer to run) a **consistency pass** when:
 Read [doc-map.md](doc-map.md) for the **Yes / Maybe / No** matrix per change type.
 
 **Always check after MVS changes:**
-- `test.md` — Reqs fields on affected TP-xx; add/remove tests; sprint section headers; coverage notes (TP-01–55 for current plan)
+- `test.md` — Reqs fields on affected TP-xx; add/remove tests; sprint section headers; coverage notes (TP-01–57 for current plan)
 
 **Usually check after test.md changes:**
 - `test_matrix.xlsx` — Tell the user what to change manually (never edit the file in Cursor)
@@ -91,7 +91,7 @@ Optionally include a **copy-paste CSV block** in chat only (user pastes into Exc
 
 Schema: `test_number`, `test_name`, `description`, `status`
 
-- `test_number`: numeric only (`16` … `55`), not `TP-16`
+- `test_number`: numeric only (`16` … `57`), not `TP-16`
 - Do not restart numbering at 1 when the user keeps TP-01–15 elsewhere in the sheet
 - Remind the user to preserve existing **status** values when only name/description changed
 

@@ -9,13 +9,13 @@ from config.types import ApproachConfig, EventManagerConfig, MotionConfig
 from netrapi.buffer import FrameBuffer
 from netrapi.buffer.classification import Classification
 from netrapi.events.approach import diagnose_approach_drop
-from netrapi.events.driving_event import DrivingEvent
+from netrapi.events.driving_event import ApproachSnapshot, DrivingEvent
 from netrapi.events.enums import EventPhase
 from netrapi.events.classify import (
     LiveMotionTracker,
     StopClassifier,
+    compute_approach_area_sum_pct,
     extract_stage1_features,
-    extract_stage2_features,
 )
 from netrapi.exceptions import BufferError, EventError
 
@@ -130,16 +130,20 @@ class EventManager:
             self.reset()
             raise EventError("stage-1 feature extraction failed")
 
-        stage2 = extract_stage2_features(
-            stage1_features=stage1,
-            areas_snapshot=self._areas_snapshot,
-            detect_frame=self._detect_frame,
-            fps=self._latch_fps,
-            approach_config=self._approach,
+        prefix = self._areas_snapshot[: self._detect_frame + 1]
+        diagnosis = diagnose_approach_drop(
+            prefix, self._latch_fps, config=self._approach
         )
-        if stage2 is None:
+        if diagnosis is None or diagnosis.event is None:
             self.reset()
             raise EventError("stage-2 feature extraction failed")
+        area_sum = compute_approach_area_sum_pct(
+            self._areas_snapshot, diagnosis.event
+        )
+        if area_sum is None:
+            self.reset()
+            raise EventError("stage-2 feature extraction failed")
+        stage2 = [stage1[1], area_sum]
 
         try:
             stop_type = self._classifier.classify(stage1, stage2)
@@ -147,8 +151,34 @@ class EventManager:
             self.reset()
             raise
 
+        winner = next(
+            (
+                candidate
+                for candidate in diagnosis.peak_candidates
+                if candidate.passed
+                and candidate.peak_index == diagnosis.event.peak_index
+            ),
+            None,
+        )
+        approach = None
+        if winner is not None and winner.drop_duration_s is not None:
+            approach = ApproachSnapshot(
+                peak_area_pct=winner.peak_area_pct,
+                approach_duration_s=winner.approach_duration_s or 0.0,
+                increasing_fraction=winner.increasing_fraction or 0.0,
+                log_linear_r2=winner.log_linear_r2 or 0.0,
+                drop_duration_s=winner.drop_duration_s,
+                post_drop_holds=bool(winner.post_drop_holds),
+                fail_reasons=winner.fail_reasons,
+            )
+
         self.reset()
-        return DrivingEvent(type=stop_type)
+        return DrivingEvent(
+            type=stop_type,
+            knn_stage1=tuple(stage1),
+            knn_stage2=tuple(stage2),
+            approach=approach,
+        )
 
     def _estimate_fps(self) -> float:
         if len(self._area_history) < 2:

@@ -45,11 +45,11 @@ Use **Yes** = update in same session unless user says doc-only. **Maybe** = conf
 |-------------------------|----------|
 | Sprint 1 | TP-01–15 |
 | Sprint 2 | TP-16–24 |
-| Sprint 3 / A | TP-25–28 |
-| Sprint B | TP-29–33 |
-| Sprint C | TP-34–40 |
-| Sprint D | TP-41–48 |
-| Sprint E | TP-49–55 |
+| Sprint 3 | TP-25–28 |
+| Sprint 4 | TP-29–31 |
+| Sprint 5 | TP-32–41 |
+| Sprint D | TP-42–49 |
+| Sprint E | TP-50–57 |
 
 Frontend, full CI/CD, and collection/evaluation UI tests are **deferred** (generate later).
 
@@ -78,5 +78,5 @@ After structural changes:
 
 - M-4.10 through M-4.31 (not M-4.42)
 - M-10.10, M-10.20–23 (not M-10.30–33)
-- TP-01 through TP-55 (current active plan)
+- TP-01 through TP-57 (current active plan)
 - M-7.10 through M-7.15 (includes presigned upload URL issuance)

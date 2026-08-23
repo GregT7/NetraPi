@@ -81,6 +81,31 @@ python -m pip install pillow==11.3.0
 if errorlevel 1 goto pip_failed
 python -m pip install scikit-learn joblib
 if errorlevel 1 goto pip_failed
+REM greenlet 3.2+ has no cp39 Windows wheel; SQLAlchemy would try to compile it.
+python -m pip install greenlet==3.1.1
+if errorlevel 1 goto pip_failed
+python -m pip install sqlmodel==0.0.34
+if errorlevel 1 goto pip_failed
+python -m pip install alembic==1.15.2
+if errorlevel 1 goto pip_failed
+REM cp39 wheels; used by TP-33/TP-39 Supabase Postgres (SQLAlchemy).
+python -m pip install psycopg2-binary==2.9.10
+if errorlevel 1 goto pip_failed
+REM Pydantic 2 on Python 3.9 cannot evaluate `int | None` without this.
+python -m pip install eval_type_backport
+if errorlevel 1 goto pip_failed
+python -m pip install python-dotenv==1.0.1
+if errorlevel 1 goto pip_failed
+python -m pip install pydantic-settings==2.5.2
+if errorlevel 1 goto pip_failed
+REM FastAPI ingest (TP-34/35); cp39 wheels
+python -m pip install fastapi==0.115.8
+if errorlevel 1 goto pip_failed
+python -m pip install uvicorn==0.32.1
+if errorlevel 1 goto pip_failed
+python -m pip install httpx==0.27.2
+python -m pip install boto3==1.35.99
+if errorlevel 1 goto pip_failed
 
 echo ==^> Installing tflite-runtime...
 python -m pip install --extra-index-url https://google-coral.github.io/py-repo/ tflite-runtime==2.5.0.post1

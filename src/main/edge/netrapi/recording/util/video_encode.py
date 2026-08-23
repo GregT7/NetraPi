@@ -44,7 +44,6 @@ def write_h264_mp4(
         raise RecordingError(f"frames must be HxWx3 BGR arrays, got shape {first.shape}")
 
     height, width = first.shape[:2]
-    frame_bytes = width * height * 3
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -117,5 +116,7 @@ def write_h264_mp4(
         detail = stderr.decode("utf-8", errors="replace").strip() or f"ffmpeg exit {process.returncode}"
         raise RecordingError(f"ffmpeg failed to encode {output_path.name}: {detail}")
 
-    if not output_path.is_file() or output_path.stat().st_size < frame_bytes:
+    # H.264 of uniform frames is often much smaller than one uncompressed frame;
+    # only reject a missing or empty mux.
+    if not output_path.is_file() or output_path.stat().st_size == 0:
         raise RecordingError(f"ffmpeg produced no output at {output_path}")

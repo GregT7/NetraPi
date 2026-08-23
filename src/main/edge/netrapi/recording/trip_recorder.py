@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -11,12 +12,24 @@ from config.types import TripRecorderConfig
 from netrapi.exceptions import RecordingError
 from netrapi.recording.util.video_encode import write_h264_mp4
 
+OnSegmentSaved = Callable[..., None]
+OnSegmentOpened = Callable[..., None]
+
 
 class TripRecorder:
-    def __init__(self, config: TripRecorderConfig) -> None:
+    def __init__(
+        self,
+        config: TripRecorderConfig,
+        *,
+        on_segment_saved: OnSegmentSaved | None = None,
+        on_segment_opened: OnSegmentOpened | None = None,
+    ) -> None:
         self._config = config
+        self._on_segment_saved = on_segment_saved
+        self._on_segment_opened = on_segment_opened
         self._trip_started_at: datetime | None = None
         self._segment_started_at: float | None = None
+        self._segment_wall_started_at: datetime | None = None
         self._segment_index = 0
         self._segment_frames: list[np.ndarray] = []
         self._frame_size: tuple[int, int] | None = None
@@ -34,6 +47,12 @@ class TripRecorder:
     @property
     def is_started(self) -> bool:
         return self._active
+
+    def set_on_segment_saved(self, callback: OnSegmentSaved | None) -> None:
+        self._on_segment_saved = callback
+
+    def set_on_segment_opened(self, callback: OnSegmentOpened | None) -> None:
+        self._on_segment_opened = callback
 
     def start(self, *, frame_shape: tuple[int, ...]) -> None:
         if len(frame_shape) < 2:
@@ -84,6 +103,7 @@ class TripRecorder:
 
         self._current_path = self._segment_path()
         self._segment_started_at = time.monotonic()
+        self._segment_wall_started_at = datetime.now()
         self._segment_frames = []
         self._segment_index += 1
         print(
@@ -91,6 +111,12 @@ class TripRecorder:
             f"(target {self._config.segment_seconds}s wall) -> {self._current_path.name}",
             flush=True,
         )
+        if self._on_segment_opened is not None and self._segment_wall_started_at is not None:
+            self._on_segment_opened(
+                local_path=self._current_path,
+                order_number=self._segment_index,
+                start_time=self._segment_wall_started_at,
+            )
 
     def _finalize_segment(self) -> None:
         output_path = self._current_path
@@ -119,9 +145,17 @@ class TripRecorder:
             f"{frame_count} frames | {fps:.2f} fps",
             flush=True,
         )
+        if self._on_segment_saved is not None and self._segment_wall_started_at is not None:
+            self._on_segment_saved(
+                local_path=output_path,
+                order_number=self._segment_index,
+                start_time=self._segment_wall_started_at,
+                end_time=datetime.now(),
+            )
         self._segment_frames = []
         self._current_path = None
         self._segment_started_at = None
+        self._segment_wall_started_at = None
 
     def _segment_path(self) -> Path:
         if self._trip_started_at is None:

@@ -1,0 +1,144 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from sqlmodel import select
+
+from db.database import get_session
+from db.models import Clip, TripSegment
+from netrapi.cloud_ingest import CloudIngest
+from netrapi.exceptions import CloudIngestError
+
+
+def _remove_file(path: str | None) -> bool:
+    if not path:
+        return True
+    file = Path(path)
+    if not file.is_file():
+        return True
+    try:
+        file.unlink()
+    except OSError as exc:
+        print(f"[cleanup] could not delete {file}: {exc}", flush=True)
+        return False
+    return True
+
+
+def _finished(row: Clip | TripSegment) -> bool:
+    return row.init_local_stored is True
+
+
+def _uploaded(row: Clip | TripSegment) -> bool:
+    return row.s3_stored is True and bool(row.s3_key)
+
+
+def _cleanup_row(
+    ingest: CloudIngest,
+    *,
+    kind: str,
+    row_id: int,
+    local_path: str | None,
+) -> bool:
+    if not _remove_file(local_path):
+        return False
+    try:
+        if kind == "clip":
+            ingest.confirm_local_delete(clip_id=row_id)
+        else:
+            ingest.confirm_local_delete(trip_segment_id=row_id)
+    except CloudIngestError as exc:
+        detail = str(exc)
+        if "404" not in detail:
+            print(f"[cleanup] {kind} {row_id} cloud flag failed: {exc}", flush=True)
+            return False
+        print(
+            f"[cleanup] {kind} {row_id} not in cloud; marking local only",
+            flush=True,
+        )
+    model = Clip if kind == "clip" else TripSegment
+    with get_session() as session:
+        row = session.get(model, row_id)
+        if row is None:
+            print(f"[cleanup] {kind} {row_id} missing after delete", flush=True)
+            return False
+        row.init_local_deleted = True
+        row.local_path = None
+        session.add(row)
+        session.commit()
+    print(f"[cleanup] {kind} {row_id} local file removed", flush=True)
+    return True
+
+
+def _iter_media(uploaded_only: bool) -> list[tuple[str, int, str | None]]:
+    refs: list[tuple[str, int, str | None]] = []
+    with get_session() as session:
+        clips = session.exec(select(Clip).order_by(Clip.id)).all()
+        trips = session.exec(select(TripSegment).order_by(TripSegment.id)).all()
+    for row in clips:
+        if row.id is None or not _finished(row):
+            continue
+        if uploaded_only and not _uploaded(row):
+            continue
+        if row.init_local_deleted is True and not (
+            row.local_path and Path(row.local_path).is_file()
+        ):
+            continue
+        refs.append(("clip", row.id, row.local_path))
+    for row in trips:
+        if row.id is None or not _finished(row):
+            continue
+        if uploaded_only and not _uploaded(row):
+            continue
+        if row.init_local_deleted is True and not (
+            row.local_path and Path(row.local_path).is_file()
+        ):
+            continue
+        refs.append(("trip", row.id, row.local_path))
+    return refs
+
+
+def delete_uploaded_local_media(ingest: CloudIngest) -> int:
+    """Delete local clip/trip MP4s that are already in S3. Does not delete S3 objects."""
+    cleaned = 0
+    for kind, row_id, local_path in _iter_media(uploaded_only=True):
+        if _cleanup_row(ingest, kind=kind, row_id=row_id, local_path=local_path):
+            cleaned += 1
+    return cleaned
+
+
+def _sweep_orphans(directory: Path | None, keep: set[Path]) -> int:
+    if directory is None or not directory.is_dir():
+        return 0
+    removed = 0
+    for path in sorted(directory.glob("*.mp4")):
+        resolved = path.resolve()
+        if resolved in keep:
+            continue
+        if _remove_file(str(path)):
+            print(f"[cleanup] orphan removed ({path})", flush=True)
+            removed += 1
+    return removed
+
+
+def delete_all_local_media(
+    ingest: CloudIngest,
+    *,
+    clips_dir: Path | None = None,
+    trips_dir: Path | None = None,
+) -> int:
+    """Delete all finished local clip/trip MP4s. Does not delete S3 objects."""
+    keep: set[Path] = set()
+    with get_session() as session:
+        rows = list(session.exec(select(Clip)).all()) + list(
+            session.exec(select(TripSegment)).all()
+        )
+        for row in rows:
+            if row.init_local_stored is not True and row.local_path:
+                keep.add(Path(row.local_path).resolve())
+    cleaned = 0
+    for kind, row_id, local_path in _iter_media(uploaded_only=False):
+        if _cleanup_row(ingest, kind=kind, row_id=row_id, local_path=local_path):
+            cleaned += 1
+    cleaned += _sweep_orphans(clips_dir, keep)
+    cleaned += _sweep_orphans(trips_dir, keep)
+    return cleaned

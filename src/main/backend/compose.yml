@@ -1,0 +1,48 @@
+# Local FastAPI only (TP-37). Not used on Render.
+# Run from this directory: docker compose up --build
+name: netrapi
+services:
+  # Temporary laptop test Postgres only (not prod, not a copy of Supabase).
+  # Matches the Postgres dialect so Dockerized FastAPI can be exercised locally.
+  # Render / prod does not use this compose file or this database.
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: netrapi_user
+      POSTGRES_PASSWORD: netrapi_pass
+      POSTGRES_DB: netrapi_host
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netrapi_user -d netrapi_host"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Throwaway Compose Postgres (test only). Do not use host
+      # backend/.env (Supabase URI) and do not point this at Pi SQLite.
+      DATABASE_URL: postgresql+psycopg2://netrapi_user:netrapi_pass@postgres:5432/netrapi_host
+      # Dummy device key for laptop Compose only. Render uses backend/.env / env UI.
+      NETRAPI_API_KEY: local-compose-netrapi-key
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy

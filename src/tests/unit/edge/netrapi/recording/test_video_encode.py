@@ -48,6 +48,39 @@ def test_write_h264_mp4_rejects_single_frame(tmp_path: Path) -> None:
         write_h264_mp4(frames=[_frame()], fps=30.0, output_path=tmp_path / "x.mp4", crf=20)
 
 
+def test_write_h264_mp4_accepts_small_compressed_output(tmp_path: Path) -> None:
+    frames = [_frame(1), _frame(2)]
+    output_path = tmp_path / "out" / "clip.mp4"
+    mock_process = MagicMock()
+    mock_process.stdin = MagicMock()
+    mock_process.returncode = 0
+    mock_process.communicate.return_value = (b"", b"")
+    # Smaller than one uncompressed 64x48 BGR frame (9_216 bytes).
+    small_mp4_bytes = 400
+
+    with patch("netrapi.recording.util.video_encode.subprocess.Popen", return_value=mock_process):
+        with patch.object(Path, "is_file", return_value=True):
+            with patch.object(Path, "stat") as stat:
+                stat.return_value = MagicMock(st_size=small_mp4_bytes)
+                write_h264_mp4(frames=frames, fps=30.0, output_path=output_path, crf=20)
+
+
+def test_write_h264_mp4_rejects_empty_output(tmp_path: Path) -> None:
+    frames = [_frame(1), _frame(2)]
+    output_path = tmp_path / "out" / "clip.mp4"
+    mock_process = MagicMock()
+    mock_process.stdin = MagicMock()
+    mock_process.returncode = 0
+    mock_process.communicate.return_value = (b"", b"")
+
+    with patch("netrapi.recording.util.video_encode.subprocess.Popen", return_value=mock_process):
+        with patch.object(Path, "is_file", return_value=True):
+            with patch.object(Path, "stat") as stat:
+                stat.return_value = MagicMock(st_size=0)
+                with pytest.raises(RecordingError, match="produced no output"):
+                    write_h264_mp4(frames=frames, fps=30.0, output_path=output_path, crf=20)
+
+
 def test_write_h264_mp4_ignores_flush_of_closed_file_on_stdin_close(tmp_path: Path) -> None:
     frames = [_frame(1), _frame(2)]
     output_path = tmp_path / "out" / "clip.mp4"

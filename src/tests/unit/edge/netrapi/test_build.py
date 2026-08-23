@@ -32,7 +32,7 @@ def _resolved_app_config() -> AppConfig:
 def test_build_pipeline_wires_components(mock_load):
     app_config = _resolved_app_config()
 
-    pipeline = build_pipeline(app_config, verify_tpu=False)
+    pipeline = build_pipeline(app_config, verify_tpu=False, persist=False)
 
     mock_load.assert_called_once()
     assert isinstance(pipeline, NetraPiPipeline)
@@ -43,6 +43,7 @@ def test_build_pipeline_wires_components(mock_load):
     assert isinstance(pipeline.manager.recorder, Recorder)
     assert isinstance(pipeline.manager.trip_recorder, TripRecorder)
     assert isinstance(pipeline.manager.buzzer, Buzzer)
+    assert pipeline.manager._local_store is None
     assert pipeline.manager.app_config.recording_manager == app_config.recording_manager
     assert pipeline.manager.buzzer.config == app_config.buzzer
     assert pipeline.manager.pre_buffer._recording_manager_config == app_config.recording_manager
@@ -56,10 +57,41 @@ def test_build_pipeline_verify_tpu_failure_raises(mock_load, mock_verify_tpu):
     app_config = _resolved_app_config()
 
     with pytest.raises(DetectionError, match="TPU verification failed"):
-        build_pipeline(app_config, verify_tpu=True)
+        build_pipeline(app_config, verify_tpu=True, persist=False)
 
     mock_load.assert_called_once()
     mock_verify_tpu.assert_called_once()
+
+
+@patch.object(Detector, "load")
+def test_build_pipeline_persist_attaches_local_store(mock_load):
+    app_config = _resolved_app_config()
+    store = MagicMock()
+
+    with (
+        patch("netrapi.local_store.LocalStore", return_value=store),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=None),
+    ):
+        pipeline = build_pipeline(app_config, verify_tpu=False, persist=True)
+
+    mock_load.assert_called_once()
+    assert pipeline.manager._local_store is store
+    assert pipeline.manager._cloud_ingest is None
+
+
+@patch.object(Detector, "load")
+def test_build_pipeline_persist_attaches_cloud_ingest(mock_load):
+    app_config = _resolved_app_config()
+    store = MagicMock()
+    cloud = MagicMock()
+
+    with (
+        patch("netrapi.local_store.LocalStore", return_value=store),
+        patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=cloud),
+    ):
+        pipeline = build_pipeline(app_config, verify_tpu=False, persist=True)
+
+    assert pipeline.manager._cloud_ingest is cloud
 
 
 def test_pipeline_run_delegates_to_manager():

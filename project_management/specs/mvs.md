@@ -73,10 +73,6 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 ### R-6.2 Cloud Storage
 - M-6.20: Uploaded video assets shall be stored in a private AWS S3 storage bucket.
 
-### R-6.3 Retention Policy
-- M-6.30: The system shall apply a fixed, time-based retention policy to stored video assets.
-- M-6.31: Retention enforcement shall be implemented using cloud lifecycle rules.
-
 ## R-7 Backend API
 ### R-7.1 Backend Responsibilities
 - M-7.10: A cloud-deployed backend API shall authenticate edge devices using API keys.

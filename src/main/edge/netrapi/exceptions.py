@@ -31,3 +31,11 @@ class ClassificationError(NetraPiError):
 
 class EventError(NetraPiError):
     """Raised when event evaluation is misused or classification cannot complete."""
+
+
+class IngestAuthError(NetraPiError):
+    """Raised when the Pi ingest API URL or key cannot be loaded."""
+
+
+class CloudIngestError(NetraPiError):
+    """Raised when a FastAPI ingest or S3 PUT call fails."""

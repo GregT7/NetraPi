@@ -6,6 +6,7 @@ from netrapi.exceptions import (
     CaptureError,
     ClassificationError,
     EventError,
+    IngestAuthError,
     NetraPiError,
 )
 
@@ -16,6 +17,7 @@ def test_exception_hierarchy():
     assert issubclass(BufferError, NetraPiError)
     assert issubclass(ClassificationError, NetraPiError)
     assert issubclass(EventError, NetraPiError)
+    assert issubclass(IngestAuthError, NetraPiError)
 
 
 def test_exceptions_are_raiseable():

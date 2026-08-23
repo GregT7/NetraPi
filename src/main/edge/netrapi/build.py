@@ -56,6 +56,8 @@ def build_recording_manager(
     recorder: Recorder,
     trip_recorder: TripRecorder,
     buzzer: Buzzer,
+    local_store=None,
+    cloud_ingest=None,
 ) -> RecordingManager:
     config = app_config.recording_manager
     return RecordingManager(
@@ -69,6 +71,8 @@ def build_recording_manager(
         recorder=recorder,
         trip_recorder=trip_recorder,
         buzzer=buzzer,
+        local_store=local_store,
+        cloud_ingest=cloud_ingest,
     )
 
 
@@ -83,7 +87,18 @@ class NetraPiPipeline:
         self.manager.run_loop(**kwargs)
 
 
-def build_pipeline(app_config: AppConfig, *, verify_tpu: bool) -> NetraPiPipeline:
+def build_pipeline(
+    app_config: AppConfig, *, verify_tpu: bool, persist: bool | None = None
+) -> NetraPiPipeline:
+    import db.database as database
+
+    from netrapi.cloud_ingest import try_cloud_ingest
+    from netrapi.local_store import LocalStore
+
+    if persist is None:
+        persist = database._engine is not None
+    store = LocalStore() if persist else None
+    cloud = try_cloud_ingest() if persist else None
     detector = build_detector(app_config, verify_tpu=verify_tpu)
     event_manager = build_event_manager(app_config)
     recorder = build_recorder(app_config)
@@ -96,5 +111,7 @@ def build_pipeline(app_config: AppConfig, *, verify_tpu: bool) -> NetraPiPipelin
         recorder=recorder,
         trip_recorder=trip_recorder,
         buzzer=buzzer,
+        local_store=store,
+        cloud_ingest=cloud,
     )
     return NetraPiPipeline(app_config=app_config, manager=manager)
