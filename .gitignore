@@ -434,3 +434,8 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Vite frontend build / Vercel CLI
+src/main/frontend/dist/
+**/.vite/
+.vercel/

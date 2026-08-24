@@ -159,14 +159,36 @@ src/main/
 │           ├── operational_exception.py ✅  POST /api/netrapi/operational-exception
 │           └── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
 │
-└── frontend/                          📋  React on Vercel; no Dockerfile
-    ├── package.json                   📋
+└── frontend/                          ✅  Vite + React + TS + Tailwind SPA; no Dockerfile
+    ├── package.json                   ✅
+    ├── vite.config.ts                 ✅  Tailwind + Vitest; tests under src/tests/unit/frontend
+    ├── vercel.json                    ✅  SPA rewrite; Vercel project not connected yet
+    ├── README.md                      ✅
+    ├── index.html                     ✅
+    ├── public/
+    │   └── gifs/
+    │       └── .gitkeep               ✅  drop approach.gif etc. later
     └── src/
-        ├── App.tsx                    📋
+        ├── main.tsx                   ✅
+        ├── App.tsx                    ✅  single-page layout
+        ├── index.css                  ✅  Tailwind v4
+        ├── test-setup.ts              ✅  Testing Library jest-dom
         ├── components/
-        │   └── .gitkeep               📋
+        │   ├── SiteNav.tsx            ✅
+        │   ├── Hero.tsx               ✅
+        │   ├── Overview.tsx           ✅  stacked Mermaid hardware + software
+        │   ├── MermaidDiagram.tsx     ✅  mermaid.render + Iconify logos
+        │   ├── mermaidCharts.ts       ✅
+        │   ├── mermaidSetup.ts        ✅
+        │   ├── diagramIconPacks.ts    ✅  Iconify subset for diagrams
+        │   ├── HowItWorks.tsx         ✅  stub
+        │   ├── Demo.tsx               ✅  YouTube placeholder + Results
+        │   ├── ClusterScatter.tsx     ✅  2D kNN neighborhood sketch
+        │   ├── clusterData.ts         ✅
+        │   ├── TryItOut.tsx           ✅  table stub (no S3)
+        │   └── Links.tsx              ✅
         └── api/
-            └── .gitkeep               📋
+            └── .gitkeep               ✅
 ```
 
 ### Deploy vs local dev
@@ -177,7 +199,7 @@ src/main/
 | Local backend stack | `src/main/backend/compose.yml` | No — dev machine only |
 | Edge on Pi | `src/main/edge/netrapi-edge.service` + `main.py` | Yes — Pi (systemd) |
 | Edge / test Python deps | `src/create_env.sh` (Pi) or `src/create_env.bat` (Windows) | Yes — creates `venv/` in cwd |
-| Frontend | `src/main/frontend/` | Yes → Vercel |
+| Frontend | `src/main/frontend/` | Later → Vercel (scaffold only; project not connected) |
 
 No separate `deploy/` folder — each app keeps its own deploy artifact (`Dockerfile` in backend, `.service` in edge).
 
@@ -307,8 +329,9 @@ src/tests/
 │   │           └── test_s3_upload.py       ✅  ↔ s3_upload.py
 │   │
 │   └── frontend/
+│       ├── tsconfig.json              ✅  IDE types; packages resolve from frontend/node_modules
 │       └── src/
-│           └── App.test.tsx           📋  stub ↔ frontend/src/App.tsx
+│           └── App.test.tsx           ✅  ↔ frontend/src/App.tsx (Vitest via frontend package)
 │
 └── integration/
     ├── tp_26/                         ✅  stubbed event gate + clips

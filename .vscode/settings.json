@@ -1,0 +1,18 @@
+{
+  "files.exclude": {
+    "**/.vite": true,
+    "**/dist": true
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/.vite/**": true,
+    "**/dist/**": true,
+    "**/node_modules/**": true,
+    "**/venv/**": true
+  },
+  "search.exclude": {
+    "**/.vite": true,
+    "**/dist": true,
+    "**/node_modules": true
+  }
+}
