@@ -6,13 +6,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if ! python3 -c "import venv" 2>/dev/null; then
+# The venv module can import while ensurepip is missing; python3-venv is required.
+if ! python3 -c "import ensurepip" 2>/dev/null; then
   sudo apt-get update -qq
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv python3-dev
 fi
 
 VENV="${ROOT}/.venv"
-if [ ! -x "${VENV}/bin/python" ]; then
+if [ ! -x "${VENV}/bin/python" ] || [ ! -x "${VENV}/bin/pip" ]; then
+  rm -rf "${VENV}"
   python3 -m venv "${VENV}"
 fi
 
