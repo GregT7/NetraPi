@@ -241,6 +241,7 @@ erDiagram
     master_config ||--|| recording_manager_config: "has"
     master_config ||--|| trip_recorder_config: "has"
     master_config ||--|| buzzer_config: "has"
+    master_config ||--|| health_config: "has"
 
     camera_config ||--|{ camera_mode: "offers"
     camera_config }o--|| camera_mode: "selected"
@@ -432,5 +433,23 @@ erDiagram
         decimal duration_seconds
         boolean play_on_unsafe
         boolean play_on_safe
+    }
+
+    health_config {
+        int id PK
+        int master_config_id FK
+        decimal render_wait_s
+        decimal render_poll_s
+        decimal render_request_timeout_s
+        String internet_probe_host
+        int internet_probe_port
+        decimal internet_probe_timeout_s
+        String public_https_host
+        int public_https_port
+        String wlan_interface
+        decimal keepalive_interval_s
+        decimal keepalive_request_timeout_s
+        int keepalive_fail_limit
+        String log_path
     }
 ```

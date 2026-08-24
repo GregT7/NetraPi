@@ -69,11 +69,21 @@ def _cleanup_row(
     return True
 
 
-def _iter_media(uploaded_only: bool) -> list[tuple[str, int, str | None]]:
+def _iter_media(
+    uploaded_only: bool, *, target: str = "both"
+) -> list[tuple[str, int, str | None]]:
+    if target not in {"clips", "trips", "both"}:
+        raise ValueError(f"invalid cleanup target: {target}")
+    include_clips = target in {"clips", "both"}
+    include_trips = target in {"trips", "both"}
     refs: list[tuple[str, int, str | None]] = []
     with get_session() as session:
-        clips = session.exec(select(Clip).order_by(Clip.id)).all()
-        trips = session.exec(select(TripSegment).order_by(TripSegment.id)).all()
+        clips = session.exec(select(Clip).order_by(Clip.id)).all() if include_clips else []
+        trips = (
+            session.exec(select(TripSegment).order_by(TripSegment.id)).all()
+            if include_trips
+            else []
+        )
     for row in clips:
         if row.id is None or not _finished(row):
             continue
@@ -97,10 +107,10 @@ def _iter_media(uploaded_only: bool) -> list[tuple[str, int, str | None]]:
     return refs
 
 
-def delete_uploaded_local_media(ingest: CloudIngest) -> int:
+def delete_uploaded_local_media(ingest: CloudIngest, *, target: str = "both") -> int:
     """Delete local clip/trip MP4s that are already in S3. Does not delete S3 objects."""
     cleaned = 0
-    for kind, row_id, local_path in _iter_media(uploaded_only=True):
+    for kind, row_id, local_path in _iter_media(uploaded_only=True, target=target):
         if _cleanup_row(ingest, kind=kind, row_id=row_id, local_path=local_path):
             cleaned += 1
     return cleaned

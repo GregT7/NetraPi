@@ -52,6 +52,7 @@ class RecordingManager:
         self._buzzer = buzzer
         self._local_store = local_store
         self._cloud_ingest = cloud_ingest
+        self._boot_issues: list[str] = []
 
         self._clip_active = False
         self._running = False
@@ -99,6 +100,16 @@ class RecordingManager:
     def camera(self) -> Camera:
         return self._camera
 
+    def set_boot_issues(self, messages: list[str]) -> None:
+        self._boot_issues = list(messages)
+
+    def disable_cloud(self, reason: str) -> None:
+        if self._cloud_ingest is None:
+            return
+        print(f"[health] disabling cloud ingest: {reason}", flush=True)
+        self._cloud_ingest = None
+        self._record_exception(reason, is_fatal=False)
+
     def begin_clip(self) -> None:
         if self._clip_active:
             return
@@ -137,6 +148,9 @@ class RecordingManager:
                     master_config_id=master_config_id,
                 )
                 self._try_ingest("sync_session", self._driving_session_id)
+                for message in self._boot_issues:
+                    self._record_exception(message, is_fatal=False)
+                self._boot_issues.clear()
             laps = 0
             while self._running:
                 if should_stop and should_stop():

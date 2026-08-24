@@ -276,6 +276,139 @@ class BuzzerConfig:
         )
 
 
+def _as_positive_number(
+    value: Any, field: str, *, source: str, integer: bool = False
+) -> float | int:
+    number = _require_type(value, (int, float), field, source=source)
+    if integer:
+        if isinstance(number, bool) or int(number) != number:
+            raise ValueError(f"Field '{field}' in {source} must be an integer")
+        number = int(number)
+        if number <= 0:
+            raise ValueError(f"Field '{field}' in {source} must be greater than 0")
+        return number
+    number = float(number)
+    if number <= 0:
+        raise ValueError(f"Field '{field}' in {source} must be greater than 0")
+    return number
+
+
+def _as_port(value: Any, field: str, *, source: str) -> int:
+    port = _as_positive_number(value, field, source=source, integer=True)
+    if not 1 <= int(port) <= 65535:
+        raise ValueError(f"Field '{field}' in {source} must be a TCP port (1-65535)")
+    return int(port)
+
+
+def _as_nonempty_str(value: Any, field: str, *, source: str) -> str:
+    text = _require_type(value, str, field, source=source).strip()
+    if not text:
+        raise ValueError(f"Field '{field}' in {source} must be a non-empty string")
+    return text
+
+
+@dataclass(frozen=True)
+class HealthConfig:
+    render_wait_s: float
+    render_poll_s: float
+    render_request_timeout_s: float
+    internet_probe_host: str
+    internet_probe_port: int
+    internet_probe_timeout_s: float
+    public_https_host: str
+    public_https_port: int
+    wlan_interface: str
+    keepalive_interval_s: float
+    keepalive_request_timeout_s: float
+    keepalive_fail_limit: int
+    log_path: Path
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any], *, source: str = "health.json") -> HealthConfig:
+        return cls(
+            render_wait_s=float(
+                _as_positive_number(
+                    _require_key(data, "render_wait_s", source=source),
+                    "render_wait_s",
+                    source=source,
+                )
+            ),
+            render_poll_s=float(
+                _as_positive_number(
+                    _require_key(data, "render_poll_s", source=source),
+                    "render_poll_s",
+                    source=source,
+                )
+            ),
+            render_request_timeout_s=float(
+                _as_positive_number(
+                    _require_key(data, "render_request_timeout_s", source=source),
+                    "render_request_timeout_s",
+                    source=source,
+                )
+            ),
+            internet_probe_host=_as_nonempty_str(
+                _require_key(data, "internet_probe_host", source=source),
+                "internet_probe_host",
+                source=source,
+            ),
+            internet_probe_port=_as_port(
+                _require_key(data, "internet_probe_port", source=source),
+                "internet_probe_port",
+                source=source,
+            ),
+            internet_probe_timeout_s=float(
+                _as_positive_number(
+                    _require_key(data, "internet_probe_timeout_s", source=source),
+                    "internet_probe_timeout_s",
+                    source=source,
+                )
+            ),
+            public_https_host=_as_nonempty_str(
+                _require_key(data, "public_https_host", source=source),
+                "public_https_host",
+                source=source,
+            ),
+            public_https_port=_as_port(
+                _require_key(data, "public_https_port", source=source),
+                "public_https_port",
+                source=source,
+            ),
+            wlan_interface=_as_nonempty_str(
+                _require_key(data, "wlan_interface", source=source),
+                "wlan_interface",
+                source=source,
+            ),
+            keepalive_interval_s=float(
+                _as_positive_number(
+                    _require_key(data, "keepalive_interval_s", source=source),
+                    "keepalive_interval_s",
+                    source=source,
+                )
+            ),
+            keepalive_request_timeout_s=float(
+                _as_positive_number(
+                    _require_key(data, "keepalive_request_timeout_s", source=source),
+                    "keepalive_request_timeout_s",
+                    source=source,
+                )
+            ),
+            keepalive_fail_limit=int(
+                _as_positive_number(
+                    _require_key(data, "keepalive_fail_limit", source=source),
+                    "keepalive_fail_limit",
+                    source=source,
+                    integer=True,
+                )
+            ),
+            log_path=_as_path(
+                _require_key(data, "log_path", source=source),
+                "log_path",
+                source=source,
+            ),
+        )
+
+
 @dataclass(frozen=True)
 class TripRecorderConfig:
     enabled: bool

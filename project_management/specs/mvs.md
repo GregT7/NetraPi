@@ -69,6 +69,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 ## R-6 Media Upload and Cloud Storage
 ### R-6.1 Upload Path
 - M-6.10: When connectivity is available (cellular hotspot or mobile data), the edge device shall upload video clips and full-session footage one at a time to private cloud object storage using temporary upload credentials issued by the backend API (presigned PUT); the edge device shall not store permanent cloud-storage credentials, and the system shall not maintain an offline upload queue.
+- M-6.11: The edge device shall provide a maintenance command that uploads pending event clips, pending trip files, or both when connectivity is available. After a successful drain, the command shall support deleting the corresponding local files that are already stored in cloud object storage.
 
 ### R-6.2 Cloud Storage
 - M-6.20: Uploaded video assets shall be stored in a private AWS S3 storage bucket.
@@ -121,3 +122,11 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-10.21: Backend and frontend deployments shall occur automatically on merge to the main branch only when all required tests pass.
 - M-10.22: Deployment pipelines shall include post-deployment health checks to verify service availability and basic functionality.
 - M-10.23: Deployments shall be considered successful only when health checks complete successfully.
+
+### R-10.3 Edge Boot Health
+- M-10.24: The edge capture process shall run a synchronous boot health check that completes before capture starts.
+- M-10.25: Failure of the Coral USB TPU TFLite smoke check shall abort the capture process.
+- M-10.26: Absence of Wi-Fi association shall select offline mode and shall not abort capture.
+- M-10.27: When a Wi-Fi association exists but internet reachability or cloud readiness fails, the edge shall fall back to offline mode, continue capture, and shall not upgrade to online later in that process.
+- M-10.28: Online mode shall be selected only when internet reachability succeeds and the backend reports process liveness plus database and object-storage readiness.
+- M-10.29: While online, the edge shall periodically ping backend liveness so the hosted API does not idle-sleep; three consecutive ping failures shall drop the process to offline for the remainder of the run without returning to online.

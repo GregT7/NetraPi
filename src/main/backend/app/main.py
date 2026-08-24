@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.routes.driving_event import router as driving_event_router
 from app.routes.driving_session import router as driving_session_router
 from app.routes.health import router as health_router
+from app.routes.ready import router as ready_router
 from app.routes.master_config import router as master_config_router
 from app.routes.operational_exception import router as operational_exception_router
 from app.routes.s3_upload import router as s3_upload_router
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if docs_enabled else None,
     )
     application.include_router(health_router)
+    application.include_router(ready_router)
     application.include_router(master_config_router)
     application.include_router(driving_session_router)
     application.include_router(trip_segment_router)

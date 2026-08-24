@@ -49,18 +49,6 @@ def _resolve_runtime_paths(app_config, repo_root: Path):
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the NetraPi edge capture and clip pipeline.")
     parser.add_argument(
-        "--verify-tpu",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Load detector and verify Edge TPU before run (default: enabled)",
-    )
-    parser.add_argument(
-        "--max-laps",
-        type=int,
-        default=None,
-        help="Stop after N loop iterations (omit for continuous run)",
-    )
-    parser.add_argument(
         "--full-record",
         action=argparse.BooleanOptionalAction,
         default=None,
@@ -69,8 +57,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     jobs = parser.add_mutually_exclusive_group()
     jobs.add_argument(
         "--drain-trips",
-        action="store_true",
-        help="Upload pending trip segments to S3 (Wi-Fi). Does not run capture.",
+        choices=["clips", "trips", "both"],
+        help="Upload pending clips, trip segments, or both (Wi-Fi). Does not run capture.",
     )
     jobs.add_argument(
         "--delete-uploaded-local",
@@ -88,6 +76,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Updates SQLite and cloud flags. Does not delete S3 objects."
         ),
     )
+    parser.add_argument(
+        "--delete-after-drain",
+        choices=["clips", "trips", "both"],
+        default=None,
+        help=(
+            "After a successful --drain-trips, delete local MP4s already in S3 "
+            "(clips, trips, or both). Does not delete S3 objects."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -100,6 +97,9 @@ def main(argv: list[str] | None = None) -> int:
     from netrapi.exceptions import NetraPiError
 
     args = parse_args(argv)
+    if args.delete_after_drain and not args.drain_trips:
+        print("--delete-after-drain requires --drain-trips", file=sys.stderr)
+        return 1
     try:
         apply_edge_env()
         if args.drain_trips or args.delete_uploaded_local or args.delete_all_local:
@@ -114,8 +114,26 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return 1
             if args.drain_trips:
-                uploaded = ingest.drain_trip_segments()
-                print(f"drained {uploaded} trip segment(s)")
+                from config.loader import AppConfig
+                from netrapi.health import wake_render
+
+                app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
+                if not wake_render(app_config):
+                    print("Render GET /health failed; drain aborted", file=sys.stderr)
+                    return 1
+                if args.drain_trips in ("clips", "both"):
+                    clips = ingest.drain_clips()
+                    print(f"drained {clips} clip(s)")
+                if args.drain_trips in ("trips", "both"):
+                    trips = ingest.drain_trip_segments()
+                    print(f"drained {trips} trip segment(s)")
+                if args.delete_after_drain:
+                    from netrapi.local_cleanup import delete_uploaded_local_media
+
+                    cleaned = delete_uploaded_local_media(
+                        ingest, target=args.delete_after_drain
+                    )
+                    print(f"deleted {cleaned} uploaded local file(s)")
                 return 0
             if args.delete_uploaded_local:
                 from netrapi.local_cleanup import delete_uploaded_local_media
@@ -137,13 +155,33 @@ def main(argv: list[str] | None = None) -> int:
         app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
         app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
         init_engine()
-        pipeline = build_pipeline(app_config, verify_tpu=args.verify_tpu)
+        from netrapi.health import KeepAlive, run_boot_health
+
+        health = run_boot_health(app_config)
+        if health.abort:
+            print("Boot health failed: Coral TPU is required. Exiting.", file=sys.stderr)
+            return 1
+        pipeline = build_pipeline(
+            app_config,
+            cloud_enabled=health.mode == "online",
+            detector=health.detector,
+        )
+        pipeline.manager.set_boot_issues(health.persist_messages)
+        keepalive = None
+        if health.mode == "online":
+            keepalive = KeepAlive(
+                app_config.health,
+                on_give_up=pipeline.manager.disable_cloud,
+            )
+            keepalive.start()
         run_kwargs = {}
-        if args.max_laps is not None:
-            run_kwargs["max_laps"] = args.max_laps
         if args.full_record is not None:
             run_kwargs["full_record"] = args.full_record
-        pipeline.run(**run_kwargs)
+        try:
+            pipeline.run(**run_kwargs)
+        finally:
+            if keepalive is not None:
+                keepalive.stop()
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
         return 1

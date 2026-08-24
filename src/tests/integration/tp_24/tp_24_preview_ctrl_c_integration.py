@@ -259,7 +259,7 @@ def main() -> int:
     )
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
 
         _run_preview_phase(

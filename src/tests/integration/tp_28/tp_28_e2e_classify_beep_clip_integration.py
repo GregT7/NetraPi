@@ -491,7 +491,7 @@ def main() -> int:
     results: list[EncounterResult] = []
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
         _install_probes(manager, session=session, probe=probe)
         _install_preview_helpers(manager, session=session)

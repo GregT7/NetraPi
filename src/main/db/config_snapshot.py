@@ -18,6 +18,7 @@ from db.models import (
     EventManagerConfig,
     EventTriggerLabel,
     FarnebackConfig,
+    HealthConfig,
     KnnConfig,
     KnnFeature,
     MasterConfig,
@@ -58,6 +59,7 @@ def payload_from_json_dir(config_dir: Path | str) -> dict[str, Any]:
     recording_raw = _load_json(root, "recording_manager.json")
     trip_raw = _load_json(root, "trip_recorder.json")
     buzzer_raw = _load_json(root, "buzzer.json")
+    health_raw = _load_json(root, "health.json")
 
     modes = []
     for mode in camera_raw.get("modes") or []:
@@ -198,6 +200,7 @@ def payload_from_json_dir(config_dir: Path | str) -> dict[str, Any]:
             "play_on_unsafe": bool(play_on["unsafe"]),
             "play_on_safe": bool(play_on["safe"]),
         },
+        "health": _health_fields(health_raw),
     }
 
 
@@ -326,6 +329,12 @@ def payload_from_db(session: Session, master_config_id: int) -> dict[str, Any]:
         BuzzerConfig.master_config_id == master_config_id,
         "buzzer_config",
     )
+    health = _one(
+        session,
+        HealthConfig,
+        HealthConfig.master_config_id == master_config_id,
+        "health_config",
+    )
     return {
         "id": master.id,
         "name": master.name,
@@ -446,6 +455,26 @@ def payload_from_db(session: Session, master_config_id: int) -> dict[str, Any]:
             "play_on_unsafe": buzzer.play_on_unsafe,
             "play_on_safe": buzzer.play_on_safe,
         },
+        "health": {
+            "id": health.id,
+            **_health_fields(
+                {
+                    "render_wait_s": health.render_wait_s,
+                    "render_poll_s": health.render_poll_s,
+                    "render_request_timeout_s": health.render_request_timeout_s,
+                    "internet_probe_host": health.internet_probe_host,
+                    "internet_probe_port": health.internet_probe_port,
+                    "internet_probe_timeout_s": health.internet_probe_timeout_s,
+                    "public_https_host": health.public_https_host,
+                    "public_https_port": health.public_https_port,
+                    "wlan_interface": health.wlan_interface,
+                    "keepalive_interval_s": health.keepalive_interval_s,
+                    "keepalive_request_timeout_s": health.keepalive_request_timeout_s,
+                    "keepalive_fail_limit": health.keepalive_fail_limit,
+                    "log_path": health.log_path,
+                }
+            ),
+        },
     }
 
 
@@ -486,6 +515,7 @@ def insert_snapshot(session: Session, payload: dict[str, Any]) -> int:
     recording = dict(payload["recording"])
     trip = dict(payload["trip"])
     buzzer = dict(payload["buzzer"])
+    health = dict(payload["health"])
     roi = dict(motion["roi"])
     farneback = dict(motion["farneback"])
     display = dict(recording["display"])
@@ -719,8 +749,34 @@ def insert_snapshot(session: Session, payload: dict[str, Any]) -> int:
             play_on_safe=bool(buzzer["play_on_safe"]),
         )
     )
+    fields = _health_fields(health)
+    session.add(
+        HealthConfig(
+            id=_id(health, use_ids),
+            master_config_id=master.id,
+            **fields,
+        )
+    )
     session.flush()
     return master.id
+
+
+def _health_fields(raw: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "render_wait_s": float(raw["render_wait_s"]),
+        "render_poll_s": float(raw["render_poll_s"]),
+        "render_request_timeout_s": float(raw["render_request_timeout_s"]),
+        "internet_probe_host": str(raw["internet_probe_host"]),
+        "internet_probe_port": int(raw["internet_probe_port"]),
+        "internet_probe_timeout_s": float(raw["internet_probe_timeout_s"]),
+        "public_https_host": str(raw["public_https_host"]),
+        "public_https_port": int(raw["public_https_port"]),
+        "wlan_interface": str(raw["wlan_interface"]),
+        "keepalive_interval_s": float(raw["keepalive_interval_s"]),
+        "keepalive_request_timeout_s": float(raw["keepalive_request_timeout_s"]),
+        "keepalive_fail_limit": int(raw["keepalive_fail_limit"]),
+        "log_path": str(raw["log_path"]),
+    }
 
 
 def _load_json(config_dir: Path, name: str) -> dict[str, Any]:
@@ -867,6 +923,9 @@ def _requested_ids_are_free(session: Session, payload: dict[str, Any]) -> bool:
     buzzer = payload.get("buzzer") or {}
     if buzzer.get("id") is not None:
         checks.append((BuzzerConfig, int(buzzer["id"])))
+    health = payload.get("health") or {}
+    if health.get("id") is not None:
+        checks.append((HealthConfig, int(health["id"])))
     for model, row_id in checks:
         if session.get(model, row_id) is not None:
             return False

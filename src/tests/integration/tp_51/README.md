@@ -3,7 +3,7 @@
 Hits the live Render service. Pass = `GET /health` returns
 `{"status":"ok","time":"..."}`. Origin from `src/main/edge/.env`
 `NETRAPI_API_URL`, else https://netrapi.onrender.com (Render may take
-~30–90s to wake). Does **not** use `src/main/backend/.env`.
+~30–180s to wake). Does **not** use `src/main/backend/.env`.
 
 ```bash
 python src/tests/integration/tp_51/tp_51_backend_deployment.py

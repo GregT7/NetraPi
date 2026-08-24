@@ -256,7 +256,7 @@ def _run_expect_no_clip(
     clips_dir = app_config.recording_manager.clips_dir
     clips_before = _clip_files(clips_dir)
 
-    pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+    pipeline = build_pipeline(app_config)
     manager = pipeline.manager
     stub = _DeferredEventStub()
     event = DrivingEvent(type=getattr(StopSignEnum, scenario.event_type_name))
@@ -304,7 +304,7 @@ def _run_expect_clip(
     post_lap_budget = _post_roll_lap_budget(float(app_config.camera.recommended_fps))
     max_laps = PRE_FILL_LAP_BUDGET + post_lap_budget + 60
 
-    pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+    pipeline = build_pipeline(app_config)
     manager = pipeline.manager
     stub = _DeferredEventStub()
     manager._event_manager = stub

@@ -95,6 +95,7 @@ sequenceDiagram
 | Order | Endpoint | Accomplishes | Reqs / tests |
 | ----- | -------- | ------------ | ------------ |
 | 1 | `GET /health` | Process is up | M-7.10; TP-35 (uvicorn), TP-37 (Compose) |
+| 1a | `GET /api/netrapi/ready` | Authenticated process + Postgres `SELECT 1` + S3 `HeadBucket` | M-10.28; TP-59 |
 | 2 | `POST /api/netrapi/master-config` | Find or create a config snapshot. Insert only if the operational payload differs from every existing snapshot; otherwise return that `id`. | decision 56 |
 | 3 | `POST /api/netrapi/driving-session` | Insert **one** session (`master_config_id` + `start_time`) | M-7.11; TP-34 |
 | 4 | `POST /api/netrapi/trip-segment` | Prime **one** full-session segment row (`local_path`, `init_local_stored`, times, `order_number`). **`s3_stored` stays null.** No file. | M-7.11, M-4.11; no dedicated TP yet |
@@ -119,9 +120,40 @@ Returns process liveness and the server UTC time.
 }
 ```
 
+Boot health and the in-drive keep-alive poll this path (cheap; no database or S3). Authenticated readiness is `GET /api/netrapi/ready`.
+
+### 5.1a `GET /api/netrapi/ready`
+
+Requires `X-API-Key`. Proves Postgres (`SELECT 1`) and S3 (`HeadBucket` on the configured bucket). Used once at edge boot after `/health` succeeds. Does not replace `/health`.
+
+**200**
+
+```json
+{
+  "status": "ok",
+  "database": "ok",
+  "s3": "ok"
+}
+```
+
+**503** (either layer failed; `status` is `"error"`)
+
+```json
+{
+  "status": "error",
+  "database": "ok",
+  "s3": "error",
+  "detail": {
+    "s3": "NoSuchBucket"
+  }
+}
+```
+
+**401** missing or wrong API key.
+
 ### 5.2 `POST /api/netrapi/master-config`
 
-Find or create a frozen config snapshot. Fingerprint is the operational JSON (camera modes + selected mode, preview, detector + allowed class **values**, event-manager triggers, approach, motion/ROI/Farneback, kNN paths + features, recording/display, trip, buzzer). `master_config.name` / `created_at` / `note` and all row `id`s are ignored. Edge **loads** JSON at startup (`AppConfig`); this call only records which snapshot a session used (decision 58).
+Find or create a frozen config snapshot. Fingerprint is the operational JSON (camera modes + selected mode, preview, detector + allowed class **values**, event-manager triggers, approach, motion/ROI/Farneback, kNN paths + features, recording/display, trip, buzzer, health). `master_config.name` / `created_at` / `note` and all row `id`s are ignored. Edge **loads** JSON at startup (`AppConfig`); this call only records which snapshot a session used (decision 58).
 
 If the fingerprint matches any existing snapshot (including Alembic seed id 1 from live `src/main/edge/config`), return that `id` and **do not insert**. If it differs, insert a new `master_config` plus children and return the new `id`.
 

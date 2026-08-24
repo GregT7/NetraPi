@@ -17,7 +17,7 @@ Type=simple
 User=pi
 WorkingDirectory=/home/pi/NetraPi
 Environment=PYTHONPATH=src/main/edge
-ExecStart=/home/pi/NetraPi/venv/bin/python src/main/edge/main.py --verify-tpu
+ExecStart=/home/pi/NetraPi/venv/bin/python src/main/edge/main.py
 Restart=on-failure
 RestartSec=5
 

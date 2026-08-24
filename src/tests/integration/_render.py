@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import time
 import urllib.error
@@ -13,7 +14,9 @@ from pathlib import Path
 
 DEFAULT_ORIGIN = "https://netrapi.onrender.com"
 SEEDED_MASTER_CONFIG_ID = 1
-HEALTH_WAIT_S = 90.0
+# Render free-tier cold start can exceed a minute; retry budget must cover it.
+HEALTH_WAIT_S = 180.0
+HEALTH_REQUEST_TIMEOUT_S = 30.0
 CLIP_BODY = b"netrapi-sprint-e\n"
 
 INTEGRATION_DIR = Path(__file__).resolve().parent
@@ -106,7 +109,7 @@ def wait_health(origin: str, *, timeout_s: float = HEALTH_WAIT_S) -> dict:
     while time.monotonic() < deadline:
         try:
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=15) as response:
+            with urllib.request.urlopen(req, timeout=HEALTH_REQUEST_TIMEOUT_S) as response:
                 if getattr(response, "status", 200) != 200:
                     last = f"HTTP {response.status}"
                     time.sleep(2)
@@ -123,7 +126,15 @@ def wait_health(origin: str, *, timeout_s: float = HEALTH_WAIT_S) -> dict:
                     continue
                 datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
                 return body
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            socket.timeout,
+            OSError,
+            json.JSONDecodeError,
+        ) as exc:
+            # Py3.9: socket.timeout is not TimeoutError; bare timeouts must retry
+            # through Render cold start instead of aborting the wait loop.
             last = str(exc)
             time.sleep(2)
     raise RuntimeError(f"GET {url} did not succeed within {timeout_s:.0f}s: {last}")

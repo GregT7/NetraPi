@@ -661,7 +661,7 @@ def main() -> int:
     results: list[EncounterResult] = []
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
         if manager._local_store is None:
             raise RuntimeError(

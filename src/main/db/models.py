@@ -423,3 +423,23 @@ class BuzzerConfig(SQLModel, table=True):
     duration_seconds: float
     play_on_unsafe: bool
     play_on_safe: bool
+
+
+class HealthConfig(SQLModel, table=True):
+    __tablename__ = "health_config"
+
+    id: int | None = Field(default=None, primary_key=True)
+    master_config_id: int = Field(foreign_key="master_config.id", unique=True)
+    render_wait_s: float
+    render_poll_s: float
+    render_request_timeout_s: float
+    internet_probe_host: str
+    internet_probe_port: int
+    internet_probe_timeout_s: float
+    public_https_host: str
+    public_https_port: int
+    wlan_interface: str
+    keepalive_interval_s: float
+    keepalive_request_timeout_s: float
+    keepalive_fail_limit: int
+    log_path: str

@@ -288,7 +288,7 @@ def _run_stubbed_unsafe_clip(
     post_lap_budget = _post_roll_lap_budget(float(app_config.camera.recommended_fps))
     max_laps = PRE_FILL_LAP_BUDGET + post_lap_budget + 60
 
-    pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+    pipeline = build_pipeline(app_config)
     manager = pipeline.manager
 
     cam = app_config.camera

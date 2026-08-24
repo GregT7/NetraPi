@@ -14,6 +14,7 @@ These are the initial target bullets derived from the project overview proposal 
 - Built an end-to-end stop-sign event detection system that runs from Raspberry Pi 5 at the edge to cloud services for storage and dashboard reporting.
 - Used Python, TensorFlow Lite (`tflite-runtime`), and Google Coral USB TPU to classify stop-sign encounters (run-through, rolling stop, complete stop) in real time on-device.
 - Built the video pipeline with OpenCV and SQLite for local event metadata, then uploaded clips one at a time when online via a FastAPI backend (presigned S3 PUT + Postgres metadata; no offline upload queue).
+- Added a synchronous edge boot health check (Coral TPU, Wi-Fi/internet, Render wake, authenticated `/ready`) that selects online or offline capture, keeps Render awake while online, and later drains leftover clips/trips on Wi-Fi (with optional local delete after a successful drain).
 - Collected 10+ hours of driving footage after system bring-up with fixed model settings, manual ground-truth labeling, and model accuracy evaluation.
 - Deployed a Dockerized FastAPI backend on Render for API key authentication, presigned upload URL issuance, metadata ingestion to Postgres, and analytics/video endpoints.
 - Stored videos in private AWS S3 buckets with signed URL access, and stored event metadata in Supabase PostgreSQL with linked S3 object paths.

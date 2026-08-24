@@ -16,7 +16,7 @@ from db.config_snapshot import (
     payload_from_json_dir,
 )
 from db.database import get_session, init_engine
-from db.models import KnnFeature, KnnParameter, MasterConfig, PreviewConfig
+from db.models import HealthConfig, KnnFeature, KnnParameter, MasterConfig, PreviewConfig
 from db.writes import insert_driving_session, insert_local_event, knn_feature_ids
 
 ALEMBIC_INI = Path(__file__).resolve().parents[3] / "main" / "db" / "alembic.ini"
@@ -75,6 +75,29 @@ def test_changed_json_inserts_new_snapshot_and_second_call_reuses(
     assert first_id != 1
     assert (second_id, created_again) == (first_id, False)
     assert preview_row.window_name == "Changed Preview"
+    assert count == 2
+
+
+def test_changed_health_json_inserts_new_snapshot(
+    sqlite_url: str, tmp_path: Path
+) -> None:
+    _upgrade(sqlite_url)
+    init_engine(sqlite_url)
+    config_dir = _copy_edge_json(tmp_path)
+    health_path = config_dir / "health.json"
+    health = json.loads(health_path.read_text(encoding="utf-8"))
+    health["render_wait_s"] = 42
+    health_path.write_text(json.dumps(health), encoding="utf-8")
+    with get_session() as session:
+        first_id, created = ensure_snapshot_from_json_dir(session, config_dir)
+        session.commit()
+        row = session.exec(
+            select(HealthConfig).where(HealthConfig.master_config_id == first_id)
+        ).one()
+        count = len(session.exec(select(MasterConfig)).all())
+    assert created is True
+    assert first_id != 1
+    assert row.render_wait_s == 42
     assert count == 2
 
 

@@ -202,7 +202,7 @@ def _run_scenario(
         resolve_runtime_paths=resolve_runtime_paths,
     )
 
-    pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+    pipeline = build_pipeline(app_config)
     manager = pipeline.manager
 
     cam = app_config.camera

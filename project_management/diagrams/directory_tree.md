@@ -49,9 +49,10 @@ src/main/
 │   └── migrations/                    ✅  one Alembic tree; dialect from engine URL
 │       ├── env.py                     ✅  SQLModel metadata; loads edge/.env or process DATABASE_URL
 │       ├── script.py.mako             ✅
-│       └── versions/                  ✅  0001 schema + 0002 classification_type / edge-json snapshot + 0003 trip file_size_bytes
+│       └── versions/                  ✅  0001 schema + 0002 classification_type / edge-json snapshot + 0003 trip file_size_bytes + 0004 health_config
 │
 ├── edge/                              ✅  Raspberry Pi — capture, detect, clip
+│   ├── README.md                      ✅  how to run capture, boot health, online/offline, drain
 │   ├── main.py                        ✅
 │   ├── .env                           🏃  gitignored; DATABASE_URL=sqlite:///netrapi.db (file lands in db/); NETRAPI_API_URL + NETRAPI_API_KEY for ingest
 │   ├── netrapi-edge.service           ✅  systemd unit for Pi (install to /etc/systemd/system/)
@@ -69,7 +70,8 @@ src/main/
 │   │   ├── motion_config.json         ✅  ROI, Farneback, stopped threshold, post_drop_window_s
 │   │   ├── knn_config.json            ✅  feature lists, k, model_path per stage
 │   │   ├── trip_recorder.json         ✅  optional full-trip segments (`--full-record`)
-│   │   └── buzzer.json                ✅  GPIO pin, volume, pitch, duration, play_on flags
+│   │   ├── buzzer.json                ✅  GPIO pin, volume, pitch, duration, play_on flags
+│   │   └── health.json                ✅  boot probes, Render wait, keep-alive, health log path
 │   │
 │   ├── models/                        ✅
 │   │   ├── ssdlite_mobiledet_coco_qat_postprocess_edgetpu.tflite  ✅
@@ -82,6 +84,7 @@ src/main/
 │       ├── build.py                   ✅
 │       ├── backend_auth.py            ✅  apply_edge_env once; snapshot X-API-Key + URL from process env
 │       ├── cloud_ingest.py            ✅  SQLite row → FastAPI JSON; master-config before session; clip PUT on event; trip PUT on drain
+│       ├── health.py                  ✅  boot probes, HDMI overlay, keep-alive, online/offline
 │       ├── local_cleanup.py           ✅  unlink local MP4s; confirm-local-delete
 │       ├── local_store.py             ✅  thin adapter: RecordingManager → db/writes.py + config snapshot
 │       ├── exceptions.py              ✅
@@ -148,6 +151,7 @@ src/main/
 │       └── routes/                    ✅  Pi ingest — [backend_api.md](backend_api.md)
 │           ├── __init__.py            ✅
 │           ├── health.py              ✅  GET /health (TP-35)
+│           ├── ready.py               ✅  GET /api/netrapi/ready (TP-59)
 │           ├── master_config.py       ✅  POST /api/netrapi/master-config (find-or-create snapshot)
 │           ├── driving_session.py     ✅  POST /api/netrapi/driving-session (TP-34)
 │           ├── trip_segment.py        ✅  POST /api/netrapi/trip-segment (JSON prime)
@@ -237,7 +241,8 @@ src/tests/
 │       ├── knn_config.json            ✅
 │       ├── preview.json               ✅
 │       ├── trip_recorder.json         ✅
-│       └── buzzer.json                ✅
+│       ├── buzzer.json                ✅
+│       └── health.json                ✅
 │
 ├── unit/
 │   ├── edge/
@@ -248,6 +253,7 @@ src/tests/
 │   │   │
 │   │   └── netrapi/                   ✅  ↔ src/main/edge/netrapi/
 │   │       ├── test_build.py          ✅
+│   │       ├── test_boot_health.py    ✅  ↔ health.py (TP-57–60)
 │   │       ├── test_cloud_ingest.py   ✅  ↔ cloud_ingest.py
 │   │       ├── test_local_cleanup.py  ✅  ↔ local_cleanup.py
 │   │       ├── test_backend_auth.py   ✅  ↔ backend_auth.py
@@ -290,9 +296,9 @@ src/tests/
 │   │       ├── test_main.py           ✅  ↔ backend/app/main.py
 │   │       ├── test_api_key.py        ✅  ↔ auth/api_key.py (401 vs /health open)
 │   │       ├── test_health.py         ✅  ↔ routes/health.py
-│   │       ├── test_config.py         ✅  ↔ config.py
 │   │       ├── test_s3.py             ✅  ↔ s3.py object keys
 │   │       └── routes/
+│   │           ├── test_ready.py              ✅  ↔ ready.py (SELECT 1 + HeadBucket)
 │   │           ├── test_driving_session.py ✅  ↔ driving_session.py (mocked session)
 │   │           ├── test_master_config.py   ✅  ↔ master_config.py (find-or-create)
 │   │           ├── test_driving_event.py   ✅  ↔ driving_event.py (nested children)
@@ -332,6 +338,12 @@ src/tests/
     ├── tp_54/                         ✅  TP-53 sqlite vs Postgres vs S3 keys
     ├── tp_55/                         ✅  sqlite restart then Render upload
     ├── tp_56/                         ✅  deployed smoke (`/health` + one event)
+    ├── tp_57/                         ✅  TPU smoke abort (mocked main)
+    ├── tp_58/                         ✅  offline Wi-Fi / internet (mocked boot)
+    ├── tp_59/                         ✅  deployed GET /api/netrapi/ready
+    ├── tp_60/                         ✅  online boot + keep-alive → offline
+    ├── tp_61/                         ✅  --drain-trips clips|trips|both + delete-after-drain
+    ├── tp_62/                         ✅  health.json snapshot (Alembic 0004)
     ├── at_7_1/                        ✅  mocked Pi pipeline → Render persist + ingest
     ├── at_7_2/                        ✅  camera + SPACE + stubbed events → cloud (dry-run)
     ├── at_7_3/                        ✅  in-car three-maneuver E2E → SQLite + S3 + Postgres
@@ -350,6 +362,6 @@ src/tests/
 4. `src/main/edge/netrapi/detection/` + `events/` stub ✅ (TP-18/TP-19 unit tests)  
 5. `src/main/edge/main.py` + `netrapi-edge.service` ✅  
 6. `src/main/data/clips/` and `src/main/data/trips/` — 🏃 created on first write; keep `src/main/data/` in `.gitignore`  
-7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain-trips`. Local MP4 cleanup: `main.py --delete-uploaded-local` or `--delete-all-local`.  
+7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain-trips {clips,trips,both}`. After a successful drain: `--delete-after-drain {clips,trips,both}`. Standalone local MP4 cleanup: `--delete-uploaded-local` or `--delete-all-local`.  
 8. Event port ✅ — approach / motion / features / stop_classifier + approach/motion/knn JSON + joblib models (design: [event_detection.md](event_detection.md))  
 9. Buzzer ✅ — `netrapi/buzzer/` + `buzzer.json` (PWM beep on configured events; soft-fail GPIO)

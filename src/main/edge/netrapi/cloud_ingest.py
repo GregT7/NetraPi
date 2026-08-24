@@ -218,6 +218,30 @@ class CloudIngest:
         )
         return True
 
+    def drain_clips(self) -> int:
+        """POST pending event JSON and PUT finished clips that are not yet in S3."""
+        with get_session() as session:
+            events = session.exec(select(Event).order_by(Event.id)).all()
+            pending: list[int] = []
+            for event in events:
+                if event.id is None:
+                    continue
+                clip = session.exec(select(Clip).where(Clip.event_id == event.id)).first()
+                if clip is None:
+                    continue
+                if clip.init_local_stored is True and not (
+                    clip.s3_stored is True and bool(clip.s3_key)
+                ):
+                    pending.append(event.id)
+        uploaded = 0
+        for event_id in pending:
+            try:
+                self.sync_event(event_id)
+                uploaded += 1
+            except Exception as exc:
+                print(f"[ingest] event {event_id} drain failed: {exc}", flush=True)
+        return uploaded
+
     def drain_trip_segments(self) -> int:
         """Upload finished trip files that are not yet in S3, one at a time."""
         with get_session() as session:

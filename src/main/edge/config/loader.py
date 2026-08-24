@@ -11,6 +11,7 @@ from config.types import (
     CameraConfig,
     DetectorConfig,
     EventManagerConfig,
+    HealthConfig,
     KnnConfig,
     MotionConfig,
     PreviewConfig,
@@ -34,6 +35,7 @@ _CONFIG_PARSERS: tuple[tuple[str, type], ...] = (
     ("recording_manager.json", RecordingManagerConfig),
     ("trip_recorder.json", TripRecorderConfig),
     ("buzzer.json", BuzzerConfig),
+    ("health.json", HealthConfig),
 )
 
 
@@ -81,6 +83,7 @@ class AppConfig:
     recording_manager: RecordingManagerConfig
     trip_recorder: TripRecorderConfig
     buzzer: BuzzerConfig
+    health: HealthConfig
 
     @classmethod
     def load(cls, config_dir: Path) -> AppConfig:
@@ -104,4 +107,5 @@ class AppConfig:
             recording_manager=loaded[7],  # type: ignore[arg-type]
             trip_recorder=loaded[8],  # type: ignore[arg-type]
             buzzer=loaded[9],  # type: ignore[arg-type]
+            health=loaded[10],  # type: ignore[arg-type]
         )

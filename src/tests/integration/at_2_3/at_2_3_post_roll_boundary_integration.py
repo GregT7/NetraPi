@@ -82,7 +82,7 @@ def main() -> int:
     at_threshold = started_at + POST_ROLL_SECONDS
 
     try:
-        pipeline = build_pipeline(app_config, verify_tpu=VERIFY_TPU)
+        pipeline = build_pipeline(app_config)
         manager = pipeline.manager
         original_write = manager.recorder.write_clip
         write_calls = {"count": 0}
