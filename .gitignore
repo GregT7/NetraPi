@@ -13,6 +13,7 @@
 vids/
 research/
 venv/
+.venv/
 data/
 metrics/
 *clip.mp4

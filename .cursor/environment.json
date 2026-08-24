@@ -1,0 +1,5 @@
+{
+  "name": "NetraPi",
+  "install": "./.cursor/install.sh",
+  "start": "true"
+}
