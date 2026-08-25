@@ -4,63 +4,82 @@
 GitHub’s Mermaid preview cannot register Iconify packs. The landing page uses the same topology with tech logos; this spec uses text labels so the diagrams still preview on GitHub.
 
 ## Hardware Architecture Diagram
-_Description:_ Raspberry Pi 5 in the center. Arducam on a windshield mount over USB. Coral TPU over USB. Cellular hotspot to S3 and the phone. Pi power cord to a portable battery.
+_Description:_ Three columns around the Pi. Camera stack on the left, Pi and battery in the middle (power cord labeled on the line), Coral and network on the right. Links are plain lines, not arrows.
 
 ```mermaid
-flowchart TB
-  Mount[Windshield mount]
-  Cam[Arducam USB]
-  Pi[Raspberry Pi 5]
-  Coral[Coral USB TPU]
-  Hotspot[Cellular hotspot]
-  S3[AWS S3]
-  Phone[Phone]
-  Cord[Pi power cord]
-  Battery[Portable battery]
-  Mount --- Cam
-  Cam -->|USB| Pi
-  Pi -->|USB| Coral
-  Pi --> Hotspot
-  Hotspot --> S3
-  Hotspot --> Phone
-  Pi --> Cord
-  Cord --> Battery
+flowchart LR
+  subgraph capture[" "]
+    direction TB
+    Mount[Windshield Mount]
+    Cam[Arducam USB]
+    Mount --- Cam
+  end
+  subgraph hub[" "]
+    direction TB
+    Pi[Raspberry Pi 5]
+    Battery[Portable Battery]
+    Pi ---|"Power Cord"| Battery
+  end
+  subgraph extras[" "]
+    direction TB
+    Coral[Coral USB TPU]
+    Hotspot[Cellular Hotspot]
+    S3[AWS S3]
+    Phone[Phone]
+    Hotspot --- S3
+    Hotspot --- Phone
+  end
+  Cam ---|USB| Pi
+  Pi ---|USB| Coral
+  Pi --- Hotspot
+  style capture fill:none,stroke:none
+  style hub fill:none,stroke:none
+  style extras fill:none,stroke:none
 ```
 
 ## Software Architecture Diagram
-_Description:_ Larger blocks only: Edge Pi, backend on Render, cloud, and the Vercel frontend. Unlabeled arrows between those blocks. SQLModel is a compact shared-schema node, not a full-width subgraph.
+_Description:_ Edge Pi, backend on Render, cloud, and the Vercel frontend sit in one horizontal row. Each block stacks its tools vertically. Persistence holds SQLAlchemy, SQLModel, and Alembic and links the Pi to the cloud. Unlabeled lines between those blocks.
 
 ```mermaid
-flowchart TB
+flowchart LR
   subgraph edge [Edge Pi]
-    direction LR
+    direction TB
     Capture[OpenCV]
     Detect[TFLite Coral]
     LocalDb[SQLite]
   end
-  subgraph backend [Backend Render]
-    direction LR
+  subgraph schema [Persistence]
+    direction TB
+    Sqla[SQLAlchemy]
+    Sqlm[SQLModel]
+    Alembic[Alembic]
+  end
+  subgraph backend [Backend]
+    direction TB
+    Render[Render]
     Api[FastAPI]
+    Uvicorn[Uvicorn]
     Dock[Docker]
   end
   subgraph cloud [Cloud]
-    direction LR
+    direction TB
     S3[S3]
     Supabase[Supabase]
   end
-  subgraph frontend [Frontend Vercel]
-    direction LR
+  subgraph frontend [Frontend]
+    direction TB
+    Vercel[Vercel]
     Spa[React]
+    Ts[TypeScript]
     Vite[Vite]
     Tw[Tailwind]
-    Shad[shadcn]
+    Shad[Shadcn]
   end
-  SharedDb[SQLModel]
-  edge --> backend
-  backend --> cloud
-  frontend --> backend
-  SharedDb --- edge
-  SharedDb --- cloud
+  edge --- backend
+  backend --- cloud
+  frontend --- backend
+  schema --- edge
+  schema --- cloud
 ```
 
 ## Physical Installation Layout

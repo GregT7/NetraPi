@@ -31,7 +31,7 @@ rows). Script prints all three event types; unsafe rows include `s3_key`.
 
 Optional trip files: this harness leaves `--full-record` off. To also record
 trip segments, run `python src/main/edge/main.py --full-record` as a separate
-drive, then `python src/main/edge/main.py --drain-trips` on Wi-Fi.
+drive, then `python src/main/edge/main.py --drain` on Wi-Fi.
 
 ## Verify
 

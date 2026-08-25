@@ -104,6 +104,7 @@ class Clip(SQLModel, table=True):
     init_local_deleted: bool | None = None
     s3_stored: bool | None = None
     file_size_bytes: int | None = None
+    public_visible: bool = Field(default=True)
     fps: int
     order_number: int
     num_frames: int

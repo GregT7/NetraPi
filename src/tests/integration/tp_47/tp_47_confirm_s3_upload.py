@@ -34,7 +34,8 @@ SMOKE_EVENT_ID = 10
 SMOKE_CLIP_ID = 10
 SMOKE_START = datetime(2026, 8, 16, 18, 0, 0, tzinfo=timezone.utc)
 BODY = b"netrapi-tp-47\n"
-EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
+JSON_BODY = b'{"schema_version":1,"points":[]}\n'
 
 
 def _configure_import_path() -> None:
@@ -130,6 +131,34 @@ def _s3_client():
     ), bucket
 
 
+def _put_issued_objects(body: dict) -> list[str]:
+    objects = body.get("objects")
+    if not isinstance(objects, list) or not objects:
+        objects = [
+            {
+                "url": body.get("url"),
+                "object_key": body.get("object_key"),
+                "content_type": "video/mp4",
+            }
+        ]
+    keys: list[str] = []
+    for item in objects:
+        content_type = str(item.get("content_type") or "video/mp4")
+        payload = BODY if content_type.startswith("video/") else JSON_BODY
+        put = httpx.put(
+            item["url"],
+            content=payload,
+            headers={"Content-Type": content_type},
+            timeout=30.0,
+        )
+        if put.status_code not in {200, 204}:
+            raise RuntimeError(
+                f"presigned PUT returned {put.status_code}: {put.text}"
+            )
+        keys.append(str(item.get("object_key")))
+    return keys
+
+
 def main() -> int:
     _configure_import_path()
     print("TP-47: confirm-s3-upload links S3 object to metadata", flush=True)
@@ -146,6 +175,7 @@ def main() -> int:
     s3 = None
     bucket = None
     object_key = None
+    uploaded_keys: list[str] = []
     try:
         _init_schema(url)
         from fastapi.testclient import TestClient
@@ -169,17 +199,7 @@ def main() -> int:
                     f"s3-upload-url returned {issued.status_code}: {issued.text}"
                 )
             object_key = issued.json().get("object_key")
-            put_url = issued.json().get("url")
-            put = httpx.put(
-                put_url,
-                content=BODY,
-                headers={"Content-Type": "video/mp4"},
-                timeout=30.0,
-            )
-            if put.status_code not in {200, 204}:
-                raise RuntimeError(
-                    f"presigned PUT returned {put.status_code}: {put.text}"
-                )
+            uploaded_keys = _put_issued_objects(issued.json())
             confirmed = client.post(
                 "/api/netrapi/confirm-s3-upload",
                 json={"clip_id": SMOKE_CLIP_ID, "object_key": object_key},
@@ -210,11 +230,12 @@ def main() -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
     finally:
-        if s3 is not None and bucket and object_key:
-            try:
-                s3.delete_object(Bucket=bucket, Key=object_key)
-            except Exception:
-                pass
+        if s3 is not None and bucket:
+            for key in uploaded_keys or ([object_key] if object_key else []):
+                try:
+                    s3.delete_object(Bucket=bucket, Key=key)
+                except Exception:
+                    pass
 
     print("PASS: confirm set s3_key / s3_stored; object exists in bucket")
     print(f"  inspect: {OUTPUT_DB_PATH}")

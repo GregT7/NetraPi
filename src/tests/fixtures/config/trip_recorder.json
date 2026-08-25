@@ -1,6 +1,8 @@
 {
   "enabled": false,
   "segments_dir": "data/trips",
+  "logs_dir": "data/logs",
+  "stats_interval_s": 15,
   "segment_seconds": 300,
   "ffmpeg_crf": 20
 }

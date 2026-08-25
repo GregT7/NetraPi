@@ -2,7 +2,7 @@
 
 Pi-facing FastAPI contract: persist a driving session, prime **trip-segment** rows without sending those MP4s, persist events, and mint S3 URLs so the **edge** can PUT **event clips during the drive** and **trip files later on Wi‑Fi**. **No FastAPI route accepts file bytes.** Trip files rotate every `segment_seconds` (default 300 s) — too heavy for cellular in the lap loop. Cloud stack, the three databases (Pi SQLite local prod, Compose Postgres test-only, Supabase cloud prod), and credentials live in [cloud_architecture.md](cloud_architecture.md). Tables live in [schema_design.md](schema_design.md). Edge capture/clip writing is [event_clip_pipeline.md](event_clip_pipeline.md). Requirements: [mvs.md](../specs/mvs.md) R-6 / R-7 / R-8.
 
-This is the **ingest** surface only. It is not a replica of SQLite and it is not the portfolio frontend API.
+This is the **ingest** surface only. It is not a replica of SQLite and it is not the portfolio frontend API. Public Try-it-out playback (private bucket, short signed GET, rate-limited mint) is [frontend_playback.md](frontend_playback.md).
 
 ---
 
@@ -16,7 +16,7 @@ Give the Raspberry Pi a small set of HTTP calls so that it can:
 4. After a stop-sign encounter, persist **one driving event** and its children, then (if connected) **PUT the event clip to S3** (`s3-upload-url` → Pi PUT → `confirm-s3-upload`). Clips are 10–20 s and rare.
 5. **Later, on Wi‑Fi:** PUT **trip** files the same way (`trip_segment_id`). Video never transits Render. Trip MP4s never use cellular from the run cycle.
 
-The Pi does not hold AWS or Postgres credentials (decision 22). Device ingest uses header `X-API-Key` matching `NETRAPI_API_KEY` (TP-42; decision 46). The edge HTTP client is `netrapi.cloud_ingest.CloudIngest` (TP-49; decision 48): after each local SQLite write, the capture loop POSTs JSON and, for event clips, PUTs via a presigned URL. Before a session upsert, `sync_session` POSTs `master-config` so the FK exists (decision 56). `sync_trip_segment` is JSON-only. Trip files PUT later via `drain_trip_segments` / `main.py --drain-trips` (decision 54). Ingest failures are logged and do not abort the loop. Uploads stay **one at a time** (decision 21). **Event clips** may S3 during the drive; **trip segments** wait for Wi‑Fi (decision 33).
+The Pi does not hold AWS or Postgres credentials (decision 22). Device ingest uses header `X-API-Key` matching `NETRAPI_API_KEY` (TP-42; decision 46). The edge HTTP client is `netrapi.cloud_ingest.CloudIngest` (TP-49; decision 48): after each local SQLite write, the capture loop POSTs JSON and, for event clips, PUTs via a presigned URL. Before a session upsert, `sync_session` POSTs `master-config` so the FK exists (decision 56). `sync_trip_segment` is JSON-only. Trip files PUT later via `drain_trip_segments` / `main.py --drain` (decision 54). Ingest failures are logged and do not abort the loop. Uploads stay **one at a time** (decision 21). **Event clips** may S3 during the drive; **trip segments** wait for Wi‑Fi (decision 33).
 
 ---
 
@@ -58,7 +58,7 @@ Full-session trip files rotate about every **`segment_seconds`** (default **300*
 
 ## 4. Sequence
 
-**Drive:** session → prime trip rows (no trip PUT) → event JSON → **clip** PUT. **Later Wi‑Fi:** `drain_trip_segments` / `main.py --drain-trips` — **trip** PUT, one file at a time.
+**Drive:** session → prime trip rows (no trip PUT) → event JSON → **clip** PUT. **Later Wi‑Fi:** `drain_trip_segments` / `main.py --drain` — **trip** PUT, one file at a time.
 
 ```mermaid
 sequenceDiagram
@@ -155,7 +155,7 @@ Requires `X-API-Key`. Proves Postgres (`SELECT 1`) and S3 (`HeadBucket` on the c
 
 Find or create a frozen config snapshot. Fingerprint is the operational JSON (camera modes + selected mode, preview, detector + allowed class **values**, event-manager triggers, approach, motion/ROI/Farneback, kNN paths + features, recording/display, trip, buzzer, health). `master_config.name` / `created_at` / `note` and all row `id`s are ignored. Edge **loads** JSON at startup (`AppConfig`); this call only records which snapshot a session used (decision 58).
 
-If the fingerprint matches any existing snapshot (including Alembic seed id 1 from live `src/main/edge/config`), return that `id` and **do not insert**. If it differs, insert a new `master_config` plus children and return the new `id`.
+If the fingerprint matches any existing snapshot (including the Alembic `edge-json` seed from live `src/main/edge/config`), return that `id` and **do not insert**. If it differs, insert a new `master_config` plus children and return the new `id`.
 
 Pi `RecordingManager` resolve order: local SQLite find-or-create from the JSON dir, then this POST (so `driving-session.master_config_id` exists in Postgres), then `start_session` with that id. `CloudIngest.sync_session` repeats the POST so Wi‑Fi drain still has the FK.
 
@@ -174,7 +174,7 @@ Pi `RecordingManager` resolve order: local SQLite find-or-create from the JSON d
 
 Drive started. One row. Session must exist before any `driving-event` for that drive.
 
-Unknown `master_config_id` is **400**. Call §5.2 first so the snapshot exists. Unchanged live JSON reuses Alembic seed id 1.
+Unknown `master_config_id` is **400**. Call §5.2 first so the snapshot exists. Unchanged live JSON reuses the Alembic `edge-json` seed snapshot.
 
 **Minimal body**
 
@@ -283,12 +283,38 @@ The clip or trip **row must already exist** (`driving-event` for clips, `trip-se
 ```json
 {
   "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
-  "method": "PUT"
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
+  "method": "PUT",
+  "objects": [
+    {
+      "name": "clip.mp4",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
+      "content_type": "video/mp4"
+    },
+    {
+      "name": "areas.json",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/areas.json",
+      "content_type": "application/json"
+    },
+    {
+      "name": "motion.json",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/motion.json",
+      "content_type": "application/json"
+    },
+    {
+      "name": "transitions.json",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/transitions.json",
+      "content_type": "application/json"
+    }
+  ]
 }
 ```
 
-The Pi PUTs the MP4 **directly to `url`**. That HTTP call is S3, not FastAPI.
+The Pi PUTs each listed object **directly to its `url`**. Those HTTP calls are S3, not FastAPI. Confirm HEADs the video and all three JSON sidecars before setting `s3_stored`.
 
 ### 5.7 `POST /api/netrapi/confirm-s3-upload`
 
@@ -299,7 +325,7 @@ JSON only. After the S3 PUT succeeds, the Pi tells FastAPI the object landed. Ba
 ```json
 {
   "clip_id": 10,
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
 }
 ```
 
@@ -309,7 +335,7 @@ JSON only. After the S3 PUT succeeds, the Pi tells FastAPI the object landed. Ba
 
 ```json
 {
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
   "s3_stored": true,
   "clip_id": 10,
   "file_size_bytes": 4096
@@ -322,7 +348,7 @@ Keep uploads **one at a time**. **Clips** may PUT during the drive when online. 
 
 ### 5.8 `POST /api/netrapi/s3-download-url`
 
-JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true, `s3_key` set). FastAPI mints a time-limited S3 **GET** URL (clip 15 min, trip 60 min). The object stays private; unsigned GETs to the bucket URL fail (TP-46). Frontend JWT playback can reuse this later; Sprint 6 authenticates with `X-API-Key`.
+JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true, `s3_key` set). FastAPI mints a time-limited S3 **GET** URL (clip 15 min, trip 60 min). The object stays private; unsigned GETs to the bucket URL fail (TP-46). Sprint 6 authenticates this **ingest** route with `X-API-Key`. Do not put that key in Vite. Public demo playback is `POST /api/public/clip-download-url` (no device key) — [frontend_playback.md](frontend_playback.md). JWT on `Authorization` stays reserved (decision 46 / 50).
 
 **Request**
 
@@ -339,7 +365,7 @@ JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true,
 ```json
 {
   "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
   "method": "GET",
   "clip_id": 10
 }
@@ -387,7 +413,7 @@ JSON only. After the Pi deletes a local clip or trip MP4, it tells FastAPI so Po
 }
 ```
 
-Edge entry points (no capture loop): `main.py --delete-uploaded-local` (only rows with `s3_stored` true) and `main.py --delete-all-local` (all finished local MP4s, plus leftover files in the clips/trips directories). Unfinished recordings are left on disk.
+Edge entry points (no capture loop): `main.py --delete-uploaded` (only rows with `s3_stored` true) and `main.py --delete-all` (all finished local MP4s, plus leftover files in the clips/trips directories). Both also remove empty clip/trip folders. Unfinished recordings are left on disk.
 
 ---
 

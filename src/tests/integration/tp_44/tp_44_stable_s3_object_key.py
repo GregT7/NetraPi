@@ -31,7 +31,7 @@ SMOKE_SESSION_ID = 1
 SMOKE_EVENT_ID = 10
 SMOKE_CLIP_ID = 10
 SMOKE_START = datetime(2026, 8, 16, 18, 0, 0, tzinfo=timezone.utc)
-EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
 
 
 def _configure_import_path() -> None:
