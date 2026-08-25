@@ -1,5 +1,15 @@
 import ClusterScatter from './ClusterScatter'
-import { LABEL_COLORS } from './clusterData'
+import MermaidDiagram from './MermaidDiagram'
+import {
+  CLUSTER_POINTS,
+  LABEL_COLORS,
+  STAGE1_FEATURE_LABELS,
+  STAGE1_FEATURE_PAIRS,
+  STAGE1_PCA_POINTS,
+  STAGE1_PCA_VARIANCE,
+  stage1PairPoints,
+} from './clusterData'
+import { KNN_CHART } from './mermaidCharts'
 
 const YOUTUBE_VIDEO_ID = ''
 
@@ -18,7 +28,7 @@ export default function Demo() {
   return (
     <section className="scroll-mt-20 px-6 py-16" id="demo">
       <div className="mx-auto max-w-3xl space-y-10">
-        <h2 className="text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl">
+        <h2 className="text-3xl font-semibold tracking-tight text-zinc-50 md:text-4xl">
           Demo
         </h2>
 
@@ -31,7 +41,7 @@ export default function Demo() {
             title="NetraPi demo"
           />
         ) : (
-          <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-lg text-zinc-400">
+          <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-sm text-zinc-400">
             Demo clip coming soon
           </div>
         )}
@@ -55,7 +65,7 @@ function Results() {
         The set is about 100 unique clips, around 25 per class. I left out the
         duplicate clips I made later (ids 108, 109, 110, and after).
       </p>
-      <p className="text-base text-zinc-400">
+      <p className="text-zinc-400">
         The percents below come from the ap_050 run. That run still included
         those extra ids, so a recount on unique clips only is still pending.
         Overall accuracy on that run was 83.3%.
@@ -76,20 +86,64 @@ function Results() {
       </ul>
       <p>
         The classifier is a two-stage kNN with k=3. First it picks safe vs
-        unsafe. If it was unsafe, a second stage picks rolling stop vs
-        run-through.
+        unsafe from four motion numbers. If it was unsafe, a second stage picks
+        rolling stop vs run-through from min motion plus how big the sign got.
+        Clips that never trigger approach stay unrelated.
       </p>
+      <figure>
+        <MermaidDiagram chart={KNN_CHART} />
+        <figcaption className="mt-2 text-center text-zinc-400">
+          Hierarchical kNN
+        </figcaption>
+      </figure>
       <p>
-        Stage 2 only uses two numbers, so that part can be drawn as a scatter
-        plot: min motion after the drop (x) vs how big the stop sign got during
-        the approach (y). Complete stops sit at low motion. Run-throughs sit at
-        high motion. Unrelated clips usually have a weak sign-area signal.
+        Those four stage-1 numbers cannot be drawn as-is, so the plot below is a
+        PCA of the standardized motion features. PC1 is{' '}
+        {Math.round(STAGE1_PCA_VARIANCE[0] * 100)}% of the variance and tracks
+        more motion / less time stopped. PC2 is{' '}
+        {Math.round(STAGE1_PCA_VARIANCE[1] * 100)}%. Complete stops should sit
+        toward the low-motion side of PC1. Color is the stage-1 split, not the
+        final four labels.
       </p>
-      <p className="text-base text-zinc-400">
-        This plot is a sketch of those neighborhoods, not the exported 100-clip
-        table. Same axes the live kNN uses.
+      <p className="text-zinc-400">
+        Axes are principal components, not raw motion. Unrelated clips are
+        omitted.
       </p>
-      <ClusterScatter />
+      <ClusterScatter
+        points={STAGE1_PCA_POINTS}
+        xDomain={[-3, 5]}
+        xLabel="PC1"
+        yLabel="PC2"
+      />
+      <p>
+        The six plots below are every pair of those four raw numbers: mean
+        motion, min motion, p95 motion, and stop fraction. Same stage-1 labels
+        as the PCA.
+      </p>
+      <div className="grid gap-8 sm:grid-cols-2">
+        {STAGE1_FEATURE_PAIRS.map(([xKey, yKey], index) => (
+          <ClusterScatter
+            key={`${xKey}-${yKey}`}
+            points={stage1PairPoints(xKey, yKey)}
+            showLegend={index === 0}
+            xLabel={STAGE1_FEATURE_LABELS[xKey]}
+            yLabel={STAGE1_FEATURE_LABELS[yKey]}
+          />
+        ))}
+      </div>
+      <p>
+        Stage 2 is already two numbers, so it needs no PCA: min motion after the
+        drop (x) vs sign-area sum on the approach (y).
+      </p>
+      <p className="text-zinc-400">
+        Rolling vs run-through on the same axes the live stage-2 kNN uses.
+        Complete stops and unrelated clips are omitted.
+      </p>
+      <ClusterScatter
+        points={CLUSTER_POINTS}
+        xLabel="Min motion"
+        yLabel="Sign area"
+      />
     </div>
   )
 }

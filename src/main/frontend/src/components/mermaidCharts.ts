@@ -1,49 +1,101 @@
-export const HARDWARE_CHART = `flowchart TB
-  Mount@{ icon: "mdi:car-windshield", form: "rounded", label: "Windshield mount" }
-  Cam@{ icon: "mdi:cctv", form: "rounded", label: "Arducam USB" }
-  Pi@{ icon: "logos:raspberry-pi", form: "rounded", label: "Raspberry Pi 5" }
-  Coral@{ icon: "logos:tensorflow", form: "rounded", label: "Coral USB TPU" }
-  Hotspot@{ icon: "mdi:wifi", form: "rounded", label: "Cellular hotspot" }
-  S3@{ icon: "logos:aws-s3", form: "rounded", label: "AWS S3" }
-  Phone@{ icon: "mdi:cellphone", form: "rounded", label: "Phone" }
-  Cord@{ icon: "mdi:power-plug", form: "rounded", label: "Pi power cord" }
-  Battery@{ icon: "mdi:battery-charging", form: "rounded", label: "Portable battery" }
-  Mount --- Cam
-  Cam -->|"USB"| Pi
-  Pi -->|"USB"| Coral
-  Pi --> Hotspot
-  Hotspot --> S3
-  Hotspot --> Phone
-  Pi --> Cord
-  Cord --> Battery`
+export const KNN_CHART = `flowchart TB
+  clips["104 clips"]
+  approach["Approach detection"]
+  fired["Approach fired"]
+  silent["No approach"]
+  unrelated["Unrelated (control)"]
+  stage1["Stage 1 kNN<br/>4 features"]
+  complete["Complete stop"]
+  unsafe["Rolling / run-through"]
+  stage2["Stage 2 kNN<br/>2 features"]
+  rolling["Rolling stop"]
+  runthrough["Run-through"]
 
-export const SOFTWARE_CHART = `flowchart TB
+  clips --> approach
+  approach --> fired
+  approach --> silent
+  silent --> unrelated
+  fired --> stage1
+  stage1 --> complete
+  stage1 --> unsafe
+  unsafe --> stage2
+  stage2 --> rolling
+  stage2 --> runthrough
+
+  classDef unrelatedNode fill:#0c4a6e,stroke:#38bdf8,color:#fafafa
+  classDef completeNode fill:#064e3b,stroke:#34d399,color:#fafafa
+  classDef rollingNode fill:#713f12,stroke:#fbbf24,color:#fafafa
+  classDef runNode fill:#7f1d1d,stroke:#fb7185,color:#fafafa
+  class unrelated unrelatedNode
+  class complete completeNode
+  class rolling rollingNode
+  class runthrough runNode`
+
+export const HARDWARE_CHART = `flowchart LR
+  subgraph capture[" "]
+    direction TB
+    Mount@{ icon: "mdi:car-windshield", form: "rounded", label: "Windshield Mount" }
+    Cam@{ icon: "mdi:cctv", form: "rounded", label: "Arducam USB" }
+    Mount --- Cam
+  end
+  subgraph hub[" "]
+    direction TB
+    Pi@{ icon: "logos:raspberry-pi", form: "rounded", label: "Raspberry Pi 5" }
+    Battery@{ icon: "mdi:battery-charging", form: "rounded", label: "Portable Battery" }
+    Pi ---|"Power Cord"| Battery
+  end
+  subgraph extras[" "]
+    direction TB
+    Coral@{ icon: "logos:tensorflow", form: "rounded", label: "Coral USB TPU" }
+    Hotspot@{ icon: "mdi:wifi", form: "rounded", label: "Cellular Hotspot" }
+    S3@{ icon: "logos:aws-s3", form: "rounded", label: "AWS S3" }
+    Phone@{ icon: "mdi:cellphone", form: "rounded", label: "Phone" }
+    Hotspot --- S3
+    Hotspot --- Phone
+  end
+  Cam ---|USB| Pi
+  Pi ---|USB| Coral
+  Pi --- Hotspot
+  style capture fill:none,stroke:none
+  style hub fill:none,stroke:none
+  style extras fill:none,stroke:none`
+
+export const SOFTWARE_CHART = `flowchart LR
   subgraph edge [Edge Pi]
-    direction LR
+    direction TB
     Capture@{ icon: "logos:opencv", form: "rounded", label: "OpenCV" }
     Detect@{ icon: "logos:tensorflow", form: "rounded", label: "TFLite Coral" }
     LocalDb@{ icon: "logos:sqlite", form: "rounded", label: "SQLite" }
   end
-  subgraph backend [Backend Render]
-    direction LR
+  subgraph schema [Persistence]
+    direction TB
+    Sqla@{ icon: "logos:sqlalchemy", form: "rounded", label: "SQLAlchemy" }
+    Sqlm@{ icon: "logos:sqlmodel", form: "rounded", label: "SQLModel" }
+    Alembic@{ icon: "logos:python", form: "rounded", label: "Alembic" }
+  end
+  subgraph backend [Backend]
+    direction TB
+    Render@{ icon: "logos:render", form: "rounded", label: "Render" }
     Api@{ icon: "logos:fastapi", form: "rounded", label: "FastAPI" }
+    Uvicorn@{ icon: "logos:uvicorn", form: "rounded", label: "Uvicorn" }
     Dock@{ icon: "logos:docker-icon", form: "rounded", label: "Docker" }
   end
   subgraph cloud [Cloud]
-    direction LR
+    direction TB
     S3@{ icon: "logos:aws-s3", form: "rounded", label: "S3" }
     Supabase@{ icon: "logos:supabase-icon", form: "rounded", label: "Supabase" }
   end
-  subgraph frontend [Frontend Vercel]
-    direction LR
+  subgraph frontend [Frontend]
+    direction TB
+    Vercel@{ icon: "logos:vercel", form: "rounded", label: "Vercel" }
     Spa@{ icon: "logos:react", form: "rounded", label: "React" }
+    Ts@{ icon: "logos:typescript", form: "rounded", label: "TypeScript" }
     Vite@{ icon: "logos:vitejs", form: "rounded", label: "Vite" }
     Tw@{ icon: "logos:tailwindcss", form: "rounded", label: "Tailwind" }
-    Shad@{ icon: "logos:shadcn", form: "rounded", label: "shadcn" }
+    Shad@{ icon: "logos:shadcn", form: "rounded", label: "Shadcn" }
   end
-  SharedDb@{ icon: "logos:python", form: "rounded", label: "SQLModel" }
-  edge --> backend
-  backend --> cloud
-  frontend --> backend
-  SharedDb --- edge
-  SharedDb --- cloud`
+  edge --- backend
+  backend --- cloud
+  frontend --- backend
+  schema --- edge
+  schema --- cloud`

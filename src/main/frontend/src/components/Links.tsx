@@ -8,7 +8,7 @@ export default function Links() {
   return (
     <section className="scroll-mt-20 px-6 py-16" id="links">
       <div className="mx-auto max-w-3xl">
-        <h2 className="text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl">
+        <h2 className="text-3xl font-semibold tracking-tight text-zinc-50 md:text-4xl">
           Links
         </h2>
         <ul className="mt-6 space-y-3">

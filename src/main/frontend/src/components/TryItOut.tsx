@@ -7,6 +7,8 @@ type ClipRow = {
   label: string
 }
 
+const PAGE_SIZE = 5
+
 const clips: ClipRow[] = [
   {
     classification: 'Complete stop',
@@ -32,11 +34,54 @@ const clips: ClipRow[] = [
     id: 'clip-63',
     label: 'Unrelated',
   },
+  {
+    classification: 'Run-through',
+    dateTime: '2026-03-14 11:48',
+    id: 'clip-70',
+    label: 'Run-through',
+  },
+  {
+    classification: 'Complete stop',
+    dateTime: '2026-03-14 12:15',
+    id: 'clip-81',
+    label: 'Complete stop',
+  },
+  {
+    classification: 'Rolling stop',
+    dateTime: '2026-03-14 12:41',
+    id: 'clip-88',
+    label: 'Unrelated',
+  },
+  {
+    classification: 'Run-through',
+    dateTime: '2026-03-14 13:02',
+    id: 'clip-92',
+    label: 'Run-through',
+  },
+  {
+    classification: 'Unrelated',
+    dateTime: '2026-03-14 13:27',
+    id: 'clip-95',
+    label: 'Unrelated',
+  },
+  {
+    classification: 'Complete stop',
+    dateTime: '2026-03-14 13:54',
+    id: 'clip-99',
+    label: 'Rolling stop',
+  },
 ]
 
 export default function TryItOut() {
   const [message, setMessage] = useState('')
+  const [page, setPage] = useState(0)
   const [selectedId, setSelectedId] = useState('')
+
+  const pageCount = Math.ceil(clips.length / PAGE_SIZE)
+  const pageStart = page * PAGE_SIZE
+  const pageClips = clips.slice(pageStart, pageStart + PAGE_SIZE)
+  const rangeStart = pageStart + 1
+  const rangeEnd = pageStart + pageClips.length
 
   function selectClip(clipId: string) {
     setSelectedId(clipId)
@@ -46,7 +91,7 @@ export default function TryItOut() {
   return (
     <section className="scroll-mt-20 px-6 py-16" id="try-it-out">
       <div className="mx-auto max-w-4xl space-y-6">
-        <h2 className="text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl">
+        <h2 className="text-3xl font-semibold tracking-tight text-zinc-50 md:text-4xl">
           Try it out
         </h2>
         <p className="text-zinc-300">
@@ -72,7 +117,7 @@ export default function TryItOut() {
               </tr>
             </thead>
             <tbody>
-              {clips.map((clip) => {
+              {pageClips.map((clip) => {
                 const matched = clip.classification === clip.label
                 const selected = selectedId === clip.id
                 return (
@@ -106,7 +151,29 @@ export default function TryItOut() {
           </table>
         </div>
 
-        <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-lg text-zinc-400">
+        <div className="flex items-center justify-between gap-4 text-base text-zinc-300">
+          <button
+            className="rounded-md border border-zinc-700 px-4 py-2 text-zinc-100 enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={page === 0}
+            onClick={() => setPage((current) => current - 1)}
+            type="button"
+          >
+            Previous
+          </button>
+          <p>
+            {rangeStart}–{rangeEnd} of {clips.length}
+          </p>
+          <button
+            className="rounded-md border border-zinc-700 px-4 py-2 text-zinc-100 enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={page >= pageCount - 1}
+            onClick={() => setPage((current) => current + 1)}
+            type="button"
+          >
+            Next
+          </button>
+        </div>
+
+        <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-sm text-zinc-400">
           {message || 'No clip selected'}
         </div>
       </div>

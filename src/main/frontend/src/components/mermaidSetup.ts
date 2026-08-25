@@ -16,6 +16,13 @@ export function ensureMermaid() {
     securityLevel: 'loose',
     startOnLoad: false,
     theme: 'dark',
+    flowchart: {
+      curve: 'linear',
+      htmlLabels: true,
+      nodeSpacing: 28,
+      padding: 12,
+      rankSpacing: 48,
+    },
     themeVariables: {
       background: '#09090b',
       clusterBkg: '#27272a',

@@ -1,46 +1,74 @@
+import pca from './ap050Stage1Pca.json'
+import stage1Features from './ap050Stage1Features.json'
+import points from './ap050ClipPoints.json'
+
 const LABEL_COLORS = {
   'Complete stop': '#34d399',
+  'Rolling / run-through': '#f97316',
   'Rolling stop': '#fbbf24',
   'Run-through': '#fb7185',
   Unrelated: '#38bdf8',
 } as const
 
+export const LABEL_ORDER = [
+  'Complete stop',
+  'Rolling / run-through',
+  'Rolling stop',
+  'Run-through',
+  'Unrelated',
+] as const
+
 type Label = keyof typeof LABEL_COLORS
 
-type Point = { x: number; y: number; label: Label }
+export type ClusterPoint = { x: number; y: number; label: Label; clipId: number }
 
-function mulberry32(seed: number) {
-  let state = seed
-  return () => {
-    state = (state + 0x6d2b79f5) | 0
-    let t = Math.imul(state ^ (state >>> 15), 1 | state)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+export const STAGE1_FEATURE_KEYS = [
+  'post_drop_mean_motion',
+  'post_drop_min_motion',
+  'post_drop_p95_motion',
+  'post_drop_stop_fraction',
+] as const
+
+export type Stage1FeatureKey = (typeof STAGE1_FEATURE_KEYS)[number]
+
+export const STAGE1_FEATURE_LABELS: Record<Stage1FeatureKey, string> = {
+  post_drop_mean_motion: 'Mean motion',
+  post_drop_min_motion: 'Min motion',
+  post_drop_p95_motion: 'P95 motion',
+  post_drop_stop_fraction: 'Stop fraction',
 }
 
-const clusterSeeds: { label: Label; cx: number; cy: number; spreadX: number; spreadY: number; n: number }[] =
-  [
-    { label: 'Complete stop', cx: 0.12, cy: 9, spreadX: 0.06, spreadY: 1.6, n: 22 },
-    { label: 'Rolling stop', cx: 0.42, cy: 11, spreadX: 0.08, spreadY: 1.8, n: 20 },
-    { label: 'Run-through', cx: 0.78, cy: 10, spreadX: 0.09, spreadY: 1.7, n: 20 },
-    { label: 'Unrelated', cx: 0.28, cy: 2.4, spreadX: 0.1, spreadY: 0.9, n: 22 },
-  ]
+export const STAGE1_FEATURE_PAIRS = [
+  ['post_drop_mean_motion', 'post_drop_min_motion'],
+  ['post_drop_mean_motion', 'post_drop_p95_motion'],
+  ['post_drop_mean_motion', 'post_drop_stop_fraction'],
+  ['post_drop_min_motion', 'post_drop_p95_motion'],
+  ['post_drop_min_motion', 'post_drop_stop_fraction'],
+  ['post_drop_p95_motion', 'post_drop_stop_fraction'],
+] as const satisfies ReadonlyArray<readonly [Stage1FeatureKey, Stage1FeatureKey]>
 
-function buildPoints(): Point[] {
-  const rand = mulberry32(50)
-  const points: Point[] = []
-  for (const cluster of clusterSeeds) {
-    for (let i = 0; i < cluster.n; i += 1) {
-      points.push({
-        label: cluster.label,
-        x: Math.max(0, cluster.cx + (rand() - 0.5) * 2 * cluster.spreadX),
-        y: Math.max(0.2, cluster.cy + (rand() - 0.5) * 2 * cluster.spreadY),
-      })
-    }
-  }
-  return points
+type Stage1FeatureRow = {
+  clipId: number
+  label: Label
+} & Record<Stage1FeatureKey, number>
+
+const STAGE1_FEATURE_ROWS = stage1Features as Stage1FeatureRow[]
+
+export function stage1PairPoints(
+  xKey: Stage1FeatureKey,
+  yKey: Stage1FeatureKey,
+): ClusterPoint[] {
+  return STAGE1_FEATURE_ROWS.map((row) => ({
+    clipId: row.clipId,
+    label: row.label,
+    x: row[xKey],
+    y: row[yKey],
+  }))
 }
 
-export const CLUSTER_POINTS = buildPoints()
+export const CLUSTER_POINTS = (points as ClusterPoint[]).filter(
+  (point) => point.label === 'Rolling stop' || point.label === 'Run-through',
+)
+export const STAGE1_PCA_POINTS = pca.points as ClusterPoint[]
+export const STAGE1_PCA_VARIANCE = pca.explainedVariance as [number, number]
 export { LABEL_COLORS }

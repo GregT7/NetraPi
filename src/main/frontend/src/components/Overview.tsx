@@ -9,8 +9,8 @@ const gifSlots = [
 
 function GifSlot({ caption }: { caption: string }) {
   return (
-    <figure>
-      <div className="flex min-h-64 aspect-video items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-lg text-zinc-400 md:min-h-88">
+    <figure className="mx-auto max-w-3xl">
+      <div className="flex aspect-video max-w-3xl items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-sm text-zinc-400">
         GIF coming soon
       </div>
       <figcaption className="mt-2 text-center text-zinc-400">{caption}</figcaption>
@@ -22,7 +22,7 @@ export default function Overview() {
   return (
     <section className="scroll-mt-20 px-6 pb-16 pt-4" id="overview">
       <div className="mx-auto max-w-5xl space-y-10">
-        <h2 className="text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl">
+        <h2 className="text-3xl font-semibold tracking-tight text-zinc-50 md:text-4xl">
           Overview
         </h2>
 
@@ -68,15 +68,19 @@ export default function Overview() {
         </div>
       </div>
 
-      <div className="mx-auto mt-14 max-w-5xl space-y-14">
-        <figure className="mx-auto max-w-5xl">
-          <MermaidDiagram chart={HARDWARE_CHART} />
+      <div className="mx-auto mt-14 max-w-6xl space-y-14">
+        <figure className="mx-auto max-w-6xl">
+          <div className="text-2xl">
+            <MermaidDiagram chart={HARDWARE_CHART} plainLinks />
+          </div>
           <figcaption className="mt-2 text-center text-zinc-400">
             Hardware architecture
           </figcaption>
         </figure>
-        <figure className="mx-auto max-w-5xl">
-          <MermaidDiagram chart={SOFTWARE_CHART} />
+        <figure className="mx-auto max-w-6xl">
+          <div className="text-2xl">
+            <MermaidDiagram chart={SOFTWARE_CHART} />
+          </div>
           <figcaption className="mt-2 text-center text-zinc-400">
             Software architecture
           </figcaption>

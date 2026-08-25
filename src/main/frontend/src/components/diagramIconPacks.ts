@@ -68,6 +68,36 @@ export const logosPack = {
       "body": "<path fill=\"#3ecf8e\" d=\"M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z\"/>",
       "width": 24,
       "height": 24
+    },
+    "typescript": {
+      "body": "<image href=\"/typescript.png\" height=\"96\" preserveAspectRatio=\"xMidYMid meet\" width=\"96\"/>",
+      "height": 96,
+      "width": 96
+    },
+    "sqlalchemy": {
+      "body": "<text x=\"8\" y=\"68\" fill=\"#a8a8a8\" font-family=\"Georgia, 'Times New Roman', Times, serif\" font-size=\"64\" font-weight=\"700\">SQL</text><text x=\"188\" y=\"68\" fill=\"#d32f2f\" font-family=\"Georgia, 'Times New Roman', Times, serif\" font-size=\"64\" font-weight=\"700\">A</text>",
+      "height": 90,
+      "width": 300
+    },
+    "sqlmodel": {
+      "body": "<image href=\"/sqlmodel.png\" height=\"48\" preserveAspectRatio=\"xMidYMid meet\" width=\"160\"/>",
+      "height": 48,
+      "width": 160
+    },
+    "uvicorn": {
+      "body": "<image href=\"/uvicorn.png\" height=\"96\" preserveAspectRatio=\"xMidYMid meet\" width=\"96\"/>",
+      "height": 96,
+      "width": 96
+    },
+    "vercel": {
+      "body": "<path fill=\"#fafafa\" d=\"M12 1.05L24 22.95H0z\"/>",
+      "height": 24,
+      "width": 24
+    },
+    "render": {
+      "body": "<image href=\"/render.png\" height=\"96\" preserveAspectRatio=\"xMidYMid meet\" width=\"96\"/>",
+      "height": 96,
+      "width": 96
     }
   },
   "width": 256,

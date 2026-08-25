@@ -1,0 +1,2440 @@
+{
+  "experiment_id": "ap_050",
+  "experiment_name": "window_5_motion_area_2_stopped_lo_k3_min_area",
+  "approach_anchor": "per_frame_first_detect",
+  "stage1_feature_names": [
+    "post_drop_mean_motion",
+    "post_drop_min_motion",
+    "post_drop_p95_motion",
+    "post_drop_stop_fraction"
+  ],
+  "stage2_feature_names": [
+    "post_drop_min_motion",
+    "approach_area_sum_pct"
+  ],
+  "post_drop_window_s": 5.0,
+  "stopped_motion_threshold": 0.6,
+  "prediction_note": "predicted_* columns use the frozen Pi joblibs on these same clips (in-sample), not the original leave-one-out 83.3% run.",
+  "exported_at": "2026-08-25T01:29:40.057290+00:00",
+  "source": {
+    "data_dir": "src/tests/integration/at_3_4/data",
+    "tags_workbook": "vids/unsafe_events/clip_docs_compr.xlsx",
+    "approach_config": "winner_pf02"
+  },
+  "summary": {
+    "areas_files": 104,
+    "tagged_clips": 109,
+    "exported_clips": 104,
+    "approach_fired": 78,
+    "stage1_ready": 78,
+    "stage2_ready": 78,
+    "by_label": {
+      "unrelated": 26,
+      "rolling-stop": 27,
+      "complete-stop": 29,
+      "run-through": 22
+    },
+    "unmatched_tag_ids": [
+      110,
+      111,
+      112,
+      113,
+      114
+    ],
+    "unlabeled_file_ids": []
+  },
+  "clips": [
+    {
+      "clip_id": 1,
+      "file_stem": "clip_001_vid1_4f9R8o7Vl78_t40s-50s",
+      "fps": 29.97002997002997,
+      "frame_count": 300,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 2,
+      "file_stem": "clip_002_vid1_4f9R8o7Vl78_t400s-416s",
+      "fps": 29.97002997002997,
+      "frame_count": 479,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 252,
+      "t0_s": 8.4084,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6165458179712295,
+        "post_drop_min_motion": 0.36942480206489564,
+        "post_drop_p95_motion": 0.8683709380030631,
+        "post_drop_stop_fraction": 0.42
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.36942480206489564,
+        "approach_area_sum_pct": 76.17210144928443
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 4,
+      "file_stem": "clip_004_vid1_4f9R8o7Vl78_t1680s-1695s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 211,
+      "t0_s": 7.040366666666666,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.40982593106726806,
+        "post_drop_min_motion": 0.20705211088061332,
+        "post_drop_p95_motion": 0.6960043066740036,
+        "post_drop_stop_fraction": 0.72
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.20705211088061332,
+        "approach_area_sum_pct": 10.457446158523709
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 5,
+      "file_stem": "clip_005_vid1_4f9R8o7Vl78_t1890s-1925s",
+      "fps": 29.97002997002997,
+      "frame_count": 1048,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 577,
+      "t0_s": 19.252566666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.4032603748093049,
+        "post_drop_min_motion": 0.2656003601849079,
+        "post_drop_p95_motion": 2.848111487030983,
+        "post_drop_stop_fraction": 0.38666666666666666
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.2656003601849079,
+        "approach_area_sum_pct": 12.366482563417946
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 6,
+      "file_stem": "clip_006_vid1_4f9R8o7Vl78_t1960s-1982s",
+      "fps": 29.97002997002997,
+      "frame_count": 659,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 261,
+      "t0_s": 8.7087,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.0690248453517754,
+        "post_drop_min_motion": 0.4113592624664307,
+        "post_drop_p95_motion": 1.3391335988044735,
+        "post_drop_stop_fraction": 0.08
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4113592624664307,
+        "approach_area_sum_pct": 6.601302765844608
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 8,
+      "file_stem": "clip_008_vid1_4f9R8o7Vl78_t2055s-2070s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 259,
+      "t0_s": 8.641966666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 5.3613809497952465,
+        "post_drop_min_motion": 0.33468384891748426,
+        "post_drop_p95_motion": 15.979539141654964,
+        "post_drop_stop_fraction": 0.32
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.33468384891748426,
+        "approach_area_sum_pct": 33.3864017040824
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 10,
+      "file_stem": "clip_010_vid3_VXMjdNpAeNg_t128s-148s",
+      "fps": 59.94005994005994,
+      "frame_count": 1198,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 813,
+      "t0_s": 13.563550000000001,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.836372094380359,
+        "post_drop_min_motion": 0.22378655895590782,
+        "post_drop_p95_motion": 6.478654665946962,
+        "post_drop_stop_fraction": 0.27666666666666667
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.22378655895590782,
+        "approach_area_sum_pct": 100.00339280577836
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 11,
+      "file_stem": "clip_011_vid3_VXMjdNpAeNg_t220s-243s",
+      "fps": 59.94005994005994,
+      "frame_count": 1379,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 799,
+      "t0_s": 13.329983333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 3.236566673224171,
+        "post_drop_min_motion": 0.27974745258688927,
+        "post_drop_p95_motion": 20.15247471332551,
+        "post_drop_stop_fraction": 0.25
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.27974745258688927,
+        "approach_area_sum_pct": 106.03585278585764
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 12,
+      "file_stem": "clip_012_vid3_VXMjdNpAeNg_t285s-302s",
+      "fps": 59.94005994005994,
+      "frame_count": 1019,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 633,
+      "t0_s": 10.560550000000001,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.6881759033103783,
+        "post_drop_min_motion": 1.0462971180677414,
+        "post_drop_p95_motion": 7.871886003017427,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 1.0462971180677414,
+        "approach_area_sum_pct": 93.28563897952228
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 13,
+      "file_stem": "clip_013_vid3_VXMjdNpAeNg_t315s-336s",
+      "fps": 59.94005994005994,
+      "frame_count": 1258,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 671,
+      "t0_s": 11.194516666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.220968726252516,
+        "post_drop_min_motion": 0.40583445578813554,
+        "post_drop_p95_motion": 7.782656821012498,
+        "post_drop_stop_fraction": 0.17333333333333334
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.40583445578813554,
+        "approach_area_sum_pct": 111.36362431823875
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 14,
+      "file_stem": "clip_014_vid3_VXMjdNpAeNg_t350s-370s",
+      "fps": 59.94005994005994,
+      "frame_count": 1199,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 598,
+      "t0_s": 9.976633333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.44120241918911535,
+        "post_drop_min_motion": 0.2728672258555889,
+        "post_drop_p95_motion": 0.6042592394351959,
+        "post_drop_stop_fraction": 0.94
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.2728672258555889,
+        "approach_area_sum_pct": 57.8879043867655
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 15,
+      "file_stem": "clip_015_vid3_VXMjdNpAeNg_t530s-560s",
+      "fps": 59.94005994005994,
+      "frame_count": 1798,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 1193,
+      "t0_s": 19.903216666666665,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.5529324433008829,
+        "post_drop_min_motion": 0.6455750942230225,
+        "post_drop_p95_motion": 4.858623952865602,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.6455750942230225,
+        "approach_area_sum_pct": 169.37711821588024
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 16,
+      "file_stem": "clip_016_vid3_VXMjdNpAeNg_t600s-625s",
+      "fps": 59.94005994005994,
+      "frame_count": 1498,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 674,
+      "t0_s": 11.244566666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.0475207517097394,
+        "post_drop_min_motion": 0.4440036594867706,
+        "post_drop_p95_motion": 1.3010818493366243,
+        "post_drop_stop_fraction": 0.07
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4440036594867706,
+        "approach_area_sum_pct": 135.9083297735356
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 17,
+      "file_stem": "clip_017_vid3_VXMjdNpAeNg_t685s-705s",
+      "fps": 59.94005994005994,
+      "frame_count": 1199,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 809,
+      "t0_s": 13.496816666666668,
+      "stage1_features": {
+        "post_drop_mean_motion": 5.9284622171620525,
+        "post_drop_min_motion": 0.8751628547906876,
+        "post_drop_p95_motion": 12.625724916458129,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.8751628547906876,
+        "approach_area_sum_pct": 95.65925819699217
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 18,
+      "file_stem": "clip_018_vid3_VXMjdNpAeNg_t720s-745s",
+      "fps": 59.94005994005994,
+      "frame_count": 1499,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 773,
+      "t0_s": 12.896216666666668,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.654004717644304,
+        "post_drop_min_motion": 0.11657934598624706,
+        "post_drop_p95_motion": 1.3418930715322501,
+        "post_drop_stop_fraction": 0.48
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.11657934598624706,
+        "approach_area_sum_pct": 142.8093867843662
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 19,
+      "file_stem": "clip_019_vid3_VXMjdNpAeNg_t885s-910s",
+      "fps": 59.94005994005994,
+      "frame_count": 1499,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 774,
+      "t0_s": 12.9129,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.0955054887334505,
+        "post_drop_min_motion": 0.4431434437632561,
+        "post_drop_p95_motion": 1.7455317613482475,
+        "post_drop_stop_fraction": 0.26666666666666666
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4431434437632561,
+        "approach_area_sum_pct": 4.230876163899566
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 20,
+      "file_stem": "clip_020_vid3_VXMjdNpAeNg_t915s-940s",
+      "fps": 59.94005994005994,
+      "frame_count": 1498,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 803,
+      "t0_s": 13.396716666666666,
+      "stage1_features": {
+        "post_drop_mean_motion": 3.0043484538830816,
+        "post_drop_min_motion": 0.7387302935123443,
+        "post_drop_p95_motion": 8.82924105167389,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.7387302935123443,
+        "approach_area_sum_pct": 86.68905611060964
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 21,
+      "file_stem": "clip_021_vid3_VXMjdNpAeNg_t1130s-1155s",
+      "fps": 59.94005994005994,
+      "frame_count": 1498,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 849,
+      "t0_s": 14.164150000000001,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.488160127162933,
+        "post_drop_min_motion": 0.8742819666862488,
+        "post_drop_p95_motion": 5.321510680913925,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.8742819666862488,
+        "approach_area_sum_pct": 71.95854081816736
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 22,
+      "file_stem": "clip_022_vid3_VXMjdNpAeNg_t1170s-1190s",
+      "fps": 59.94005994005994,
+      "frame_count": 1199,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 802,
+      "t0_s": 13.380033333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 5.183236601968606,
+        "post_drop_min_motion": 0.6774631142616272,
+        "post_drop_p95_motion": 12.410147390365601,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.6774631142616272,
+        "approach_area_sum_pct": 101.56287458060058
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 23,
+      "file_stem": "clip_023_vid3_VXMjdNpAeNg_t1195s-1210s",
+      "fps": 59.94005994005994,
+      "frame_count": 899,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 593,
+      "t0_s": 9.893216666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 5.977886559834704,
+        "post_drop_min_motion": 0.8973197847604751,
+        "post_drop_p95_motion": 10.723787109851836,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.8973197847604751,
+        "approach_area_sum_pct": 66.73128125945524
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 24,
+      "file_stem": "clip_024_vid3_VXMjdNpAeNg_t1255s-1275s",
+      "fps": 59.94005994005994,
+      "frame_count": 1199,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 542,
+      "t0_s": 9.042366666666666,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.938703501880169,
+        "post_drop_min_motion": 0.40847250670194624,
+        "post_drop_p95_motion": 9.135544815063477,
+        "post_drop_stop_fraction": 0.12666666666666668
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.40847250670194624,
+        "approach_area_sum_pct": 80.99064764647484
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 25,
+      "file_stem": "clip_025_vid2_ZnnT8Xzi43c_t0s-14s",
+      "fps": 60.0,
+      "frame_count": 840,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 26,
+      "file_stem": "clip_026_vid1_4f9R8o7Vl78_t90s-105s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 27,
+      "file_stem": "clip_027_vid1_4f9R8o7Vl78_t540s-555s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 28,
+      "file_stem": "clip_028_vid1_4f9R8o7Vl78_t630s-645s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 29,
+      "file_stem": "clip_029_vid1_4f9R8o7Vl78_t865s-880s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 30,
+      "file_stem": "clip_030_vid1_4f9R8o7Vl78_t1090s-1105s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 31,
+      "file_stem": "clip_031_vid4_noytid_t20s-38s",
+      "fps": 14.291666666666666,
+      "frame_count": 257,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 167,
+      "t0_s": 11.685131195335277,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.363845980349773,
+        "post_drop_min_motion": 0.05674834102392197,
+        "post_drop_p95_motion": 5.873637956380844,
+        "post_drop_stop_fraction": 0.375
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.05674834102392197,
+        "approach_area_sum_pct": 21.648701752860866
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 32,
+      "file_stem": "clip_032_vid4_noytid_t250s-265s",
+      "fps": 14.291666666666666,
+      "frame_count": 214,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 117,
+      "t0_s": 8.1865889212828,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.084993438091543,
+        "post_drop_min_motion": 0.1352721143513918,
+        "post_drop_p95_motion": 6.603695214986802,
+        "post_drop_stop_fraction": 0.4027777777777778
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.1352721143513918,
+        "approach_area_sum_pct": 21.95031111214405
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 33,
+      "file_stem": "clip_033_vid5_noytid_t180s-192s",
+      "fps": 14.291666666666666,
+      "frame_count": 171,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 70,
+      "t0_s": 4.8979591836734695,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.0786899693801792,
+        "post_drop_min_motion": 0.24190681502223016,
+        "post_drop_p95_motion": 2.580558478236199,
+        "post_drop_stop_fraction": 0.3194444444444444
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.24190681502223016,
+        "approach_area_sum_pct": 2.9672515576567804
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 34,
+      "file_stem": "clip_034_vid5_noytid_t205s-220s",
+      "fps": 14.291666666666666,
+      "frame_count": 214,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 78,
+      "t0_s": 5.457725947521866,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.0286222828138205,
+        "post_drop_min_motion": 0.1306251108646393,
+        "post_drop_p95_motion": 3.353797028660775,
+        "post_drop_stop_fraction": 0.5833333333333334
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.1306251108646393,
+        "approach_area_sum_pct": 3.1474055587683125
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 35,
+      "file_stem": "clip_035_vid6_noytid_t245s-260s",
+      "fps": 14.25,
+      "frame_count": 213,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 94,
+      "t0_s": 6.5964912280701755,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6570684092300427,
+        "post_drop_min_motion": 0.06659194435924291,
+        "post_drop_p95_motion": 1.2179717700928463,
+        "post_drop_stop_fraction": 0.5138888888888888
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.06659194435924291,
+        "approach_area_sum_pct": 13.907697219486792
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 36,
+      "file_stem": "clip_036_vid6_noytid_t270s-285s",
+      "fps": 14.25,
+      "frame_count": 214,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 118,
+      "t0_s": 8.280701754385966,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.3138039902279464,
+        "post_drop_min_motion": 0.037253237795084715,
+        "post_drop_p95_motion": 0.6030194550007582,
+        "post_drop_stop_fraction": 0.9305555555555556
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.037253237795084715,
+        "approach_area_sum_pct": 17.388199151186434
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 37,
+      "file_stem": "clip_037_vid7_noytid_t33s-46s",
+      "fps": 14.291666666666666,
+      "frame_count": 186,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 81,
+      "t0_s": 5.667638483965015,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.5060924063281467,
+        "post_drop_min_motion": 0.14272095672786236,
+        "post_drop_p95_motion": 0.9000612120330334,
+        "post_drop_stop_fraction": 0.7222222222222222
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.14272095672786236,
+        "approach_area_sum_pct": 12.143766713235138
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 38,
+      "file_stem": "clip_038_vid7_noytid_t112s-129s",
+      "fps": 14.291666666666666,
+      "frame_count": 243,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 118,
+      "t0_s": 8.256559766763848,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.3549600874073804,
+        "post_drop_min_motion": 0.15115415975451468,
+        "post_drop_p95_motion": 0.9028845951706171,
+        "post_drop_stop_fraction": 0.8888888888888888
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.15115415975451468,
+        "approach_area_sum_pct": 22.51435999880842
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 39,
+      "file_stem": "clip_039_vid8_noytid_t185s-200s",
+      "fps": 27.276666666666667,
+      "frame_count": 409,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 125,
+      "t0_s": 4.582671391910058,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.7209959751416515,
+        "post_drop_min_motion": 0.06073232442140579,
+        "post_drop_p95_motion": 1.8651232147216792,
+        "post_drop_stop_fraction": 0.583941605839416
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.06073232442140579,
+        "approach_area_sum_pct": 4.110681047164633
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 40,
+      "file_stem": "clip_040_vid8_noytid_t270s-285s",
+      "fps": 27.276666666666667,
+      "frame_count": 410,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 201,
+      "t0_s": 7.3689355981913724,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.21722299644424423,
+        "post_drop_min_motion": 0.0261705762706697,
+        "post_drop_p95_motion": 0.46931810140609725,
+        "post_drop_stop_fraction": 1.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.0261705762706697,
+        "approach_area_sum_pct": 29.805068912855504
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 41,
+      "file_stem": "clip_041_vid9_noytid_t25s-40s",
+      "fps": 27.276666666666667,
+      "frame_count": 410,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 179,
+      "t0_s": 6.562385433215202,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.25391452064377384,
+        "post_drop_min_motion": 0.017734398739412426,
+        "post_drop_p95_motion": 0.6358821398019785,
+        "post_drop_stop_fraction": 0.927007299270073
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.017734398739412426,
+        "approach_area_sum_pct": 18.81775908513319
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 42,
+      "file_stem": "clip_042_vid9_noytid_t215s-230s",
+      "fps": 27.276666666666667,
+      "frame_count": 409,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 92,
+      "t0_s": 3.372846144445802,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.2667088908925109,
+        "post_drop_min_motion": 0.05161888301372528,
+        "post_drop_p95_motion": 0.9524596357345582,
+        "post_drop_stop_fraction": 0.8394160583941606
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.05161888301372528,
+        "approach_area_sum_pct": 6.130148789959122
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 43,
+      "file_stem": "clip_043_vid10_noytid_t40s-55s",
+      "fps": 27.276666666666667,
+      "frame_count": 409,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 197,
+      "t0_s": 7.22229011365025,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.9600409528594055,
+        "post_drop_min_motion": 0.07830418422818183,
+        "post_drop_p95_motion": 2.931236698627471,
+        "post_drop_stop_fraction": 0.49635036496350365
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.07830418422818183,
+        "approach_area_sum_pct": 24.841284860449786
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 44,
+      "file_stem": "clip_044_vid10_noytid_t65s-80s",
+      "fps": 27.276666666666667,
+      "frame_count": 410,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 79,
+      "t0_s": 2.8962483196871562,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6382237278863135,
+        "post_drop_min_motion": 0.08228821977972985,
+        "post_drop_p95_motion": 1.391047239303588,
+        "post_drop_stop_fraction": 0.45255474452554745
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.08228821977972985,
+        "approach_area_sum_pct": 5.980585813662742
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 45,
+      "file_stem": "clip_045_vid10_noytid_t100s-115s",
+      "fps": 27.276666666666667,
+      "frame_count": 410,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 219,
+      "t0_s": 8.02884027862642,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.5049836271462868,
+        "post_drop_min_motion": 0.044807791151106356,
+        "post_drop_p95_motion": 1.9289564430713644,
+        "post_drop_stop_fraction": 0.7591240875912408
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.044807791151106356,
+        "approach_area_sum_pct": 5.025275272971541
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 46,
+      "file_stem": "clip_046_vid10_noytid_t169s-182s",
+      "fps": 27.276666666666667,
+      "frame_count": 355,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 138,
+      "t0_s": 5.059269216668703,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.9157414427231045,
+        "post_drop_min_motion": 0.09618434794247151,
+        "post_drop_p95_motion": 2.1580415272712696,
+        "post_drop_stop_fraction": 0.36496350364963503
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.09618434794247151,
+        "approach_area_sum_pct": 18.692870350544055
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 47,
+      "file_stem": "clip_047_vid10_noytid_t199s-213s",
+      "fps": 27.276666666666667,
+      "frame_count": 381,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 199,
+      "t0_s": 7.295612855920811,
+      "stage1_features": {
+        "post_drop_mean_motion": 3.8908143683506626,
+        "post_drop_min_motion": 0.26485577672719957,
+        "post_drop_p95_motion": 8.837271552085875,
+        "post_drop_stop_fraction": 0.0948905109489051
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.26485577672719957,
+        "approach_area_sum_pct": 42.81738857641173
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 48,
+      "file_stem": "clip_048_vid10_noytid_t230s-245s",
+      "fps": 27.276666666666667,
+      "frame_count": 410,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 167,
+      "t0_s": 6.122448979591836,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.8317499080176608,
+        "post_drop_min_motion": 0.03088418608531356,
+        "post_drop_p95_motion": 3.2408743977546686,
+        "post_drop_stop_fraction": 0.6204379562043796
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.03088418608531356,
+        "approach_area_sum_pct": 27.174759664144332
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 49,
+      "file_stem": "clip_049_vid10_noytid_t275s-290s",
+      "fps": 27.276666666666667,
+      "frame_count": 409,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 185,
+      "t0_s": 6.782353660026885,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.4199934711618634,
+        "post_drop_min_motion": 0.026200425066053867,
+        "post_drop_p95_motion": 2.9167846632003704,
+        "post_drop_stop_fraction": 0.8978102189781022
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.026200425066053867,
+        "approach_area_sum_pct": 11.964557062442793
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 50,
+      "file_stem": "clip_050_vid10_noytid_t290s-300s",
+      "fps": 27.276666666666667,
+      "frame_count": 272,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 205,
+      "t0_s": 7.515581082732494,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.24247387919797378,
+        "post_drop_min_motion": 0.079846703261137,
+        "post_drop_p95_motion": 0.4631312279403209,
+        "post_drop_stop_fraction": 1.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.079846703261137,
+        "approach_area_sum_pct": 17.099400237644602
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 51,
+      "file_stem": "clip_051_vid11_noytid_t19s-34s",
+      "fps": 27.276666666666667,
+      "frame_count": 409,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 192,
+      "t0_s": 7.0389832579738485,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.790827104218141,
+        "post_drop_min_motion": 0.02959279017522931,
+        "post_drop_p95_motion": 3.1023002099990835,
+        "post_drop_stop_fraction": 0.7226277372262774
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.02959279017522931,
+        "approach_area_sum_pct": 55.69083226580824
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 52,
+      "file_stem": "clip_052_vid11_noytid_t47s-60s",
+      "fps": 27.276666666666667,
+      "frame_count": 354,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 187,
+      "t0_s": 6.855676402297446,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.29898442727969077,
+        "post_drop_min_motion": 0.05306568406522274,
+        "post_drop_p95_motion": 0.6404631251096724,
+        "post_drop_stop_fraction": 0.9124087591240876
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.05306568406522274,
+        "approach_area_sum_pct": 40.531861818534765
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 53,
+      "file_stem": "clip_053_vid11_noytid_t90s-107s",
+      "fps": 27.276666666666667,
+      "frame_count": 464,
+      "tag": "complete_stop",
+      "label": "complete-stop",
+      "label_display": "Complete stop",
+      "approach_fired": true,
+      "detect_frame": 243,
+      "t0_s": 8.908713185873152,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.40309748088084435,
+        "post_drop_min_motion": 0.05052321068942547,
+        "post_drop_p95_motion": 1.048820669651031,
+        "post_drop_stop_fraction": 0.7956204379562044
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.05052321068942547,
+        "approach_area_sum_pct": 20.181751745650445
+      },
+      "predicted_stage1": "complete-stop",
+      "predicted_stage2": "",
+      "predicted_e2e": "complete-stop"
+    },
+    {
+      "clip_id": 54,
+      "file_stem": "clip_054_vid12_noytid_t101s-108s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 142,
+      "t0_s": 4.733333333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.2194345202060717,
+        "post_drop_min_motion": 0.6352187696844339,
+        "post_drop_p95_motion": 1.7666116285324098,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.6352187696844339,
+        "approach_area_sum_pct": 8.511894152723443
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 55,
+      "file_stem": "clip_055_vid12_noytid_t140s-153s",
+      "fps": 30.0,
+      "frame_count": 390,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 286,
+      "t0_s": 9.533333333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.1231704753745222,
+        "post_drop_min_motion": 0.46566425189375876,
+        "post_drop_p95_motion": 1.9229116994142532,
+        "post_drop_stop_fraction": 0.11538461538461539
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.46566425189375876,
+        "approach_area_sum_pct": 14.652405637900046
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 56,
+      "file_stem": "clip_056_vid12_noytid_t180s-188s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 162,
+      "t0_s": 5.4,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.138962416681711,
+        "post_drop_min_motion": 0.5976614341139793,
+        "post_drop_p95_motion": 4.656262561082837,
+        "post_drop_stop_fraction": 0.01282051282051282
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.5976614341139793,
+        "approach_area_sum_pct": 5.069778681655279
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 57,
+      "file_stem": "clip_057_vid12_noytid_t210s-220s",
+      "fps": 30.0,
+      "frame_count": 300,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 203,
+      "t0_s": 6.766666666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.828985555986928,
+        "post_drop_min_motion": 0.6044821438379586,
+        "post_drop_p95_motion": 3.126551055908199,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.6044821438379586,
+        "approach_area_sum_pct": 3.1833917100936304
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 58,
+      "file_stem": "clip_058_vid12_noytid_t243s-250s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 153,
+      "t0_s": 5.1,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.5502734129465177,
+        "post_drop_min_motion": 0.8207387626171112,
+        "post_drop_p95_motion": 2.3311713198386124,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.8207387626171112,
+        "approach_area_sum_pct": 4.720636606032613
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 59,
+      "file_stem": "clip_059_vid12_noytid_t272s-280s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 150,
+      "t0_s": 5.0,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.7313049745712323,
+        "post_drop_min_motion": 0.87915453533642,
+        "post_drop_p95_motion": 4.908967764377594,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.87915453533642,
+        "approach_area_sum_pct": 8.306089575010844
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 60,
+      "file_stem": "clip_060_vid13_noytid_t0s-8s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 130,
+      "t0_s": 4.333333333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.9283076371287264,
+        "post_drop_min_motion": 0.9489756357390433,
+        "post_drop_p95_motion": 5.04667426586151,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.9489756357390433,
+        "approach_area_sum_pct": 4.116848648454408
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 61,
+      "file_stem": "clip_061_vid13_noytid_t27s-33s",
+      "fps": 30.0,
+      "frame_count": 180,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 137,
+      "t0_s": 4.566666666666666,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.734843221779501,
+        "post_drop_min_motion": 1.0490555565804243,
+        "post_drop_p95_motion": 2.59078196644783,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 1.0490555565804243,
+        "approach_area_sum_pct": 6.055112206609614
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 62,
+      "file_stem": "clip_062_vid13_noytid_t53s-60s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 140,
+      "t0_s": 4.666666666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.3633468559394326,
+        "post_drop_min_motion": 0.9901682704687118,
+        "post_drop_p95_motion": 5.054729149341583,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.9901682704687118,
+        "approach_area_sum_pct": 5.288781981796475
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 63,
+      "file_stem": "clip_063_vid13_noytid_t80s-87s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 144,
+      "t0_s": 4.8,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.11478402469361,
+        "post_drop_min_motion": 1.1373412397835636,
+        "post_drop_p95_motion": 3.947322714328766,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 1.1373412397835636,
+        "approach_area_sum_pct": 6.6288314457036535
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 64,
+      "file_stem": "clip_064_vid13_noytid_t108s-114s",
+      "fps": 30.0,
+      "frame_count": 180,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 129,
+      "t0_s": 4.3,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.9723820205009772,
+        "post_drop_min_motion": 0.8823965787887573,
+        "post_drop_p95_motion": 4.600166934728622,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.8823965787887573,
+        "approach_area_sum_pct": 4.122239303981345
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 65,
+      "file_stem": "clip_065_vid13_noytid_t135s-141s",
+      "fps": 30.0,
+      "frame_count": 180,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 147,
+      "t0_s": 4.9,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.6161275813852571,
+        "post_drop_min_motion": 1.029724774044007,
+        "post_drop_p95_motion": 2.3383955645561216,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 1.029724774044007,
+        "approach_area_sum_pct": 6.201317673029116
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 66,
+      "file_stem": "clip_066_vid13_noytid_t162s-167s",
+      "fps": 30.0,
+      "frame_count": 150,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 110,
+      "t0_s": 3.6666666666666665,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.4373965784988831,
+        "post_drop_min_motion": 0.8239762131124735,
+        "post_drop_p95_motion": 2.338883072137832,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.8239762131124735,
+        "approach_area_sum_pct": 6.073474813569035
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 67,
+      "file_stem": "clip_067_vid13_noytid_t188s-194s",
+      "fps": 30.0,
+      "frame_count": 180,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 139,
+      "t0_s": 4.633333333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.2184819269312046,
+        "post_drop_min_motion": 0.7440908689983189,
+        "post_drop_p95_motion": 1.9098594546318055,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.7440908689983189,
+        "approach_area_sum_pct": 9.587528126825617
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 68,
+      "file_stem": "clip_068_vid13_noytid_t212s-222s",
+      "fps": 30.0,
+      "frame_count": 300,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 186,
+      "t0_s": 6.2,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.7927323493252307,
+        "post_drop_min_motion": 0.18419816233217717,
+        "post_drop_p95_motion": 1.4620895388722417,
+        "post_drop_stop_fraction": 0.40350877192982454
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.18419816233217717,
+        "approach_area_sum_pct": 24.219158483037972
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 69,
+      "file_stem": "clip_069_vid13_noytid_t248s-255s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 133,
+      "t0_s": 4.433333333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6950729154733724,
+        "post_drop_min_motion": 0.33964847922325136,
+        "post_drop_p95_motion": 1.2585858619213106,
+        "post_drop_stop_fraction": 0.44155844155844154
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.33964847922325136,
+        "approach_area_sum_pct": 15.610813622626196
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 71,
+      "file_stem": "clip_071_vid14_noytid_t9s-19s",
+      "fps": 30.0,
+      "frame_count": 300,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 144,
+      "t0_s": 4.8,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.1706012881739232,
+        "post_drop_min_motion": 0.34147660061717033,
+        "post_drop_p95_motion": 3.4881639003753664,
+        "post_drop_stop_fraction": 0.41721854304635764
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.34147660061717033,
+        "approach_area_sum_pct": 13.82011162827368
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 72,
+      "file_stem": "clip_072_vid14_noytid_t75s-83s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 129,
+      "t0_s": 4.3,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.686384520783752,
+        "post_drop_min_motion": 0.2829723495990038,
+        "post_drop_p95_motion": 1.3742389410734177,
+        "post_drop_stop_fraction": 0.5855855855855856
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.2829723495990038,
+        "approach_area_sum_pct": 15.853980229822362
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 74,
+      "file_stem": "clip_074_vid14_noytid_t188s-196s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 154,
+      "t0_s": 5.133333333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.7740772128204996,
+        "post_drop_min_motion": 0.4433752987533808,
+        "post_drop_p95_motion": 1.361753407120705,
+        "post_drop_stop_fraction": 0.36046511627906974
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4433752987533808,
+        "approach_area_sum_pct": 8.745860128416538
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 75,
+      "file_stem": "clip_075_vid14_noytid_t219s-228s",
+      "fps": 30.0,
+      "frame_count": 270,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 147,
+      "t0_s": 4.9,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.8773052613595426,
+        "post_drop_min_motion": 0.34135798197239636,
+        "post_drop_p95_motion": 1.8913364464044546,
+        "post_drop_stop_fraction": 0.43902439024390244
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.34135798197239636,
+        "approach_area_sum_pct": 10.013292021674047
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 76,
+      "file_stem": "clip_076_vid14_noytid_t245s-252s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 114,
+      "t0_s": 3.8,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6932786176747565,
+        "post_drop_min_motion": 0.24432771895080804,
+        "post_drop_p95_motion": 1.2945768311619759,
+        "post_drop_stop_fraction": 0.5104166666666666
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.24432771895080804,
+        "approach_area_sum_pct": 9.22203788271716
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 77,
+      "file_stem": "clip_077_vid15_noytid_t78s-85s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 139,
+      "t0_s": 4.633333333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.5830875353940146,
+        "post_drop_min_motion": 0.4264467928558588,
+        "post_drop_p95_motion": 0.7641278877854347,
+        "post_drop_stop_fraction": 0.5915492957746479
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4264467928558588,
+        "approach_area_sum_pct": 9.741076686072958
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 78,
+      "file_stem": "clip_078_vid15_noytid_t108s-112s",
+      "fps": 30.0,
+      "frame_count": 120,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 110,
+      "t0_s": 3.6666666666666665,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.47153428433462985,
+        "post_drop_min_motion": 0.41026964839547875,
+        "post_drop_p95_motion": 0.5347212800383568,
+        "post_drop_stop_fraction": 1.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.41026964839547875,
+        "approach_area_sum_pct": 8.871821460278895
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 79,
+      "file_stem": "clip_079_vid15_noytid_t133s-137s",
+      "fps": 30.0,
+      "frame_count": 120,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 93,
+      "t0_s": 3.1,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6324360818326198,
+        "post_drop_min_motion": 0.4390342805534601,
+        "post_drop_p95_motion": 0.862561174435541,
+        "post_drop_stop_fraction": 0.5185185185185185
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4390342805534601,
+        "approach_area_sum_pct": 9.279666864014047
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 80,
+      "file_stem": "clip_080_vid15_noytid_t156s-161s",
+      "fps": 30.0,
+      "frame_count": 150,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 94,
+      "t0_s": 3.1333333333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.110980762451488,
+        "post_drop_min_motion": 0.4601566054858267,
+        "post_drop_p95_motion": 2.760178005695343,
+        "post_drop_stop_fraction": 0.32142857142857145
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4601566054858267,
+        "approach_area_sum_pct": 6.138530702811096
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 81,
+      "file_stem": "clip_081_vid15_noytid_t179s-184s",
+      "fps": 30.0,
+      "frame_count": 150,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 101,
+      "t0_s": 3.3666666666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.6026880222923902,
+        "post_drop_min_motion": 0.4501338375732303,
+        "post_drop_p95_motion": 0.949643877148628,
+        "post_drop_stop_fraction": 0.6530612244897959
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.4501338375732303,
+        "approach_area_sum_pct": 9.713940213166339
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 82,
+      "file_stem": "clip_082_vid15_noytid_t203s-210s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 117,
+      "t0_s": 3.9,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.28208842931655786,
+        "post_drop_min_motion": 0.1981786374002695,
+        "post_drop_p95_motion": 0.3813875153660774,
+        "post_drop_stop_fraction": 0.989247311827957
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.1981786374002695,
+        "approach_area_sum_pct": 17.47196247330436
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 83,
+      "file_stem": "clip_083_vid15_noytid_t231s-238s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 148,
+      "t0_s": 4.933333333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.3110805913888579,
+        "post_drop_min_motion": 0.23382143564522267,
+        "post_drop_p95_motion": 0.3961981797218322,
+        "post_drop_stop_fraction": 1.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.23382143564522267,
+        "approach_area_sum_pct": 24.687064973921125
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 84,
+      "file_stem": "clip_084_vid15_noytid_t282s-290s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 137,
+      "t0_s": 4.566666666666666,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.33420444600537275,
+        "post_drop_min_motion": 0.1421290308237076,
+        "post_drop_p95_motion": 0.8443813715502615,
+        "post_drop_stop_fraction": 0.8932038834951457
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.1421290308237076,
+        "approach_area_sum_pct": 19.83621061150167
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 85,
+      "file_stem": "clip_085_vid16_noytid_t3s-10s",
+      "fps": 30.0,
+      "frame_count": 210,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 147,
+      "t0_s": 4.9,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.3177731637148157,
+        "post_drop_min_motion": 0.18720398098230362,
+        "post_drop_p95_motion": 0.6195292504876851,
+        "post_drop_stop_fraction": 0.9365079365079365
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.18720398098230362,
+        "approach_area_sum_pct": 20.05447327243637
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 86,
+      "file_stem": "clip_086_vid16_noytid_t27s-33s",
+      "fps": 30.0,
+      "frame_count": 180,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 113,
+      "t0_s": 3.7666666666666666,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.2580934207636251,
+        "post_drop_min_motion": 0.16105384938418865,
+        "post_drop_p95_motion": 0.3628736236691475,
+        "post_drop_stop_fraction": 1.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.16105384938418865,
+        "approach_area_sum_pct": 16.61546370503686
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 87,
+      "file_stem": "clip_087_vid16_noytid_t71s-79s",
+      "fps": 30.0,
+      "frame_count": 240,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 143,
+      "t0_s": 4.766666666666667,
+      "stage1_features": {
+        "post_drop_mean_motion": 0.33723619564138735,
+        "post_drop_min_motion": 0.17990765795111657,
+        "post_drop_p95_motion": 0.7026741101592772,
+        "post_drop_stop_fraction": 0.9278350515463918
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.17990765795111657,
+        "approach_area_sum_pct": 21.027319551606283
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    },
+    {
+      "clip_id": 88,
+      "file_stem": "clip_088_vid3_VXMjdNpAeNg_t244s-257s",
+      "fps": 59.94005994005994,
+      "frame_count": 779,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 89,
+      "file_stem": "clip_089_vid3_VXMjdNpAeNg_t270s-283s",
+      "fps": 59.94005994005994,
+      "frame_count": 780,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": true,
+      "detect_frame": 187,
+      "t0_s": 3.1197833333333334,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.100403032720089,
+        "post_drop_min_motion": 1.5858114242553711,
+        "post_drop_p95_motion": 2.5327584534883503,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 1.5858114242553711,
+        "approach_area_sum_pct": 5.364113849314833
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 90,
+      "file_stem": "clip_090_vid3_VXMjdNpAeNg_t302s-311s",
+      "fps": 59.94005994005994,
+      "frame_count": 540,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 91,
+      "file_stem": "clip_091_vid3_VXMjdNpAeNg_t388s-403s",
+      "fps": 59.94005994005994,
+      "frame_count": 900,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 92,
+      "file_stem": "clip_092_vid3_VXMjdNpAeNg_t420s-435s",
+      "fps": 59.94005994005994,
+      "frame_count": 900,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 93,
+      "file_stem": "clip_093_vid3_VXMjdNpAeNg_t442s-457s",
+      "fps": 59.94005994005994,
+      "frame_count": 899,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 94,
+      "file_stem": "clip_094_vid3_VXMjdNpAeNg_t470s-485s",
+      "fps": 59.94005994005994,
+      "frame_count": 900,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 95,
+      "file_stem": "clip_095_vid3_VXMjdNpAeNg_t500s-515s",
+      "fps": 59.94005994005994,
+      "frame_count": 899,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 96,
+      "file_stem": "clip_096_vid3_VXMjdNpAeNg_t562s-577s",
+      "fps": 59.94005994005994,
+      "frame_count": 899,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 97,
+      "file_stem": "clip_097_vid3_VXMjdNpAeNg_t640s-655s",
+      "fps": 59.94005994005994,
+      "frame_count": 900,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 98,
+      "file_stem": "clip_098_vid1_4f9R8o7Vl78_t70s-85s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 99,
+      "file_stem": "clip_099_vid1_4f9R8o7Vl78_t110s-125s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 100,
+      "file_stem": "clip_100_vid1_4f9R8o7Vl78_t165s-180s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 101,
+      "file_stem": "clip_101_vid1_4f9R8o7Vl78_t210s-225s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 102,
+      "file_stem": "clip_102_vid1_4f9R8o7Vl78_t240s-255s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 103,
+      "file_stem": "clip_103_vid1_4f9R8o7Vl78_t285s-300s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 104,
+      "file_stem": "clip_104_vid1_4f9R8o7Vl78_t320s-335s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 105,
+      "file_stem": "clip_105_vid1_4f9R8o7Vl78_t440s-455s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 106,
+      "file_stem": "clip_106_vid1_4f9R8o7Vl78_t490s-505s",
+      "fps": 29.97002997002997,
+      "frame_count": 449,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 107,
+      "file_stem": "clip_107_vid1_4f9R8o7Vl78_t570s-585s",
+      "fps": 29.97002997002997,
+      "frame_count": 450,
+      "tag": "unrelated",
+      "label": "unrelated",
+      "label_display": "Unrelated",
+      "approach_fired": false,
+      "detect_frame": null,
+      "t0_s": null,
+      "stage1_features": null,
+      "stage2_features": null,
+      "predicted_stage1": null,
+      "predicted_stage2": null,
+      "predicted_e2e": null
+    },
+    {
+      "clip_id": 108,
+      "file_stem": "clip_108_vid12_noytid_t101s-118s",
+      "fps": 30.0,
+      "frame_count": 510,
+      "tag": "run_through_stop",
+      "label": "run-through",
+      "label_display": "Run-through",
+      "approach_fired": true,
+      "detect_frame": 142,
+      "t0_s": 4.733333333333333,
+      "stage1_features": {
+        "post_drop_mean_motion": 2.5693659962467934,
+        "post_drop_min_motion": 0.6352187696844339,
+        "post_drop_p95_motion": 4.991249656677246,
+        "post_drop_stop_fraction": 0.0
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.6352187696844339,
+        "approach_area_sum_pct": 8.511894152723443
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "run-through",
+      "predicted_e2e": "run-through"
+    },
+    {
+      "clip_id": 109,
+      "file_stem": "clip_109_vid14_noytid_t9s-24s",
+      "fps": 30.0,
+      "frame_count": 450,
+      "tag": "rolling_stop",
+      "label": "rolling-stop",
+      "label_display": "Rolling stop",
+      "approach_fired": true,
+      "detect_frame": 144,
+      "t0_s": 4.8,
+      "stage1_features": {
+        "post_drop_mean_motion": 1.1705957862963818,
+        "post_drop_min_motion": 0.34147660061717033,
+        "post_drop_p95_motion": 3.470435291528702,
+        "post_drop_stop_fraction": 0.41721854304635764
+      },
+      "stage2_features": {
+        "post_drop_min_motion": 0.34147660061717033,
+        "approach_area_sum_pct": 13.82011162827368
+      },
+      "predicted_stage1": "rolling-or-run-through",
+      "predicted_stage2": "rolling-stop",
+      "predicted_e2e": "rolling-stop"
+    }
+  ]
+}
