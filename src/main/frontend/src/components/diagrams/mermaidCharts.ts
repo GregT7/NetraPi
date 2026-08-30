@@ -1,36 +1,3 @@
-export const KNN_CHART = `flowchart TB
-  clips["104 clips"]
-  approach["Approach detection"]
-  fired["Approach fired"]
-  silent["No approach"]
-  unrelated["Unrelated (control)"]
-  stage1["Stage 1 kNN<br/>4 features"]
-  complete["Complete stop"]
-  unsafe["Rolling / run-through"]
-  stage2["Stage 2 kNN<br/>2 features"]
-  rolling["Rolling stop"]
-  runthrough["Run-through"]
-
-  clips --> approach
-  approach --> fired
-  approach --> silent
-  silent --> unrelated
-  fired --> stage1
-  stage1 --> complete
-  stage1 --> unsafe
-  unsafe --> stage2
-  stage2 --> rolling
-  stage2 --> runthrough
-
-  classDef unrelatedNode fill:#0c4a6e,stroke:#38bdf8,color:#fafafa
-  classDef completeNode fill:#064e3b,stroke:#34d399,color:#fafafa
-  classDef rollingNode fill:#713f12,stroke:#fbbf24,color:#fafafa
-  classDef runNode fill:#7f1d1d,stroke:#fb7185,color:#fafafa
-  class unrelated unrelatedNode
-  class complete completeNode
-  class rolling rollingNode
-  class runthrough runNode`
-
 export const HARDWARE_CHART = `flowchart LR
   subgraph capture[" "]
     direction TB

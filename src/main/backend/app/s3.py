@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 from app.config import Settings, get_settings
 
 CLIP_EXPIRES_SECONDS = 15 * 60
+PUBLIC_CLIP_EXPIRES_SECONDS = 2 * 60
 TRIP_EXPIRES_SECONDS = 60 * 60
 DEFAULT_CONTENT_TYPE = "video/mp4"
 _MONTH_ABBREV = (

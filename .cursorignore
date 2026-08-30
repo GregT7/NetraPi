@@ -20,7 +20,6 @@ serviceAccount.json
 
 # Heavy local artifacts (also gitignored)
 venv/
-vids/
 research/
 data/
 metrics/

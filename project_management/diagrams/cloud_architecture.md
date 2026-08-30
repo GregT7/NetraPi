@@ -2,7 +2,7 @@
 
 Stack for one-device MVS: the Pi keeps **production** SQLite + local files; FastAPI (Render, or Compose on the laptop) is the only process with AWS and Postgres credentials; private S3 holds media; **production** cloud metadata is Supabase Postgres. Compose Postgres is a throwaway laptop test DB only — not prod, not a copy of Supabase. Video never transits FastAPI. The Pi never holds permanent AWS or Postgres credentials (decision 22).
 
-HTTP ingest payloads and the Pi↔API sequence live in [backend_api.md](backend_api.md). Tables live in [schema_design.md](schema_design.md). Edge capture/clip writing is [event_clip_pipeline.md](event_clip_pipeline.md). Requirements: [mvs.md](../specs/mvs.md) R-6 / R-7 / R-8.
+HTTP ingest payloads and the Pi↔API sequence live in [backend_api.md](backend_api.md). Tables live in [schema_design.md](schema_design.md). Edge capture/clip writing is [event_clip_pipeline.md](event_clip_pipeline.md). Public Try-it-out playback (rate limit + short signed GET + private bucket) lives in [frontend_playback.md](frontend_playback.md). Requirements: [mvs.md](../specs/mvs.md) R-6 / R-7 / R-8.
 
 > **Tip:** Zoom the Markdown preview (Ctrl/Cmd + mouse wheel) or open this file on GitHub full-width. Diagrams use a dark theme for readability.
 
@@ -38,7 +38,7 @@ This file is not a replica of the ingest API and not the ER diagram.
 
 ## 2. Components
 
-FastAPI is the only process with AWS keys and a Postgres URL. The Pi writes **production** SQLite directly, then talks HTTP to FastAPI and PUTs bytes to a short-lived S3 URL. Production cloud metadata is Supabase. Compose Postgres is not in this picture (test only, [§4](#4-three-databases)). Frontend React on Vercel is deferred; backend signed GET is TP-46.
+FastAPI is the only process with AWS keys and a Postgres URL. The Pi writes **production** SQLite directly, then talks HTTP to FastAPI and PUTs bytes to a short-lived S3 URL. Production cloud metadata is Supabase. Compose Postgres is not in this picture (test only, [§4](#4-three-databases)). Frontend React on Vercel is still a later deploy; public Try-it-out playback is implemented in [frontend_playback.md](frontend_playback.md). Backend signed GET for ingest is TP-46.
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryTextColor': '#e6e6e6', 'lineColor': '#6eb5ff', 'fontSize': '13px'}}}%%
@@ -55,7 +55,7 @@ flowchart LR
     S3[private S3]
     Pg[Supabase Postgres prod]
   end
-  Frontend[frontend Vercel deferred]
+  Frontend[frontend Vercel]
 
   Pi -->|"edge/.env"| Sqlite
   Pi --> Files
@@ -63,7 +63,7 @@ flowchart LR
   Pi -->|"presigned PUT"| S3
   Api -->|"engine from backend/.env"| Pg
   Api -->|"mint PUT URL"| S3
-  Frontend -.->|"signed GET later"| S3
+  Frontend -.->|"signed GET see frontend_playback"| S3
   Frontend -.->|"read metadata later"| Pg
 ```
 
@@ -294,7 +294,7 @@ Event clips may PUT during the drive when online (small, infrequent). Trip segme
 
 Do not design these here (ingest and MVS cloud path stay as above):
 
-- List/filter events, React on Vercel (M-7.14, R-9). Backend signed GET is TP-46.
+- List/filter events and Vercel project setup (M-7.14, R-9). Public clip playback is [frontend_playback.md](frontend_playback.md). Ingest signed GET is TP-46.
 - Two-way sync (Postgres → SQLite)
 - S3 time-based retention / lifecycle (decision 29)
 - Multipart video on FastAPI (bytes go Pi → S3)
@@ -311,4 +311,4 @@ Do not design these here (ingest and MVS cloud path stay as above):
 | TP-42–49 | API key; S3 PUT/GET; `driving-event` → Postgres; hotspot upload; local E2E |
 | TP-50–56 | Render deploy + edge ↔ deployed backend E2E (no frontend) |
 
-React UI / Vercel playback stay deferred. Backend signed GET is TP-46.
+Public Try-it-out playback: [frontend_playback.md](frontend_playback.md). Backend ingest signed GET is TP-46.

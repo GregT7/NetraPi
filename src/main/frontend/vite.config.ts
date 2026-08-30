@@ -40,6 +40,12 @@ export default defineConfig({
     fs: {
       allow: [path.resolve(rootDir, '../..')],
     },
+    proxy: {
+      '/api': {
+        changeOrigin: true,
+        target: 'http://127.0.0.1:8000',
+      },
+    },
   },
   test: {
     environment: 'jsdom',

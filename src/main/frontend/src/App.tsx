@@ -1,10 +1,10 @@
-import Demo from './components/Demo'
-import Hero from './components/Hero'
-import HowItWorks from './components/HowItWorks'
-import Links from './components/Links'
-import Overview from './components/Overview'
-import SiteNav from './components/SiteNav'
-import TryItOut from './components/TryItOut'
+import Demo from './components/demo/Demo'
+import Hero from './components/hero/Hero'
+import HowItWorks from './components/how-it-works/HowItWorks'
+import Links from './components/links/Links'
+import Overview from './components/overview/Overview'
+import SiteNav from './components/layout/SiteNav'
+import TryItOut from './components/try-it-out/TryItOut'
 
 export default function App() {
   return (

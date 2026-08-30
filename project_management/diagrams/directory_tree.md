@@ -137,18 +137,19 @@ src/main/
 │   ├── Dockerfile                     ✅  image for Render and local Compose
 │   ├── compose.yml                    ✅  local only — `docker compose up` from this dir (context `src/main`)
 │   ├── requirements.txt               ✅  fastapi / uvicorn / httpx / boto3 / db pins
-│   ├── .env                           🏃  gitignored; DATABASE_URL (Supabase URI) + NETRAPI_API_KEY + AWS
+│   ├── .env                           🏃  gitignored; DATABASE_URL + NETRAPI_API_KEY + AWS; optional CORS_ORIGINS
 │   ├── README.md                      ✅  local uvicorn / env keys (create `.env` by hand)
 │   ├── DOCKER.md                      ✅  Docker Desktop prereq; `docker build` + Compose (TP-37)
 │   └── app/
 │       ├── __init__.py                ✅  puts src/main on path for `db`
-│       ├── main.py                    ✅  lifespan + routers
-│       ├── config.py                  ✅  pydantic-settings: DATABASE_URL; NETRAPI_API_KEY; optional AWS + SUPABASE_DB_*
-│       ├── s3.py                      ✅  presign PUT/GET + HEAD; keys MMM-YYYY/driving_session_id_{id}/{clips|trips}/{clip|trip}-{id}.mp4
+│       ├── main.py                    ✅  lifespan + routers + CORS
+│       ├── config.py                  ✅  pydantic-settings: DATABASE_URL; NETRAPI_API_KEY; optional AWS, CORS_ORIGINS, SUPABASE_DB_*
+│       ├── s3.py                      ✅  presign PUT/GET + HEAD; ingest clip GET 15 min; public clip GET 2 min
+│       ├── public_limits.py           ✅  public mint: 10/min/IP + max 20 live URLs
 │       ├── auth/                      ✅  device API key (TP-42)
 │       │   ├── __init__.py            ✅
 │       │   └── api_key.py             ✅  X-API-Key on /api/netrapi/*
-│       └── routes/                    ✅  Pi ingest — [backend_api.md](backend_api.md)
+│       └── routes/                    ✅  Pi ingest — [backend_api.md](backend_api.md); public playback — [frontend_playback.md](frontend_playback.md)
 │           ├── __init__.py            ✅
 │           ├── health.py              ✅  GET /health (TP-35)
 │           ├── ready.py               ✅  GET /api/netrapi/ready (TP-59)
@@ -157,11 +158,12 @@ src/main/
 │           ├── trip_segment.py        ✅  POST /api/netrapi/trip-segment (JSON prime)
 │           ├── driving_event.py       ✅  POST /api/netrapi/driving-event (TP-36 / nested children)
 │           ├── operational_exception.py ✅  POST /api/netrapi/operational-exception
-│           └── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
+│           ├── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
+│           └── public_clip.py         ✅  GET /api/public/clips; POST /api/public/clip-download-url
 │
 └── frontend/                          ✅  Vite + React + TS + Tailwind SPA; no Dockerfile
     ├── package.json                   ✅
-    ├── vite.config.ts                 ✅  Tailwind + Vitest; tests under src/tests/unit/frontend
+    ├── vite.config.ts                 ✅  Tailwind + Vitest; `/api` proxy to local FastAPI
     ├── vercel.json                    ✅  SPA rewrite; Vercel project not connected yet
     ├── README.md                      ✅
     ├── index.html                     ✅
@@ -174,21 +176,34 @@ src/main/
         ├── index.css                  ✅  Tailwind v4
         ├── test-setup.ts              ✅  Testing Library jest-dom
         ├── components/
-        │   ├── SiteNav.tsx            ✅
-        │   ├── Hero.tsx               ✅
-        │   ├── Overview.tsx           ✅  stacked Mermaid hardware + software
-        │   ├── MermaidDiagram.tsx     ✅  mermaid.render + Iconify logos
-        │   ├── mermaidCharts.ts       ✅
-        │   ├── mermaidSetup.ts        ✅
-        │   ├── diagramIconPacks.ts    ✅  Iconify subset for diagrams
-        │   ├── HowItWorks.tsx         ✅  stub
-        │   ├── Demo.tsx               ✅  YouTube placeholder + Results
-        │   ├── ClusterScatter.tsx     ✅  2D kNN neighborhood sketch
-        │   ├── clusterData.ts         ✅
-        │   ├── TryItOut.tsx           ✅  table stub (no S3)
-        │   └── Links.tsx              ✅
+        │   ├── layout/
+        │   │   └── SiteNav.tsx        ✅
+        │   ├── hero/
+        │   │   └── Hero.tsx           ✅
+        │   ├── overview/
+        │   │   └── Overview.tsx       ✅  stacked Mermaid hardware + software
+        │   ├── how-it-works/
+        │   │   ├── HowItWorks.tsx     ✅
+        │   │   ├── FeatureGuide.tsx   ✅
+        │   │   ├── KnnHierarchy.tsx   ✅
+        │   │   ├── AreaMotionChart.tsx ✅
+        │   │   └── ClusterScatter.tsx ✅
+        │   ├── demo/
+        │   │   └── Demo.tsx           ✅  YouTube placeholder
+        │   ├── try-it-out/
+        │   │   └── TryItOut.tsx       ✅  public mint + S3 playback
+        │   ├── links/
+        │   │   └── Links.tsx          ✅
+        │   ├── diagrams/
+        │   │   ├── MermaidDiagram.tsx ✅  mermaid.render + Iconify logos
+        │   │   ├── mermaidCharts.ts   ✅
+        │   │   ├── mermaidSetup.ts    ✅
+        │   │   └── diagramIconPacks.ts ✅  Iconify subset for diagrams
+        │   └── data/
+        │       ├── clusterData.ts     ✅
+        │       └── ap050*.json        ✅  plot source data
         └── api/
-            └── .gitkeep               ✅
+            └── publicPlayback.ts      ✅  GET /api/public/clips; POST clip-download-url
 ```
 
 ### Deploy vs local dev
@@ -199,7 +214,7 @@ src/main/
 | Local backend stack | `src/main/backend/compose.yml` | No — dev machine only |
 | Edge on Pi | `src/main/edge/netrapi-edge.service` + `main.py` | Yes — Pi (systemd) |
 | Edge / test Python deps | `src/create_env.sh` (Pi) or `src/create_env.bat` (Windows) | Yes — creates `venv/` in cwd |
-| Frontend | `src/main/frontend/` | Later → Vercel (scaffold only; project not connected) |
+| Frontend | `src/main/frontend/` | Later → Vercel (playback talks to Render via `VITE_API_URL`) |
 
 No separate `deploy/` folder — each app keeps its own deploy artifact (`Dockerfile` in backend, `.service` in edge).
 

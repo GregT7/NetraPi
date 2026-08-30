@@ -2,7 +2,7 @@
 
 Pi-facing FastAPI contract: persist a driving session, prime **trip-segment** rows without sending those MP4s, persist events, and mint S3 URLs so the **edge** can PUT **event clips during the drive** and **trip files later on Wi‑Fi**. **No FastAPI route accepts file bytes.** Trip files rotate every `segment_seconds` (default 300 s) — too heavy for cellular in the lap loop. Cloud stack, the three databases (Pi SQLite local prod, Compose Postgres test-only, Supabase cloud prod), and credentials live in [cloud_architecture.md](cloud_architecture.md). Tables live in [schema_design.md](schema_design.md). Edge capture/clip writing is [event_clip_pipeline.md](event_clip_pipeline.md). Requirements: [mvs.md](../specs/mvs.md) R-6 / R-7 / R-8.
 
-This is the **ingest** surface only. It is not a replica of SQLite and it is not the portfolio frontend API.
+This is the **ingest** surface only. It is not a replica of SQLite and it is not the portfolio frontend API. Public Try-it-out playback (private bucket, short signed GET, rate-limited mint) is [frontend_playback.md](frontend_playback.md).
 
 ---
 
@@ -322,7 +322,7 @@ Keep uploads **one at a time**. **Clips** may PUT during the drive when online. 
 
 ### 5.8 `POST /api/netrapi/s3-download-url`
 
-JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true, `s3_key` set). FastAPI mints a time-limited S3 **GET** URL (clip 15 min, trip 60 min). The object stays private; unsigned GETs to the bucket URL fail (TP-46). Frontend JWT playback can reuse this later; Sprint 6 authenticates with `X-API-Key`.
+JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true, `s3_key` set). FastAPI mints a time-limited S3 **GET** URL (clip 15 min, trip 60 min). The object stays private; unsigned GETs to the bucket URL fail (TP-46). Sprint 6 authenticates this **ingest** route with `X-API-Key`. Do not put that key in Vite. Public demo playback is `POST /api/public/clip-download-url` (no device key) — [frontend_playback.md](frontend_playback.md). JWT on `Authorization` stays reserved (decision 46 / 50).
 
 **Request**
 
