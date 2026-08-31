@@ -23,6 +23,55 @@ body {
   }
 }
 
+.playback-no-seek::-webkit-media-controls-timeline {
+  pointer-events: none;
+}
+
+@keyframes playback-poll {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes playback-poll-stroke {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes playback-edge-flash {
+  0% {
+    box-shadow: 0 0 10px #fbbf24;
+    opacity: 1;
+  }
+  100% {
+    box-shadow: none;
+    opacity: 0.85;
+  }
+}
+
+.playback-poll {
+  animation: playback-poll 1.1s ease-in-out infinite;
+}
+
+.playback-poll-stroke {
+  animation: playback-poll-stroke 1.1s ease-in-out infinite;
+}
+
+.playback-edge-flash {
+  animation: playback-edge-flash 0.7s ease-out 1;
+}
+
 .hardware-diagram .node,
 .hardware-diagram svg,
 [data-diagram-wrap],
@@ -45,5 +94,11 @@ body {
     background-color: rgb(251 191 36 / 0.16);
     box-shadow: 0 0 18px 4px rgb(251 191 36 / 0.7);
     outline-color: #fbbf24;
+  }
+
+  .playback-poll,
+  .playback-poll-stroke,
+  .playback-edge-flash {
+    animation: none;
   }
 }

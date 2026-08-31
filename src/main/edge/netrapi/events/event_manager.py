@@ -9,7 +9,7 @@ from config.types import ApproachConfig, EventManagerConfig, MotionConfig
 from netrapi.buffer import FrameBuffer
 from netrapi.buffer.classification import Classification
 from netrapi.events.approach import diagnose_approach_drop
-from netrapi.events.driving_event import ApproachSnapshot, DrivingEvent
+from netrapi.events.driving_event import ApproachSnapshot, DrivingEvent, PlaybackSeries
 from netrapi.events.enums import EventPhase
 from netrapi.events.classify import (
     LiveMotionTracker,
@@ -57,6 +57,7 @@ class EventManager:
         self._area_history: deque[tuple[float, float]] = deque()
         self._motion_history: list[tuple[float, float]] = []
         self._areas_snapshot: list[float] = []
+        self._area_stamp_snapshot: list[float] = []
         self._detect_frame: int = -1
         self._anchor_t: float | None = None
         self._motion_tracker = LiveMotionTracker(motion)
@@ -86,6 +87,7 @@ class EventManager:
         self._area_history.clear()
         self._motion_history.clear()
         self._areas_snapshot = []
+        self._area_stamp_snapshot = []
         self._detect_frame = -1
         self._anchor_t = None
         self._motion_tracker.reset()
@@ -172,12 +174,36 @@ class EventManager:
                 fail_reasons=winner.fail_reasons,
             )
 
+        playback = PlaybackSeries(
+            area_points=self._playback_area_points(),
+            motion_points=tuple(self._motion_history),
+            anchor_t=self._anchor_t,
+            evaluate_t=time.monotonic(),
+        )
         self.reset()
         return DrivingEvent(
             type=stop_type,
             knn_stage1=tuple(stage1),
             knn_stage2=tuple(stage2),
             approach=approach,
+            playback_series=playback,
+        )
+
+    def _playback_area_points(self) -> tuple[tuple[float, float], ...]:
+        if (
+            self._area_stamp_snapshot
+            and len(self._area_stamp_snapshot) == len(self._areas_snapshot)
+        ):
+            return tuple(zip(self._area_stamp_snapshot, self._areas_snapshot))
+        if not self._areas_snapshot or self._anchor_t is None:
+            return ()
+        fps = self._latch_fps if self._latch_fps > 0 else self._fallback_fps
+        dt = 1.0 / fps
+        last = self._anchor_t
+        n = len(self._areas_snapshot)
+        return tuple(
+            (last - (n - 1 - index) * dt, value)
+            for index, value in enumerate(self._areas_snapshot)
         )
 
     def _estimate_fps(self) -> float:
@@ -205,6 +231,7 @@ class EventManager:
         if diagnosis is None or diagnosis.event is None:
             return
 
+        self._area_stamp_snapshot = [stamp for stamp, _ in self._area_history]
         self._areas_snapshot = list(areas)
         self._detect_frame = len(self._areas_snapshot) - 1
         self._anchor_t = clock

@@ -8,6 +8,7 @@ from db.database import get_session
 from db.models import Clip, TripSegment
 from netrapi.cloud_ingest import CloudIngest
 from netrapi.exceptions import CloudIngestError
+from netrapi.recording.playback_json import SIDECAR_NAMES
 
 
 def _remove_file(path: str | None) -> bool:
@@ -22,6 +23,26 @@ def _remove_file(path: str | None) -> bool:
         print(f"[cleanup] could not delete {file}: {exc}", flush=True)
         return False
     return True
+
+
+def _remove_local(path: str | None) -> bool:
+    if not path:
+        return True
+    file = Path(path)
+    if file.is_file() and file.name == "clip.mp4":
+        parent = file.parent
+        for name in SIDECAR_NAMES:
+            sidecar = parent / name
+            if sidecar.is_file() and not _remove_file(str(sidecar)):
+                return False
+        if not _remove_file(str(file)):
+            return False
+        try:
+            parent.rmdir()
+        except OSError:
+            pass
+        return True
+    return _remove_file(path)
 
 
 def _finished(row: Clip | TripSegment) -> bool:
@@ -39,7 +60,7 @@ def _cleanup_row(
     row_id: int,
     local_path: str | None,
 ) -> bool:
-    if not _remove_file(local_path):
+    if not _remove_local(local_path):
         return False
     try:
         if kind == "clip":
@@ -120,11 +141,11 @@ def _sweep_orphans(directory: Path | None, keep: set[Path]) -> int:
     if directory is None or not directory.is_dir():
         return 0
     removed = 0
-    for path in sorted(directory.glob("*.mp4")):
-        resolved = path.resolve()
-        if resolved in keep:
+    candidates = list(directory.glob("*.mp4")) + list(directory.glob("*/clip.mp4"))
+    for path in sorted({item.resolve() for item in candidates}):
+        if path in keep:
             continue
-        if _remove_file(str(path)):
+        if _remove_local(str(path)):
             print(f"[cleanup] orphan removed ({path})", flush=True)
             removed += 1
     return removed

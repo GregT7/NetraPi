@@ -196,7 +196,7 @@ def _remove_lgpio_notify_pipes(*directories: Path) -> None:
 def _clip_files(clips_dir: Path) -> set[Path]:
     if not clips_dir.is_dir():
         return set()
-    return {path.resolve() for path in clips_dir.glob("*.mp4")}
+    return {path.resolve() for path in clips_dir.rglob("*.mp4")}
 
 
 def _pre_buffer_time_span(pre_buffer) -> float:

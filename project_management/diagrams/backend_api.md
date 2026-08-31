@@ -283,12 +283,38 @@ The clip or trip **row must already exist** (`driving-event` for clips, `trip-se
 ```json
 {
   "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
-  "method": "PUT"
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
+  "method": "PUT",
+  "objects": [
+    {
+      "name": "clip.mp4",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
+      "content_type": "video/mp4"
+    },
+    {
+      "name": "areas.json",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/areas.json",
+      "content_type": "application/json"
+    },
+    {
+      "name": "motion.json",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/motion.json",
+      "content_type": "application/json"
+    },
+    {
+      "name": "transitions.json",
+      "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
+      "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/transitions.json",
+      "content_type": "application/json"
+    }
+  ]
 }
 ```
 
-The Pi PUTs the MP4 **directly to `url`**. That HTTP call is S3, not FastAPI.
+The Pi PUTs each listed object **directly to its `url`**. Those HTTP calls are S3, not FastAPI. Confirm HEADs the video and all three JSON sidecars before setting `s3_stored`.
 
 ### 5.7 `POST /api/netrapi/confirm-s3-upload`
 
@@ -299,7 +325,7 @@ JSON only. After the S3 PUT succeeds, the Pi tells FastAPI the object landed. Ba
 ```json
 {
   "clip_id": 10,
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
 }
 ```
 
@@ -309,7 +335,7 @@ JSON only. After the S3 PUT succeeds, the Pi tells FastAPI the object landed. Ba
 
 ```json
 {
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
   "s3_stored": true,
   "clip_id": 10,
   "file_size_bytes": 4096
@@ -339,7 +365,7 @@ JSON only. The clip or trip row must already be **confirmed** (`s3_stored` true,
 ```json
 {
   "url": "https://bucket.s3.amazonaws.com/...?X-Amz-Signature=...",
-  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10.mp4",
+  "object_key": "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4",
   "method": "GET",
   "clip_id": 10
 }

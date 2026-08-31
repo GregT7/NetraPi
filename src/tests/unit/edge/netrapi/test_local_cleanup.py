@@ -205,3 +205,57 @@ def test_delete_all_local_removes_pending_and_orphans(tmp_path: Path) -> None:
         assert row.local_path is None
     bodies = [item[2] for item in calls if item[1].endswith("confirm-local-delete")]
     assert {"clip_id": clip_id} in bodies
+
+
+def test_delete_uploaded_local_removes_clip_directory(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
+    _upgrade(url)
+    clip_dir = tmp_path / "clip_1_stamp"
+    clip_dir.mkdir()
+    clip_file = clip_dir / "clip.mp4"
+    areas = clip_dir / "areas.json"
+    motion = clip_dir / "motion.json"
+    transitions = clip_dir / "transitions.json"
+    clip_file.write_bytes(b"clip")
+    areas.write_text("{}", encoding="utf-8")
+    motion.write_text("{}", encoding="utf-8")
+    transitions.write_text("{}", encoding="utf-8")
+    started = datetime(2026, 8, 16, 18, 0, 0)
+    ingest, calls = _ingest()
+
+    with get_session() as session:
+        driving = insert_driving_session(session, start_time=started)
+        event = insert_local_event(
+            session,
+            driving_session_id=driving.id,
+            time=started + timedelta(seconds=1),
+            type_value="rolling-stop",
+            clip_path=clip_file,
+            fps=30,
+            order_number=1,
+            num_frames=30,
+            clip_start=started,
+            clip_end=started + timedelta(seconds=1),
+        )
+        session.commit()
+        clip = session.exec(select(Clip).where(Clip.event_id == event.id)).first()
+        assert clip is not None
+        clip.s3_key = "Aug-2026/driving_session_id_1/clips/clip-1/clip.mp4"
+        clip.s3_stored = True
+        session.add(clip)
+        session.commit()
+        clip_id = clip.id
+
+    cleaned = delete_uploaded_local_media(ingest)
+    assert cleaned == 1
+    assert not clip_file.is_file()
+    assert not areas.is_file()
+    assert not motion.is_file()
+    assert not transitions.is_file()
+    assert not clip_dir.is_dir()
+    with get_session() as session:
+        row = session.get(Clip, clip_id)
+        assert row is not None
+        assert row.init_local_deleted is True
+        assert row.local_path is None
+    assert any(item[1].endswith("confirm-local-delete") for item in calls)

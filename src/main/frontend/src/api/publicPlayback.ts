@@ -30,10 +30,38 @@ type PublicClipListResponse = {
 }
 
 type PublicMintResponse = {
+  areas?: PlaybackSeriesFile | null
   expires_in: number
   live_url_max?: number
   live_urls?: number
+  motion?: PlaybackSeriesFile | null
+  transitions?: PlaybackTransitionsFile | null
   url: string
+}
+
+export type PlaybackSeriesPoint = {
+  area?: number
+  score?: number
+  t: number
+}
+
+export type PlaybackSeriesFile = {
+  classification?: string
+  points: PlaybackSeriesPoint[]
+  sample_end_s: number
+  schema_version: number
+  t0_s: number
+}
+
+export type PlaybackTransitionState = {
+  id: string
+  t: number
+}
+
+export type PlaybackTransitionsFile = {
+  classification?: string
+  schema_version: number
+  states: PlaybackTransitionState[]
 }
 
 export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClipList> {

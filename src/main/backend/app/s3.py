@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 import boto3
@@ -12,6 +13,12 @@ CLIP_EXPIRES_SECONDS = 15 * 60
 PUBLIC_CLIP_EXPIRES_SECONDS = 2 * 60
 TRIP_EXPIRES_SECONDS = 60 * 60
 DEFAULT_CONTENT_TYPE = "video/mp4"
+JSON_CONTENT_TYPE = "application/json"
+CLIP_VIDEO_NAME = "clip.mp4"
+CLIP_AREAS_NAME = "areas.json"
+CLIP_MOTION_NAME = "motion.json"
+CLIP_TRANSITIONS_NAME = "transitions.json"
+CLIP_SIDECAR_NAMES = (CLIP_AREAS_NAME, CLIP_MOTION_NAME, CLIP_TRANSITIONS_NAME)
 _MONTH_ABBREV = (
     "Jan",
     "Feb",
@@ -45,10 +52,34 @@ def media_object_key(
     if kind not in ("clip", "trip"):
         raise ValueError(f"unknown media kind {kind!r}")
     folder = "clips" if kind == "clip" else "trips"
+    if kind == "clip":
+        return (
+            f"{month_year_stamp(start_time)}/driving_session_id_{session_id}/"
+            f"{folder}/clip-{row_id}/{CLIP_VIDEO_NAME}"
+        )
     return (
         f"{month_year_stamp(start_time)}/driving_session_id_{session_id}/"
         f"{folder}/{kind}-{row_id}.mp4"
     )
+
+
+def is_directory_clip_key(object_key: str) -> bool:
+    return object_key.endswith(f"/{CLIP_VIDEO_NAME}") and "/clips/clip-" in object_key
+
+
+def clip_sidecar_key(video_key: str, filename: str) -> str | None:
+    if filename not in CLIP_SIDECAR_NAMES:
+        raise ValueError(f"unknown clip sidecar {filename!r}")
+    if not is_directory_clip_key(video_key):
+        return None
+    return f"{video_key.rsplit('/', 1)[0]}/{filename}"
+
+
+def clip_sidecar_keys(video_key: str) -> tuple[str, ...] | None:
+    if not is_directory_clip_key(video_key):
+        return None
+    prefix = video_key.rsplit("/", 1)[0]
+    return tuple(f"{prefix}/{name}" for name in CLIP_SIDECAR_NAMES)
 
 
 def s3_settings_or_raise(
@@ -122,6 +153,25 @@ def head_object(object_key: str, *, settings: Settings | None = None) -> dict | 
         if code in {"404", "NoSuchKey", "NotFound"}:
             return None
         raise
+
+
+def get_object_json(object_key: str, *, settings: Settings | None = None) -> dict | None:
+    _key_id, _secret, _region, bucket = s3_settings_or_raise(settings)
+    try:
+        body = _client(settings).get_object(Bucket=bucket, Key=object_key)
+        raw = body["Body"].read()
+    except ClientError as exc:
+        code = str(exc.response.get("Error", {}).get("Code", ""))
+        if code in {"404", "NoSuchKey", "NotFound"}:
+            return None
+        raise
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
 
 
 def head_bucket(*, settings: Settings | None = None) -> None:

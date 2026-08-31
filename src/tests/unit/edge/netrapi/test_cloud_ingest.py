@@ -81,8 +81,13 @@ def test_try_cloud_ingest_returns_client(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
     _upgrade(url)
-    clip_path = tmp_path / "clip.mp4"
+    clip_dir = tmp_path / "clip_1"
+    clip_dir.mkdir()
+    clip_path = clip_dir / "clip.mp4"
     clip_path.write_bytes(b"fake-mp4")
+    (clip_dir / "areas.json").write_text("{}", encoding="utf-8")
+    (clip_dir / "motion.json").write_text("{}", encoding="utf-8")
+    (clip_dir / "transitions.json").write_text("{}", encoding="utf-8")
     started = datetime(2026, 8, 16, 18, 0, 0)
     calls: list[tuple] = []
 
@@ -90,9 +95,35 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
         calls.append((method, path, body))
         if path.endswith("s3-upload-url"):
             return {
-                "url": "https://s3.example/put",
-                "object_key": "Aug-2026/driving_session_id_1/clips/clip-1.mp4",
+                "url": "https://s3.example/put-video",
+                "object_key": "Aug-2026/driving_session_id_1/clips/clip-1/clip.mp4",
                 "method": "PUT",
+                "objects": [
+                    {
+                        "name": "clip.mp4",
+                        "url": "https://s3.example/put-video",
+                        "object_key": "Aug-2026/driving_session_id_1/clips/clip-1/clip.mp4",
+                        "content_type": "video/mp4",
+                    },
+                    {
+                        "name": "areas.json",
+                        "url": "https://s3.example/put-areas",
+                        "object_key": "Aug-2026/driving_session_id_1/clips/clip-1/areas.json",
+                        "content_type": "application/json",
+                    },
+                    {
+                        "name": "motion.json",
+                        "url": "https://s3.example/put-motion",
+                        "object_key": "Aug-2026/driving_session_id_1/clips/clip-1/motion.json",
+                        "content_type": "application/json",
+                    },
+                    {
+                        "name": "transitions.json",
+                        "url": "https://s3.example/put-transitions",
+                        "object_key": "Aug-2026/driving_session_id_1/clips/clip-1/transitions.json",
+                        "content_type": "application/json",
+                    },
+                ],
             }
         return {"ok": True}
 
@@ -144,11 +175,16 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
     )
     assert len(event_body["knn_parameters"]) == 6
     assert event_body["approach_parameters"]["peak_area_pct"] == 1.1
-    assert put_calls == [("https://s3.example/put", b"fake-mp4", "video/mp4")]
+    assert put_calls == [
+        ("https://s3.example/put-video", b"fake-mp4", "video/mp4"),
+        ("https://s3.example/put-areas", b"{}", "application/json"),
+        ("https://s3.example/put-motion", b"{}", "application/json"),
+        ("https://s3.example/put-transitions", b"{}", "application/json"),
+    ]
     with get_session() as session:
         clip = session.exec(select(Clip).where(Clip.event_id == event_id)).first()
         assert clip is not None
-        assert clip.s3_key == "Aug-2026/driving_session_id_1/clips/clip-1.mp4"
+        assert clip.s3_key == "Aug-2026/driving_session_id_1/clips/clip-1/clip.mp4"
         assert clip.s3_stored is True
         assert clip.file_size_bytes == len(b"fake-mp4")
 

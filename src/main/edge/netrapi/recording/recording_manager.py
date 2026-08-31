@@ -15,9 +15,10 @@ from netrapi.buzzer import Buzzer
 from netrapi.capture import Camera, PreviewUI
 from netrapi.detection import Detector
 from netrapi.events import EventManager
-from netrapi.events.driving_event import DrivingEvent
+from netrapi.events.driving_event import DrivingEvent, PlaybackSeries
 from netrapi.recording.clip_package import ClipPackage
 from netrapi.recording.clip_result import ClipResult
+from netrapi.recording.playback_json import write_playback_sidecars
 from netrapi.recording.util.encoding_fps import clip_encoding_fps
 from netrapi.recording.recorder import Recorder
 from netrapi.recording.trip_recorder import TripRecorder
@@ -61,6 +62,8 @@ class RecordingManager:
         self._event_index = 0
         self._driving_session_id: int | None = None
         self._pending_event_id: int | None = None
+        self._pending_playback: PlaybackSeries | None = None
+        self._pending_classification: str | None = None
         self._open_trip_segment_id: int | None = None
         self._open_trip_segment_start: datetime | None = None
         if local_store is not None and hasattr(trip_recorder, "set_on_segment_saved"):
@@ -204,6 +207,8 @@ class RecordingManager:
                 else:
                     # Metadata already synced; no clip will call attach.
                     self._pending_event_id = None
+                    self._pending_playback = None
+                    self._pending_classification = None
             return None
         else:
             self.post_buffer.append(record)
@@ -239,6 +244,8 @@ class RecordingManager:
             trip_offset_seconds=trip_offset,
         )
         self._pending_event_id = event_id
+        self._pending_playback = event.playback_series
+        self._pending_classification = event.type.model_label
         self._try_ingest("sync_event", event_id)
 
     def _capture_frame_record(self) -> FrameRecord:
@@ -278,8 +285,16 @@ class RecordingManager:
             event_index=self._event_index,
         )
         result = self._recorder.write_clip(package, fps=encoding_fps)
+        write_playback_sidecars(
+            result.clip_path,
+            self._pending_playback,
+            pre_roll_seconds=self._app_config.recording_manager.pre_roll_seconds,
+            classification=self._pending_classification or "",
+        )
         event_id = self._pending_event_id
         self._pending_event_id = None
+        self._pending_playback = None
+        self._pending_classification = None
         if (
             self._local_store is not None
             and event_id is not None

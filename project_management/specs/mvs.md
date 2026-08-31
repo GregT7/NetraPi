@@ -70,6 +70,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 ### R-6.1 Upload Path
 - M-6.10: When connectivity is available (cellular hotspot or mobile data), the edge device shall upload video clips and full-session footage one at a time to private cloud object storage using temporary upload credentials issued by the backend API (presigned PUT); the edge device shall not store permanent cloud-storage credentials, and the system shall not maintain an offline upload queue.
 - M-6.11: The edge device shall provide a maintenance command that uploads pending event clips, pending trip files, or both when connectivity is available. After a successful drain, the command shall support deleting the corresponding local files that are already stored in cloud object storage.
+- M-6.12: Each uploaded event clip shall be stored as a directory in private object storage containing `clip.mp4`, `areas.json`, `motion.json`, and `transitions.json`.
 
 ### R-6.2 Cloud Storage
 - M-6.20: Uploaded video assets shall be stored in a private AWS S3 storage bucket.
@@ -91,6 +92,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-8.10: Structured event metadata shall be stored in a cloud-hosted PostgreSQL database.
 - M-8.11: The paths to the stored video clips within the S3 bucket shall be included in database.
 - M-8.12: The paths to stored video clips in the s3 bucket shall be used to retrieve video clips.
+- M-8.13: The stored clip path shall identify the video object inside the per-clip directory so that `areas.json`, `motion.json`, and `transitions.json` can be derived.
 
 ## R-9 Web Frontend (Interactive Portfolio)
 ### R-9.1 Portfolio Presentation
@@ -103,6 +105,8 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-9.22: The frontend shall support video playback via signed URLs.
 - M-9.23: The frontend shall display event metadata and timestamps.
 - M-9.24: The frontend shall allow users to browse and select clips from the collected footage.
+- M-9.25: The Try-it-out section shall offer detailed analysis playback (default) and simple video-only playback, toggled by the visitor.
+- M-9.26: Detailed analysis playback shall synchronize a state diagram and area/motion graphs to clip playback time using native video controls without seeking.
 
 ### R-9.3 Visualization
 - M-9.30: The frontend shall include at least one visualization of collected event or evaluation data.

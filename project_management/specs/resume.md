@@ -19,6 +19,7 @@ These are the initial target bullets derived from the project overview proposal 
 - Deployed a Dockerized FastAPI backend on Render for API key authentication, presigned upload URL issuance, metadata ingestion to Postgres, and analytics/video endpoints.
 - Stored videos in private AWS S3 buckets with signed URL access, and stored event metadata in Supabase PostgreSQL with linked S3 object paths.
 - Public demo playback lets visitors browse and play real collected event clips through short-lived signed GET URLs (2-minute TTL), capped at 20 concurrent signatures and rate-limited per client IP, so they can engage with actual footage while unbounded public GETs are less likely to produce a large AWS S3 bill.
+- Try-it-out detailed playback (default) will replay the stop-sign state machine next to area/motion graphs synchronized to the clip, using JSON sidecars (`areas.json`, `motion.json`, `transitions.json`) stored beside each video in S3.
 - Deployed a React + Tailwind dashboard on Vercel with event browsing, clip selection, accuracy metrics, and at least one evaluation visualization.
 - Set up GitHub Actions for lint, test, build, and deployment checks, and ran the edge app as a `systemd` service for reliable startup and recovery.
 

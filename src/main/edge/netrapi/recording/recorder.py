@@ -75,7 +75,8 @@ class Recorder:
         output_dir = self._config.clips_dir
         output_dir.mkdir(parents=True, exist_ok=True)
         stamp = package.triggered_at.strftime("%Y%m%d_%H%M%S")
-        return output_dir / f"clip_{package.event_index}_{stamp}.mp4"
+        clip_dir = output_dir / f"clip_{package.event_index}_{stamp}"
+        return clip_dir / "clip.mp4"
 
     def release(self) -> None:
         self._out_path = None

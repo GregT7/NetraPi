@@ -12,8 +12,14 @@ from app.public_limits import (
     release_live_slot,
 )
 from app.s3 import (
+    CLIP_AREAS_NAME,
+    CLIP_MOTION_NAME,
+    CLIP_SIDECAR_NAMES,
+    CLIP_TRANSITIONS_NAME,
     PUBLIC_CLIP_EXPIRES_SECONDS,
     S3NotConfiguredError,
+    clip_sidecar_key,
+    get_object_json,
     presign_get,
 )
 from db.database import get_session
@@ -94,6 +100,16 @@ def _live_url_status() -> dict[str, int]:
     }
 
 
+def _sidecar_json(object_key: str, name: str) -> dict | None:
+    sidecar_key = clip_sidecar_key(object_key, name)
+    if sidecar_key is None:
+        return None
+    try:
+        return get_object_json(sidecar_key)
+    except Exception:
+        return None
+
+
 @router.get("/clips")
 def list_public_clips():
     with get_session() as session:
@@ -152,6 +168,7 @@ def issue_public_clip_download_url(payload: PublicClipDownloadIn, request: Reque
 
     try:
         url = presign_get(object_key, expires_in=PUBLIC_CLIP_EXPIRES_SECONDS)
+        sidecars = {name: _sidecar_json(object_key, name) for name in CLIP_SIDECAR_NAMES}
     except S3NotConfiguredError as exc:
         release_live_slot(expiry)
         raise HTTPException(
@@ -168,5 +185,8 @@ def issue_public_clip_download_url(payload: PublicClipDownloadIn, request: Reque
         "method": "GET",
         "clip_id": clip_id,
         "expires_in": PUBLIC_CLIP_EXPIRES_SECONDS,
+        "areas": sidecars.get(CLIP_AREAS_NAME),
+        "motion": sidecars.get(CLIP_MOTION_NAME),
+        "transitions": sidecars.get(CLIP_TRANSITIONS_NAME),
         **_live_url_status(),
     }

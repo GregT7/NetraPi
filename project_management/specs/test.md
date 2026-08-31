@@ -1507,21 +1507,92 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows) and that selecting a row sets the video `src` to a minted GET URL.
 - **Test level**: Unit
 - **Verification approach**: Test
-- **Reqs**: M-7.14, M-9.22, M-9.23, M-9.24
+- **Reqs**: M-7.14, M-9.22, M-9.23, M-9.24, M-9.25, M-9.26
 - **Prerequisites**
   - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
 - **Steps**
   1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`).
   2. Click a clip row; video `src` becomes the minted GET URL.
+  3. Confirm **Detailed analysis** is checked by default (Style A: no native scrub bar; play overlay).
+  4. Uncheck **Detailed analysis**; native controls appear and the same video `src` is kept (no second mint).
 - **Pass criteria**
   - No dummy table rows.
   - Click sets video `src` to the minted GET.
+  - Style A is the default; toggling to Style B does not remint.
   - Unit coverage in `TryItOut.test.tsx`.
 
 ---
 
+# Sprint 10 — Clip telemetry sidecars and detailed playback
+
+*Tests: TP-67 to TP-70*
+
+> **Focus:** Persist area/motion/transition series as JSON next to each event clip (local directory + S3 prefix `.../clips/clip-{id}/`). Public mint still spends one live GET slot for the MP4 and inlines sidecar JSON. Unit: `test_playback_json.py`, `test_s3.py`, `test_s3_upload.py`, `test_public_clip.py`, `test_cloud_ingest.py`, `TryItOut.test.tsx`.
+
+### TP-67: Local clip directory with playback JSON
+- **Description**: Verifies an evaluated event writes `clip.mp4`, `areas.json`, `motion.json`, and `transitions.json` in one local clip directory, with clip-relative timestamps.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-6.12
+- **Prerequisites**
+  - `EventManager` snapshots playback series; `Recorder` writes `clip_{n}_{stamp}/clip.mp4`.
+- **Steps**
+  1. Evaluate a latched event; confirm `playback_series` is present.
+  2. Write a clip; confirm the MP4 sits in a per-clip directory.
+  3. Confirm `areas.json` / `motion.json` use `t0_s` relative to clip start.
+  4. Confirm `transitions.json` lists Monitoring → SampleMotion → classification state at those times.
+- **Pass criteria**
+  - Local layout is `clip_{n}_{stamp}/clip.mp4` plus the three JSON files.
+  - Unit coverage in `test_event_manager.py`, `test_recorder.py`, `test_playback_json.py`.
+
+### TP-68: Clip upload URL issues four objects
+- **Description**: Verifies `POST /api/netrapi/s3-upload-url` for a clip returns the video key `.../clips/clip-{id}/clip.mp4` plus presigned PUTs for `areas.json`, `motion.json`, and `transitions.json`.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-6.12, M-7.15, M-8.13
+- **Prerequisites**
+  - Directory clip keys implemented in `s3.py`.
+- **Steps**
+  1. Issue upload URLs for a primed clip.
+  2. Confirm `object_key` is `.../clip-10/clip.mp4` and `objects` has four entries.
+  3. Confirm a second call returns the same video key.
+- **Pass criteria**
+  - Trip keys stay `{kind}-{id}.mp4`.
+  - Unit coverage in `test_s3.py` and `test_s3_upload.py`.
+
+### TP-69: Confirm requires video and sidecar objects
+- **Description**: Verifies `confirm-s3-upload` HEADs `clip.mp4`, `areas.json`, `motion.json`, and `transitions.json` before setting `s3_stored`.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-6.12, M-8.11, M-8.13
+- **Prerequisites**
+  - Sidecar HEAD implemented on confirm.
+- **Steps**
+  1. Confirm when all four objects exist (`s3_stored` true; `s3_key` is the video key).
+  2. Confirm when the video exists but a sidecar is missing (400).
+- **Pass criteria**
+  - Missing sidecar → 400.
+  - Edge ingest PUTs four local files (`test_cloud_ingest.py`).
+  - Unit coverage in `test_s3_upload.py`.
+
+### TP-70: Public mint inlines sidecar JSON
+- **Description**: Verifies the public mint returns `areas`, `motion`, and `transitions` JSON from S3 without spending extra live URL slots. Legacy flat `clip-{id}.mp4` keys still mint video with sidecar fields null.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-7.13, M-7.18, M-8.13, M-9.26
+- **Prerequisites**
+  - Public mint reads sidecar objects via `get_object_json`.
+- **Steps**
+  1. Mint a directory-key clip; response includes `areas`/`motion`/`transitions` (or null if missing).
+  2. Confirm `live_urls` increases by 1 (video GET only).
+- **Pass criteria**
+  - Sidecar JSON is not a second public signature.
+  - Unit coverage in `test_public_clip.py`.
+
+---
+
 ## 8. Coverage Notes
-This plan currently covers through **Sprint 9** (public portfolio clip list + mint). Sprint 9 frontend is **partial** (Try-it-out list/play unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
+This plan currently covers through **Sprint 10** (clip telemetry sidecars + detailed Try-it-out playback). Sprint 9 frontend is **partial** (Try-it-out list/play unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
 - remaining frontend / portfolio UI tests (filters, eval UI)
 - full CI/CD matrix beyond backend deploy health
 - 10-hour collection and model-evaluation publication tests
@@ -1539,5 +1610,6 @@ Covered now:
 - Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
 - Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain-trips clips|trips|both` + `--delete-after-drain`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
 - Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP (`test_public_clip.py`, `TryItOut.test.tsx`)
+- Sprint 10: per-clip S3 directory (`clip.mp4` + `areas.json` + `motion.json` + `transitions.json`), public mint inlines sidecar JSON, Try-it-out detailed/simple toggle (`test_playback_json.py`, `test_s3_upload.py`, `TryItOut.test.tsx`)
 
-**TP range:** TP-01 through TP-66. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).
+**TP range:** TP-01 through TP-70. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

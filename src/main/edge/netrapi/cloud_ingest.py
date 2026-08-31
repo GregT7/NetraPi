@@ -36,6 +36,7 @@ PutBytes = Callable[[str, bytes, str], None]
 JSON_TIMEOUT_S = 30.0
 PUT_TIMEOUT_S = 600.0
 CLIP_CONTENT_TYPE = "video/mp4"
+JSON_CONTENT_TYPE = "application/json"
 
 
 def _iso(value: datetime) -> str:
@@ -399,11 +400,7 @@ class CloudIngest:
             "/api/netrapi/s3-upload-url",
             {"clip_id": clip_id, "content_type": CLIP_CONTENT_TYPE},
         )
-        put_url = issued.get("url")
-        object_key = issued.get("object_key")
-        if not put_url or not object_key:
-            raise CloudIngestError(f"s3-upload-url missing url/object_key: {issued!r}")
-        self._put_bytes(str(put_url), path.read_bytes(), CLIP_CONTENT_TYPE)
+        object_key = self._put_clip_objects(issued, path)
         self._json_request(
             "POST",
             "/api/netrapi/confirm-s3-upload",
@@ -414,6 +411,37 @@ class CloudIngest:
             f"[ingest] event {event_id} clip {clip_id} uploaded ({object_key})",
             flush=True,
         )
+
+    def _put_clip_objects(self, issued: dict[str, Any], clip_path: Path) -> str:
+        object_key = issued.get("object_key")
+        objects = issued.get("objects")
+        if isinstance(objects, list) and objects:
+            for item in objects:
+                if not isinstance(item, dict):
+                    raise CloudIngestError(f"s3-upload-url object entry invalid: {item!r}")
+                name = item.get("name")
+                put_url = item.get("url")
+                content_type = str(item.get("content_type") or CLIP_CONTENT_TYPE)
+                if not put_url or not name:
+                    raise CloudIngestError(
+                        f"s3-upload-url object missing url/name: {item!r}"
+                    )
+                local = (
+                    clip_path
+                    if name == clip_path.name
+                    else clip_path.with_name(str(name))
+                )
+                if not local.is_file():
+                    raise CloudIngestError(f"missing local clip file ({local})")
+                self._put_bytes(str(put_url), local.read_bytes(), content_type)
+            if not object_key:
+                raise CloudIngestError(f"s3-upload-url missing object_key: {issued!r}")
+            return str(object_key)
+        put_url = issued.get("url")
+        if not put_url or not object_key:
+            raise CloudIngestError(f"s3-upload-url missing url/object_key: {issued!r}")
+        self._put_bytes(str(put_url), clip_path.read_bytes(), CLIP_CONTENT_TYPE)
+        return str(object_key)
 
     def _mark_local_clip_uploaded(
         self, clip_id: int, object_key: str, clip_path: Path

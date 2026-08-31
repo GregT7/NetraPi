@@ -35,7 +35,7 @@ _EVENT = {
         "stage2_classification_type_id": 3,
     },
 }
-_EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+_EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
 _PUBLIC = "/api/public/clip-download-url"
 
 
@@ -91,7 +91,10 @@ def test_public_mint_returns_two_minute_get(ingest_client: TestClient) -> None:
     with patch(
         "app.routes.public_clip.presign_get",
         return_value="https://s3.example/public-get",
-    ) as presign:
+    ) as presign, patch(
+        "app.routes.public_clip.get_object_json",
+        return_value=None,
+    ):
         response = ingest_client.post(_PUBLIC, json={"clip_id": 10})
     assert response.status_code == 200
     assert response.json() == {
@@ -100,11 +103,49 @@ def test_public_mint_returns_two_minute_get(ingest_client: TestClient) -> None:
         "method": "GET",
         "clip_id": 10,
         "expires_in": PUBLIC_CLIP_EXPIRES_SECONDS,
+        "areas": None,
+        "motion": None,
+        "transitions": None,
         "live_urls": 1,
         "live_url_max": 20,
     }
     presign.assert_called_once()
     assert presign.call_args.kwargs["expires_in"] == 120
+    assert live_slot_count() == 1
+
+
+def test_public_mint_inlines_sidecar_json(ingest_client: TestClient) -> None:
+    _confirm_clip(ingest_client)
+    areas = {"schema_version": 1, "t0_s": 5.0, "sample_end_s": 10.0, "points": []}
+    motion = {"schema_version": 1, "t0_s": 5.0, "sample_end_s": 10.0, "points": []}
+    transitions = {
+        "schema_version": 1,
+        "classification": "rolling-stop",
+        "states": [{"t": 0.0, "id": "Monitoring"}],
+    }
+
+    def _json(object_key: str):
+        if object_key.endswith("areas.json"):
+            return areas
+        if object_key.endswith("motion.json"):
+            return motion
+        if object_key.endswith("transitions.json"):
+            return transitions
+        return None
+
+    with patch(
+        "app.routes.public_clip.presign_get",
+        return_value="https://s3.example/public-get",
+    ), patch(
+        "app.routes.public_clip.get_object_json",
+        side_effect=_json,
+    ):
+        response = ingest_client.post(_PUBLIC, json={"clip_id": 10})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["areas"] == areas
+    assert body["motion"] == motion
+    assert body["transitions"] == transitions
     assert live_slot_count() == 1
 
 
@@ -128,6 +169,7 @@ def test_public_mint_rejects_21st_live_url(ingest_client: TestClient) -> None:
             "app.routes.public_clip.presign_get",
             return_value="https://s3.example/public-get",
         ),
+        patch("app.routes.public_clip.get_object_json", return_value=None),
     ):
         first = ingest_client.post(_PUBLIC, json={"clip_id": 10})
         second = ingest_client.post(_PUBLIC, json={"clip_id": 10})

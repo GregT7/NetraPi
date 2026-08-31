@@ -58,7 +58,7 @@ sequenceDiagram
   end
 ```
 
-Click a table row → POST that row’s Postgres `clip.id` to `POST /api/public/clip-download-url` (no API key) → set `<video src>` to the returned URL. The table is filled only by `GET /api/public/clips` (confirmed clips in cloud Postgres). There is no sample/dummy table.
+Click a table row → POST that row’s Postgres `clip.id` to `POST /api/public/clip-download-url` (no API key) → set `<video src>` to the returned URL. The table debounces row selection and reuses an unexpired minted URL so click-through does not burn the per-IP rate or live-slot caps. The table is filled only by `GET /api/public/clips` (confirmed clips in cloud Postgres). There is no sample/dummy table.
 
 Only **confirmed** clips mint: `s3_stored` true and `s3_key` set, otherwise 400 — same rule as ingest download.
 
@@ -122,6 +122,7 @@ Implemented:
 - `GET /api/public/clips` — confirmed clips for the Try it out table
 - CORS for `http://localhost:5173` and `http://127.0.0.1:5173` (add the Vercel origin via `CORS_ORIGINS` on Render)
 - Try it out click-to-play (`VITE_API_URL` on Vercel; Vite proxies `/api` to local FastAPI)
+- Public mint inlines `areas`/`motion`/`transitions` JSON (one live slot for the MP4). Try it out detailed analysis is the default; simple video-only remains available. Detailed playback uses native HTML5 controls with seeking disabled.
 
 Not in this pass:
 
