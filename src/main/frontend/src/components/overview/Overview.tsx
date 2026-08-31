@@ -1,4 +1,5 @@
-import { LABEL_COLORS } from '../data/clusterData'
+import { LABEL_COLORS, LABEL_DISPLAY } from '../data/clusterData'
+import { HARDWARE_NODE_CARDS } from '../diagrams/hardwareNodeCards'
 import MermaidDiagram from '../diagrams/MermaidDiagram'
 import { HARDWARE_CHART, SOFTWARE_CHART } from '../diagrams/mermaidCharts'
 
@@ -7,22 +8,22 @@ const gifSlots = [
     src: '/gifs/approach.gif?v=3',
     alt: 'Stop sign growing in the camera view, then dropping away',
     caption:
-      'NetraPi waits for a stop sign to grow in view and then drop away. That drop is when a stop is labeled complete, rolling, or a run-through. Footage that never shows this pattern is skipped.',
+      'NetraPi waits for a stop sign to grow in view and then drop away. That drop is when a stop is labeled Complete Stop, Rolling Stop, or Run-through Stop. Footage that never shows this pattern is skipped.',
   },
   {
     src: '/gifs/classification.gif?v=1',
-    alt: 'Stop labeled complete, rolling, or run-through after the approach',
+    alt: 'Stop labeled Complete Stop, Rolling Stop, or Run-through Stop after the approach',
     caption:
-      'After that drop, the Pi records motion for five seconds and then names the stop: complete, rolling, or a run-through. The banner on the clip is that final label.',
+      'After that drop, the Pi records motion for five seconds and then names the stop: Complete Stop, Rolling Stop, or Run-through Stop. The banner on the clip is that final label.',
   },
   { caption: 'Saving the clip' },
 ] as const
 
 const accuracy = [
-  { label: 'Unrelated', value: '96.2%' },
-  { label: 'Complete stop', value: '75.9%' },
-  { label: 'Run-through', value: '85.7%' },
-  { label: 'Rolling stop', value: '76.9%' },
+  { key: 'Unrelated', value: '96.2%' },
+  { key: 'Complete stop', value: '75.9%' },
+  { key: 'Run-through', value: '85.7%' },
+  { key: 'Rolling stop', value: '76.9%' },
 ] as const
 
 function GifSlot({
@@ -66,8 +67,8 @@ export default function Overview() {
           <p>
             NetraPi is a dashcam I built on a Raspberry Pi 5 with a Coral USB
             TPU. It watches the road for stop signs and labels what happened:
-            a complete stop, a rolling stop, a run-through, or unrelated (the
-            sign was in view, but it was not a real stop).
+            a Complete Stop, a Rolling Stop, a Run-through Stop, or Unrelated
+            (the sign was in view, but it was not a real stop).
           </p>
           <p>
             When something fires, it saves a short clip and some notes. If the
@@ -108,10 +109,14 @@ export default function Overview() {
       <div className="mx-auto mt-14 max-w-6xl space-y-14">
         <figure className="mx-auto max-w-6xl">
           <div className="text-2xl">
-            <MermaidDiagram chart={HARDWARE_CHART} plainLinks />
+            <MermaidDiagram
+              chart={HARDWARE_CHART}
+              nodeCards={HARDWARE_NODE_CARDS}
+              plainLinks
+            />
           </div>
           <figcaption className="mt-2 text-center text-zinc-400">
-            Hardware architecture
+            Hardware Architecture
           </figcaption>
         </figure>
         <figure className="mx-auto max-w-6xl">
@@ -119,7 +124,7 @@ export default function Overview() {
             <MermaidDiagram chart={SOFTWARE_CHART} />
           </div>
           <figcaption className="mt-2 text-center text-zinc-400">
-            Software architecture
+            Software Architecture
           </figcaption>
         </figure>
       </div>
@@ -149,13 +154,13 @@ function Results() {
         {accuracy.map((row) => (
           <li
             className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3"
-            key={row.label}
+            key={row.key}
           >
             <span
               className="mr-2 inline-block h-3 w-3 rounded-full"
-              style={{ backgroundColor: LABEL_COLORS[row.label] }}
+              style={{ backgroundColor: LABEL_COLORS[row.key] }}
             />
-            {row.label}: {row.value}
+            {LABEL_DISPLAY[row.key]}: {row.value}
           </li>
         ))}
       </ul>

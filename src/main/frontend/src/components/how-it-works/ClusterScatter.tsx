@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { LABEL_COLORS, LABEL_ORDER, type ClusterPoint } from '../data/clusterData'
+import { LABEL_COLORS, LABEL_DISPLAY, LABEL_ORDER, type ClusterPoint } from '../data/clusterData'
 
 type ClusterScatterProps = {
   points: ClusterPoint[]
@@ -52,7 +52,7 @@ export default function ClusterScatter({
   return (
     <figure>
       <div className="flex">
-        <div className="flex w-7 shrink-0 items-center justify-center">
+        <div className="flex w-12 shrink-0 items-center justify-center">
           <span className="text-sm text-zinc-300 [writing-mode:vertical-rl] rotate-180">
             {yLabel}
           </span>
@@ -122,7 +122,7 @@ export default function ClusterScatter({
                   <Scatter
                     fill={group.color}
                     key={group.label}
-                    name={group.label}
+                    name={LABEL_DISPLAY[group.label]}
                     data={group.data}
                   />
                 ))}

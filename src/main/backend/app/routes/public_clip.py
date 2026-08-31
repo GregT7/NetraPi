@@ -4,8 +4,10 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlmodel import SQLModel, select
 
 from app.public_limits import (
+    PUBLIC_MAX_LIVE_URLS,
     PublicMintLimitError,
     acquire_live_slot,
+    live_slot_count,
     record_mint_request,
     release_live_slot,
 )
@@ -20,12 +22,12 @@ from db.models import Classification, ClassificationType, Clip, Event
 router = APIRouter(prefix="/api/public")
 
 _TYPE_LABELS = {
-    "complete-stop": "Complete stop",
+    "complete-stop": "Complete Stop",
     "false_negative": "Missed stop",
     "false_positive": "Unrelated",
     "rolling-or-run-through": "Unsafe",
-    "rolling-stop": "Rolling stop",
-    "run-through": "Run-through",
+    "rolling-stop": "Rolling Stop",
+    "run-through": "Run-through Stop",
 }
 
 
@@ -82,7 +84,14 @@ def _clip_labels(session, event_id: int, types: dict[int, str]) -> tuple[str, st
 
 
 def _format_clip_time(value) -> str:
-    return value.strftime("%Y-%m-%d %H:%M")
+    return value.strftime("%Y-%m-%d %I:%M %p")
+
+
+def _live_url_status() -> dict[str, int]:
+    return {
+        "live_urls": live_slot_count(),
+        "live_url_max": PUBLIC_MAX_LIVE_URLS,
+    }
 
 
 @router.get("/clips")
@@ -90,18 +99,16 @@ def list_public_clips():
     with get_session() as session:
         types = _type_values(session)
         clips = session.exec(
-            select(Clip)
+            select(Clip, Event)
+            .join(Event, Event.id == Clip.event_id)
             .where(Clip.s3_stored.is_(True))
             .where(Clip.s3_key.is_not(None))
-            .order_by(Clip.start_time.desc())
+            .order_by(Event.time.asc())
             .limit(50)
         ).all()
         body = []
-        for clip in clips:
+        for clip, event in clips:
             if not clip.s3_key or clip.id is None:
-                continue
-            event = session.get(Event, clip.event_id)
-            if event is None:
                 continue
             label, prediction = _clip_labels(session, clip.event_id, types)
             body.append(
@@ -113,7 +120,7 @@ def list_public_clips():
                     "classification": prediction,
                 }
             )
-        return {"clips": body}
+        return {"clips": body, **_live_url_status()}
 
 
 @router.post("/clip-download-url")
@@ -161,4 +168,5 @@ def issue_public_clip_download_url(payload: PublicClipDownloadIn, request: Reque
         "method": "GET",
         "clip_id": clip_id,
         "expires_in": PUBLIC_CLIP_EXPIRES_SECONDS,
+        **_live_url_status(),
     }

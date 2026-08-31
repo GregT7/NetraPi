@@ -198,6 +198,7 @@ src/main/
         │   │   ├── MermaidDiagram.tsx ✅  mermaid.render + Iconify logos
         │   │   ├── mermaidCharts.ts   ✅
         │   │   ├── mermaidSetup.ts    ✅
+        │   │   ├── hardwareNodeCards.ts ✅  hover copy for hardware nodes
         │   │   └── diagramIconPacks.ts ✅  Iconify subset for diagrams
         │   └── data/
         │       ├── clusterData.ts     ✅

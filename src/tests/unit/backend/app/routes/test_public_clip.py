@@ -100,6 +100,8 @@ def test_public_mint_returns_two_minute_get(ingest_client: TestClient) -> None:
         "method": "GET",
         "clip_id": 10,
         "expires_in": PUBLIC_CLIP_EXPIRES_SECONDS,
+        "live_urls": 1,
+        "live_url_max": 20,
     }
     presign.assert_called_once()
     assert presign.call_args.kwargs["expires_in"] == 120
@@ -152,7 +154,7 @@ def test_public_list_empty_without_confirmed_clip(ingest_client: TestClient) -> 
     _prime_clip(ingest_client)
     response = ingest_client.get("/api/public/clips")
     assert response.status_code == 200
-    assert response.json() == {"clips": []}
+    assert response.json() == {"clips": [], "live_urls": 0, "live_url_max": 20}
 
 
 def test_public_list_returns_confirmed_clip(ingest_client: TestClient) -> None:
@@ -164,11 +166,13 @@ def test_public_list_returns_confirmed_clip(ingest_client: TestClient) -> None:
             {
                 "clip_id": 10,
                 "id": "clip-10",
-                "dateTime": "2026-08-16 18:00",
-                "label": "Rolling stop",
-                "classification": "Rolling stop",
+                "dateTime": "2026-08-16 06:00 PM",
+                "label": "Rolling Stop",
+                "classification": "Rolling Stop",
             }
-        ]
+        ],
+        "live_urls": 0,
+        "live_url_max": 20,
     }
 
 

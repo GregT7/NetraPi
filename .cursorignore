@@ -21,7 +21,7 @@ serviceAccount.json
 # Heavy local artifacts (also gitignored)
 venv/
 research/
-data/
+
 metrics/
 
 # Frontend generated trees — keep out of index, file search, and Agent context

@@ -1,7 +1,7 @@
 # NetraPi Test Plan (Updated for Full MVS Coverage)
 
 ## 1. Purpose
-Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, and deployment. Frontend and later evaluation UI tests are deferred until those layers exist.
+Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, deployment, and the public portfolio clip list/playback (Sprint 9). Filters, evaluation UI, and Vercel CI remain deferred.
 
 ## 2. How to Use This Plan
 This document is ordered by **sprint section** in this file (Sprint 1–5, then D–E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
@@ -16,10 +16,10 @@ Each test includes:
 ## 3. System Definitions
 - **Edge runtime**: Raspberry Pi 5, Coral USB TPU, camera, local scripts/services, local file storage, and local SQLite database
 - **Cloud storage**: private AWS S3 bucket used for full-session footage and event clips
-- **Backend API**: deployed cloud API that authenticates the edge device, issues temporary S3 upload URLs (presigned PUT), persists metadata to Postgres, and returns signed playback URLs
+- **Backend API**: deployed cloud API that authenticates the edge device, issues temporary S3 upload URLs (presigned PUT), persists metadata to Postgres, returns signed playback URLs for ingest, and mints short-lived public GET URLs for portfolio playback
 - **Database**: cloud-hosted PostgreSQL (via backend) storing structured metadata and S3 paths; local SQLite on the Pi for offline event metadata until an online upload completes
 - **Upload path**: when online, Pi authenticates to the backend → backend issues a short-lived S3 PUT URL and later writes Postgres metadata; Pi does not hold permanent AWS or Postgres credentials
-- **Frontend / UI**: deferred — portfolio tests will be added when frontend work starts
+- **Frontend / UI**: public Try-it-out clip list and signed playback mint (Sprint 9). Filters, evaluation UI, and Vercel CI remain deferred
 - **Ground-truth labeling**: manual review of collected footage to assign run-through, rolling stop, and complete stop categories for accuracy evaluation
 - **Event type**: one of **run-through**, **rolling stop**, or **complete stop** (model prediction or manual label)
 
@@ -1070,7 +1070,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Metadata does not bypass the backend (no Pi→Postgres direct write).
 
 ### TP-46: Private object access via signed GET
-- **Description**: Ensures uploaded objects are not public and are reachable via backend-issued signed GET URLs.
+- **Description**: Ensures uploaded objects are not public and are reachable via backend-issued signed GET URLs. This test is the **authenticated ingest** mint (`POST /api/netrapi/s3-download-url`). Unauthenticated public portfolio mint is TP-64.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.20, M-7.13
@@ -1445,9 +1445,84 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
+# Sprint 9 — Public portfolio clip list and playback
+
+*Tests: TP-63 to TP-66*
+
+> **Focus:** Unauthenticated public clip list and short-lived signed GET mint for Try-it-out. Design: [frontend_playback.md](../diagrams/frontend_playback.md). Unit: `src/tests/unit/backend/app/routes/test_public_clip.py`, `src/tests/unit/frontend/src/TryItOut.test.tsx`. Ingest signed GET remains TP-46.
+
+### TP-63: Public confirmed-clip list
+- **Description**: Verifies `GET /api/public/clips` returns confirmed S3 clips without an API key, oldest event first, and leaves ingest routes keyed.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.14, M-7.16, M-9.23, M-9.24
+- **Prerequisites**
+  - Public clip list route implemented.
+  - At least one confirmed clip (or unit fixtures).
+- **Steps**
+  1. `GET /api/public/clips` with no `X-API-Key`.
+  2. Confirm only `s3_stored` rows appear; timestamps are oldest-first; labels are display names.
+  3. Call an ingest route (`POST /api/netrapi/s3-download-url` or similar) without a key (401).
+- **Pass criteria**
+  - List succeeds without an API key.
+  - Unconfirmed clips are omitted; order is ascending event time.
+  - Ingest routes still 401 without the device key.
+  - Unit coverage in `test_public_clip.py`.
+
+### TP-64: Public mint vs ingest mint
+- **Description**: Verifies the public mint issues a 2-minute GET and does not use the ingest API key. Keyed Pi ingest mint remains TP-46.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.13, M-7.16, M-7.17, M-9.22
+- **Prerequisites**
+  - Public mint implemented.
+  - A confirmed clip exists (or unit fixtures).
+- **Steps**
+  1. `POST /api/public/clip-download-url` with `{ clip_id }` and no API key.
+  2. Confirm `expires_in` is 120 seconds; unconfirmed clip returns 400.
+  3. `POST /api/netrapi/s3-download-url` without a key (401).
+- **Pass criteria**
+  - Public `expires_in` is 120.
+  - Unconfirmed object returns 400; missing clip 404.
+  - Ingest download is 401 without the key.
+  - Unit coverage in `test_public_clip.py`.
+
+### TP-65: Public mint limits
+- **Description**: Verifies the public mint rejects a 21st live GET signature and an 11th mint from the same IP in 60 seconds.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-7.18
+- **Prerequisites**
+  - Public mint limits implemented (`app/public_limits.py`).
+- **Steps**
+  1. Issue live public URLs until the global cap (20, or a lowered unit cap).
+  2. Issue one more (429).
+  3. Issue more than 10 mint requests from one IP in 60 seconds (429).
+- **Pass criteria**
+  - 21st concurrent live URL → 429.
+  - 11th mint per IP per 60 seconds → 429.
+  - Unit coverage in `test_public_clip.py`.
+
+### TP-66: Try it out browse and play
+- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows) and that selecting a row sets the video `src` to a minted GET URL.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-7.14, M-9.22, M-9.23, M-9.24
+- **Prerequisites**
+  - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
+- **Steps**
+  1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`).
+  2. Click a clip row; video `src` becomes the minted GET URL.
+- **Pass criteria**
+  - No dummy table rows.
+  - Click sets video `src` to the minted GET.
+  - Unit coverage in `TryItOut.test.tsx`.
+
+---
+
 ## 8. Coverage Notes
-This plan currently covers through **Sprint 8** (edge boot health + online/offline + drain catch-up, plus Sprint 7 cloud E2E). Deferred for later test generation:
-- frontend / portfolio UI tests
+This plan currently covers through **Sprint 9** (public portfolio clip list + mint). Sprint 9 frontend is **partial** (Try-it-out list/play unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
+- remaining frontend / portfolio UI tests (filters, eval UI)
 - full CI/CD matrix beyond backend deploy health
 - 10-hour collection and model-evaluation publication tests
 - dedicated edge managed-service (systemd) verification for M-10.10
@@ -1463,5 +1538,6 @@ Covered now:
 - Sprint 7 harnesses under `src/tests/integration/tp_50`–`tp_56` against https://netrapi.onrender.com
 - Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
 - Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain-trips clips|trips|both` + `--delete-after-drain`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
+- Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP (`test_public_clip.py`, `TryItOut.test.tsx`)
 
-**TP range:** TP-01 through TP-62. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).
+**TP range:** TP-01 through TP-66. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

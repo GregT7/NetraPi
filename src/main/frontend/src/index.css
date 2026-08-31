@@ -8,3 +8,42 @@ body {
   font-size: 1rem;
   line-height: 1.6;
 }
+
+@keyframes hardware-overlay-shine {
+  0% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 rgb(251 191 36 / 0);
+    outline-color: transparent;
+  }
+  40%,
+  100% {
+    background-color: rgb(251 191 36 / 0.2);
+    box-shadow: 0 0 22px 6px rgb(251 191 36 / 0.8);
+    outline-color: #fbbf24;
+  }
+}
+
+.hardware-diagram .node,
+.hardware-diagram svg,
+[data-diagram-wrap],
+[data-diagram-wrap] * {
+  cursor: default !important;
+}
+
+.hardware-shine-ring {
+  animation: hardware-overlay-shine 1.35s ease-in-out both;
+  border-radius: 12px;
+  outline: 3px solid transparent;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hardware-shine-ring {
+    animation: none;
+    background-color: rgb(251 191 36 / 0.16);
+    box-shadow: 0 0 18px 4px rgb(251 191 36 / 0.7);
+    outline-color: #fbbf24;
+  }
+}

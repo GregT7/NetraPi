@@ -60,12 +60,12 @@ export default function AreaMotionChart() {
   return (
     <figure className="space-y-2">
       <figcaption className="text-center text-lg font-medium text-zinc-50">
-        Sign Area and Motion
+        Sign Area and Motion Over Time
       </figcaption>
       <div className="flex">
-        <div className="flex w-8 shrink-0 items-center justify-center">
+        <div className="flex w-12 shrink-0 items-center justify-center">
           <span className="text-sm text-sky-300 [writing-mode:vertical-rl] rotate-180">
-            Sign Area
+            Sign Area (% of Frame)
           </span>
         </div>
         <div className="min-w-0 flex-1">
@@ -117,7 +117,7 @@ export default function AreaMotionChart() {
                 <Line
                   dataKey="areaPct"
                   dot={false}
-                  name="Sign Area"
+                  name="Sign Area (% of Frame)"
                   stroke="#38bdf8"
                   strokeWidth={2}
                   type="monotone"
@@ -126,7 +126,7 @@ export default function AreaMotionChart() {
                 <Line
                   dataKey="motion"
                   dot={false}
-                  name="Motion"
+                  name="Motion (px / Frame)"
                   stroke="#fbbf24"
                   strokeWidth={2}
                   type="monotone"
@@ -145,9 +145,9 @@ export default function AreaMotionChart() {
           </div>
           <p className="mt-1 text-center text-sm text-zinc-200">Time (s)</p>
         </div>
-        <div className="flex w-8 shrink-0 items-center justify-center">
+        <div className="flex w-12 shrink-0 items-center justify-center">
           <span className="text-sm text-amber-300 [writing-mode:vertical-rl]">
-            Motion
+            Motion (px / Frame)
           </span>
         </div>
       </div>

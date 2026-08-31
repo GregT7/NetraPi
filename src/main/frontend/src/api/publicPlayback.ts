@@ -11,6 +11,12 @@ export type PublicClipRow = {
   label: string
 }
 
+export type PublicClipList = {
+  clips: PublicClipRow[]
+  liveUrlMax: number
+  liveUrls: number
+}
+
 type PublicClipListResponse = {
   clips: Array<{
     classification: string
@@ -19,14 +25,18 @@ type PublicClipListResponse = {
     id: string
     label: string
   }>
+  live_url_max?: number
+  live_urls?: number
 }
 
 type PublicMintResponse = {
   expires_in: number
+  live_url_max?: number
+  live_urls?: number
   url: string
 }
 
-export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClipRow[]> {
+export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClipList> {
   let response: Response
   try {
     response = await fetch(apiUrl('/api/public/clips'), { signal })
@@ -43,13 +53,17 @@ export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClip
   if (!Array.isArray(body.clips)) {
     throw new Error('Could not load clips from the database.')
   }
-  return body.clips.map((clip) => ({
-    classification: clip.classification,
-    clipId: clip.clip_id,
-    dateTime: clip.dateTime,
-    id: clip.id,
-    label: clip.label,
-  }))
+  return {
+    clips: body.clips.map((clip) => ({
+      classification: clip.classification,
+      clipId: clip.clip_id,
+      dateTime: clip.dateTime,
+      id: clip.id,
+      label: clip.label,
+    })),
+    liveUrlMax: body.live_url_max ?? 20,
+    liveUrls: body.live_urls ?? 0,
+  }
 }
 
 export async function mintPublicClipUrl(

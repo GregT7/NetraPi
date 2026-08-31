@@ -17,12 +17,14 @@ export const HARDWARE_CHART = `flowchart LR
     Hotspot@{ icon: "mdi:wifi", form: "rounded", label: "Cellular Hotspot" }
     S3@{ icon: "logos:aws-s3", form: "rounded", label: "AWS S3" }
     Phone@{ icon: "mdi:cellphone", form: "rounded", label: "Phone" }
+    Buzzer@{ icon: "mdi:volume-high", form: "rounded", label: "GPIO Buzzer" }
     Hotspot --- S3
     Hotspot --- Phone
   end
   Cam ---|USB| Pi
   Pi ---|USB| Coral
   Pi --- Hotspot
+  Pi ---|"GPIO"| Buzzer
   style capture fill:none,stroke:none
   style hub fill:none,stroke:none
   style extras fill:none,stroke:none`
@@ -66,3 +68,22 @@ export const SOFTWARE_CHART = `flowchart LR
   frontend --- backend
   schema --- edge
   schema --- cloud`
+
+export const EVENT_STATE_CHART = `stateDiagram-v2
+  [*] --> Monitoring
+
+  Monitoring --> Monitoring : Approach not detected
+  Monitoring --> SampleMotion : Approach Stop Sign Detected
+  SampleMotion --> SampleMotion : Under 5 seconds
+  SampleMotion --> CompleteStop : 5 seconds passed
+  SampleMotion --> RollingStop : 5 seconds passed
+  SampleMotion --> RunThrough : 5 seconds passed
+
+  CompleteStop --> Monitoring
+  RollingStop --> Monitoring
+  RunThrough --> Monitoring
+
+  state "Sample Car's Motion" as SampleMotion
+  state "Complete Stop" as CompleteStop
+  state "Rolling Stop" as RollingStop
+  state "Run-through Stop" as RunThrough`

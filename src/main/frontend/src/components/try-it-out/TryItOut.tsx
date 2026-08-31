@@ -9,6 +9,8 @@ const PAGE_SIZE = 5
 
 export default function TryItOut() {
   const [clips, setClips] = useState<PublicClipRow[]>([])
+  const [liveUrlMax, setLiveUrlMax] = useState(20)
+  const [liveUrls, setLiveUrls] = useState(0)
   const [listError, setListError] = useState('')
   const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -16,16 +18,20 @@ export default function TryItOut() {
   const [selectedId, setSelectedId] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const mintAbort = useRef<AbortController | null>(null)
+  const liveStatusAbort = useRef<AbortController | null>(null)
+  const liveStatusTimers = useRef<ReturnType<typeof setTimeout>[]>([])
 
   const loadClips = useCallback((signal?: AbortSignal) => {
     setListLoading(true)
     setListError('')
     fetchPublicClips(signal)
-      .then((rows) => {
+      .then((result) => {
         if (signal?.aborted) {
           return
         }
-        setClips(rows)
+        setClips(result.clips)
+        setLiveUrls(result.liveUrls)
+        setLiveUrlMax(result.liveUrlMax)
         setPage(0)
         setListLoading(false)
       })
@@ -46,10 +52,49 @@ export default function TryItOut() {
       })
   }, [])
 
+  const refreshLiveStatus = useCallback(() => {
+    liveStatusAbort.current?.abort()
+    const controller = new AbortController()
+    liveStatusAbort.current = controller
+    fetchPublicClips(controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        setLiveUrls(result.liveUrls)
+        setLiveUrlMax(result.liveUrlMax)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return
+        }
+      })
+  }, [])
+
+  function scheduleLiveStatusRefresh(expiresInSeconds: number) {
+    const delayMs = Math.max(0, expiresInSeconds) * 1000
+    const timerId = setTimeout(() => {
+      liveStatusTimers.current = liveStatusTimers.current.filter((id) => id !== timerId)
+      refreshLiveStatus()
+    }, delayMs)
+    liveStatusTimers.current.push(timerId)
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     loadClips(controller.signal)
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      mintAbort.current?.abort()
+      liveStatusAbort.current?.abort()
+      for (const timerId of liveStatusTimers.current) {
+        clearTimeout(timerId)
+      }
+      liveStatusTimers.current = []
+    }
   }, [loadClips])
 
   const pageCount = Math.max(1, Math.ceil(clips.length / PAGE_SIZE))
@@ -72,6 +117,15 @@ export default function TryItOut() {
         }
         setVideoUrl(minted.url)
         setMessage('')
+        if (typeof minted.live_urls === 'number') {
+          setLiveUrls(minted.live_urls)
+        }
+        if (typeof minted.live_url_max === 'number') {
+          setLiveUrlMax(minted.live_url_max)
+        }
+        if (typeof minted.expires_in === 'number') {
+          scheduleLiveStatusRefresh(minted.expires_in)
+        }
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
@@ -94,6 +148,9 @@ export default function TryItOut() {
         <p className="text-zinc-300">
           Confirmed clips from the cloud database. Click a row to play it from
           the private S3 bucket. The browser never holds AWS or device keys.
+        </p>
+        <p className="text-sm text-zinc-400">
+          Live S3 links {liveUrls}/{liveUrlMax}
         </p>
         {listError ? (
           <div className="flex flex-wrap items-center gap-3 text-sm text-red-400">

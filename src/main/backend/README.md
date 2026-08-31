@@ -1,5 +1,21 @@
 # Backend FastAPI (Pi ingest)
 
+## Run locally (this directory, not Docker)
+
+From `src/main/backend`, with this folder’s venv and `requirements.txt` installed. Uses gitignored `.env` here (`DATABASE_URL` is the **Supabase** URI — not Compose Postgres). Stop Compose first if it already owns port 8000.
+
+```bat
+.\venv\Scripts\activate.bat
+set PYTHONPATH=..;.
+uvicorn app.main:app --reload
+```
+
+Health: http://127.0.0.1:8000/health  
+Public clips: http://127.0.0.1:8000/api/public/clips  
+Docs: http://127.0.0.1:8000/docs
+
+---
+
 Local uvicorn app for `GET /health` (TP-35), `POST /api/netrapi/master-config`, `POST /api/netrapi/driving-session`
 (TP-34), `POST /api/netrapi/trip-segment`, and `POST /api/netrapi/driving-event`
 (TP-36). JSON only. S3 routes (`s3-upload-url`, `confirm-s3-upload`, `s3-download-url`) need AWS
@@ -20,7 +36,7 @@ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 `CORS_ORIGINS` is optional locally (those two Vite origins are the default). On Render, add the Vercel origin so the browser can call the public mint. `POST /api/netrapi/*` requires header `X-API-Key` matching `NETRAPI_API_KEY`. `GET /health` and `/api/public/*` stay open. Swagger (`/docs`, `/redoc`, `/openapi.json`) is on for local uvicorn / Compose and off on Render (decision 59).
 
-From repo root, integration venv (Alembic `0001`–`0002` must already be applied to that `DATABASE_URL`; `master_config` id 1 must exist):
+Alternatively from **repo root** (integration venv; Alembic `0001`–`0002` must already be applied to that `DATABASE_URL`; `master_config` id 1 must exist):
 
 ```bat
 .\src\tests\integration\venv\Scripts\activate.bat

@@ -1,15 +1,8 @@
 import AreaMotionChart from './AreaMotionChart'
 import ClusterScatter from './ClusterScatter'
-import FeatureGuide from './FeatureGuide'
-import KnnHierarchy from './KnnHierarchy'
-import {
-  CLUSTER_POINTS,
-  STAGE1_FEATURE_LABELS,
-  STAGE1_FEATURE_PAIRS,
-  STAGE1_PCA_POINTS,
-  STAGE1_PCA_VARIANCE,
-  stage1PairPoints,
-} from '../data/clusterData'
+import MermaidDiagram from '../diagrams/MermaidDiagram'
+import { EVENT_STATE_CHART } from '../diagrams/mermaidCharts'
+import { CLUSTER_POINTS } from '../data/clusterData'
 
 export default function HowItWorks() {
   return (
@@ -18,93 +11,107 @@ export default function HowItWorks() {
         <h2 className="text-3xl font-semibold tracking-tight text-zinc-50 md:text-4xl">
           How it works
         </h2>
+        <p>
+          The system works by constantly reading from the camera to understand
+          what's going on. It's looking for a consistent, repeatable event that
+          always occurs, regardless of the driver's ultimate decision:
+          Complete Stop, Rolling Stop, or Run-through Stop.
+          If we can identify and consistently detect this common event, then we
+          will know when and what to record. Capturing a mixed set of clips
+          that doesn't concern the driver will distract them, making it more
+          difficult for them to improve. We want to avoid that problem. The
+          ultimate goal is to make the application as useful and painless as
+          possible. This common event is easiest to see by thinking through an
+          example.
+        </p>
+        <p>
+          Imagine this scenario: someone driving a car turns onto a long street
+          where at the end, there is a stop sign before an intersection. They
+          continue driving forward towards the sign. As the distance decreases,
+          the size of the stop sign increases from the perspective of the
+          camera. Eventually, the size hits a peak and then completely
+          disappears once the car advances past it. At this moment, there is a
+          3-pronged fork in the road. The driver can follow the law and stop,
+          slow down a little but keep driving anyways, or completely drive past
+          the sign without any consideration. The three branching outcomes all
+          share the approach of the stop sign. This is the event we need the Pi
+          to look for. The diagram below is that loop: stay in monitoring until
+          an Approach Stop Sign is detected, sample the car's motion for 5
+          seconds, sort the stop into Complete Stop, Rolling Stop, or
+          Run-through Stop, then return to monitoring. Before we dive into
+          how the Pi finds that approach, we need to discuss some additional
+          processing details.
+        </p>
         <figure>
-          <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-900 text-sm text-zinc-400">
-            Video coming soon
-          </div>
+          <MermaidDiagram chart={EVENT_STATE_CHART} />
           <figcaption className="mt-4 text-center text-zinc-400">
-            Approach to classification
+            Stop-Sign Encounter States
           </figcaption>
         </figure>
         <p>
-          The Pi keeps polling for an approach: a stop sign that grows in the
-          frame, then shrinks. If that never happens, it keeps watching. If it
-          does, it collects 5 seconds of motion, then a two-stage kNN with k=3
-          classifies the stop.
-        </p>
-        <p>
-          Sign area comes from the detector box. Motion comes from Farneback
-          optical flow. Farneback estimates how every pixel in a road region
-          moved between two frames. The motion score is a high percentile of
-          those magnitudes. A low score means the scene looks still.
+          Throughout the drive, the camera is constantly reading in frames and
+          passing them to a downloaded object detector stored as a pretrained
+          TFLite model. The object detector looks at the image, and tries to
+          identify what is in the image and where it's located. When a
+          detection occurs, a rectangle that outlines the area of interest is
+          generated. Plotting the area calculations of these rectangles over
+          time creates a "shark-fin" like pattern which can be
+          observed in the graph below. Identifying this pattern means identifying
+          the approach. Any person inspecting the graph could recognize this
+          shape but the challenge is getting the computer to accomplish this
+          independently.
         </p>
         <AreaMotionChart />
-        <p className="text-zinc-400">
-          The example above is one complete-stop clip. Sign area rises then
-          drops (the approach). T0 is that drop. Motion after T0 is what stage
-          1 reads.
-        </p>
-        <FeatureGuide />
-        <figure>
-          <KnnHierarchy />
-          <figcaption className="mt-4 text-center text-zinc-400">
-            Hierarchical KNN
-          </figcaption>
-        </figure>
         <p>
-          Those four stage-1 numbers cannot be drawn as-is, so the plot below
-          is a PCA of the standardized motion features. PC1 is{' '}
-          {Math.round(STAGE1_PCA_VARIANCE[0] * 100)}% of the variance and
-          tracks more motion / less time stopped. PC2 is{' '}
-          {Math.round(STAGE1_PCA_VARIANCE[1] * 100)}%. Complete stops should
-          sit toward the low-motion side of PC1. Color is the stage-1 split,
-          not the final four labels.
+          The Pi can algorithmically locate this pattern by constantly
+          searching for exponential growth in area over a short time frame
+          followed by a steep drop to an empty reading. The point where the
+          area calculation transitions from a global or local maximum to an
+          empty reading is called the "peak." Locating the peak is at
+          the heart of this recipe and is considered the time when we
+          officially have found the approach pattern. However, it is likely
+          that many false peaks present themselves while driving. Each
+          potential peak candidate has a series of strict criteria applied to
+          it which filters out most candidates until a singular valid one
+          remains. While we've finally found the approach pattern, this
+          is not the end of the story. We still need to sort the driver's
+          decision into the 3 bins shown in the diagram.
         </p>
-        <p className="text-zinc-400">
-          Axes are principal components, not raw motion. Unrelated clips are
-          omitted.
-        </p>
-        <ClusterScatter
-          points={STAGE1_PCA_POINTS}
-          title="Stage 1 PCA"
-          xDomain={[-3, 5]}
-          xLabel="PC1"
-          yLabel="PC2"
-        />
         <p>
-          The six plots below are every pair of those four raw numbers: mean
-          motion, min motion, p95 motion, and stop fraction. Same stage-1
-          labels as the PCA.
-        </p>
-        <div className="grid gap-6 sm:grid-cols-2">
-          {STAGE1_FEATURE_PAIRS.map(([xKey, yKey]) => (
-            <div
-              className="rounded-lg border border-zinc-700 bg-zinc-900/50 p-3"
-              key={`${xKey}-${yKey}`}
-            >
-              <ClusterScatter
-                points={stage1PairPoints(xKey, yKey)}
-                title={`${STAGE1_FEATURE_LABELS[xKey]} vs ${STAGE1_FEATURE_LABELS[yKey]}`}
-                xLabel={STAGE1_FEATURE_LABELS[xKey]}
-                yLabel={STAGE1_FEATURE_LABELS[yKey]}
-              />
-            </div>
-          ))}
-        </div>
-        <p>
-          Stage 2 is already two numbers, so it needs no PCA: min motion after
-          the drop (x) vs sign-area sum on the approach (y).
-        </p>
-        <p className="text-zinc-400">
-          Rolling vs run-through on the same axes the live stage-2 kNN uses.
-          Complete stops and unrelated clips are omitted.
+          At the moment of the peak, we know the driver must make a decision
+          so we start paying closer attention. Evaluating the motion of the car
+          is the key which is where the Farneback Optical Flow Algorithm comes
+          into the picture. The algorithm can approximate motion by evaluating
+          the rate of change in pixel intensity. If the pixel intensity
+          changes at a higher rate, whatever is in the image is likely moving
+          faster in real life and vice versa for slower deltas. The 3 different
+          decisions all possess unique motion profiles that can be easily
+          understood: Complete Stop overall has lower motion scores, Rolling
+          Stop has a little more motion, and Run-through Stop has the most
+          motion (this is overly simplified for easier explanation). If we
+          sample the car's motion after an approach is detected, we can
+          then compare the live data with the results of previous examples to
+          see which category the event most closely aligns with. The
+          comparisons are driven by the machine learning algorithm k-nearest
+          neighbors (k-NN), which is ideal for this scenario. That k-NN is
+          multi-stage and uses five features in total. Other features help
+          earlier in the pipeline; the second stage uses just two of those
+          values, shown in the plot below.
         </p>
         <ClusterScatter
           points={CLUSTER_POINTS}
-          title="Stage 2 Features"
-          xLabel="Min Motion"
-          yLabel="Sign Area"
+          title="Rolling Stop vs Run-through Stop by Minimum Motion and Total Sign Area"
+          xLabel="Minimum Motion (px / Frame)"
+          yLabel="Total Sign Area (%)"
         />
+        <p>
+          Finally, the event has been identified, now we need to wrap things
+          up and record the footage. The Pi will record the footage and save
+          it to the cloud through the cellular hotspot my phone is hosting.
+          The footage will immediately be available for viewing on the hosted
+          frontend for anyone curious about my driving. After that, it returns
+          to monitoring and waits for the next approach.
+        </p>
       </div>
     </section>
   )
