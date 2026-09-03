@@ -2,18 +2,114 @@
 
 Capture, detect, and record stop-sign events on the Raspberry Pi.
 
-## Run capture
+## Operations: systemd + drain
 
-From the repo root, with the edge venv active and `src/main/edge/.env` set (`DATABASE_URL`, `NETRAPI_API_URL`, `NETRAPI_API_KEY`):
+Capture can run under **systemd** (manual start only on this Pi). Trip MP4s
+(and any leftover clips) are uploaded with a **separate** `main.py --drain-trips`
+command — not by the systemd unit.
+
+### Prerequisites
+
+- Edge venv at `src/main/edge/venv`
+- `src/main/edge/.env` with `DATABASE_URL`, `NETRAPI_API_URL`, `NETRAPI_API_KEY`
+  (`DATABASE_URL` is local SQLite only, e.g. `sqlite:///netrapi.db`)
+- Camera + Coral attached; HDMI session logged in if you want the OpenCV preview
+  (`DISPLAY=:0`)
+
+`main.py` runs Alembic `upgrade head` on the SQLite URL at start (capture and
+drain). No manual migrate step for normal drives.
+
+### Install the unit (once)
+
+From the **repo root**:
 
 ```bash
-# once per device / schema change
-alembic -c src/main/db/alembic.ini upgrade head
+sudo cp src/main/edge/netrapi-edge.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
 
+Unit paths are for user `terrelgat` and this clone under
+`/home/terrelgat/Desktop/NetraPi`. Edit the unit if those change, then
+`daemon-reload` again.
+
+**Do not** `systemctl enable netrapi-edge` unless you want capture at every boot.
+State should stay `disabled`.
+
+### Drive: start / watch / stop capture
+
+```bash
+sudo systemctl start netrapi-edge
+sudo systemctl status netrapi-edge
+journalctl -u netrapi-edge -f    # follow logs (Ctrl+C stops the follow only)
+sudo systemctl stop netrapi-edge
+```
+
+- `start` / `stop` do not enable boot auto-start.
+- Logs for the **service** go to the journal (not your interactive terminal).
+- After code changes under `edge/`, `sudo systemctl restart netrapi-edge` to pick them up.
+
+### After a drive: drain to S3
+
+Event **clips** usually upload during an ONLINE drive. **Trip** segments are
+saved locally and only PUT to S3 when you drain.
+
+Stop capture first (avoids fighting over SQLite / USB):
+
+```bash
+sudo systemctl stop netrapi-edge
+
+cd ~/Desktop/NetraPi/src/main/edge
+source venv/bin/activate
+
+python main.py --drain-trips both    # clips then trips
+# or
+python main.py --drain-trips trips
+python main.py --drain-trips clips
+```
+
+Drain is **not** part of `netrapi-edge.service`. Output prints in that terminal
+(not `journalctl -u netrapi-edge`). It wakes Render via `GET /health`, then
+uploads pending media. Example lines:
+
+```text
+[drain] target=both; waking Render via GET /health ...
+[drain] Render is up
+[drain] trips: 2 pending, 1 already in S3
+[ingest] trip_segment 3: PUT trip_….mp4 (... bytes) ...
+[ingest] trip_segment 3 uploaded (...)
+```
+
+Optional: after a successful drain, unlink local MP4s that are already in S3
+(does **not** delete S3 objects):
+
+```bash
+python main.py --drain-trips both --delete-after-drain both
+python main.py --drain-trips trips --delete-after-drain trips
+```
+
+`--delete-after-drain` requires `--drain-trips`.
+
+### Check what’s pending locally
+
+```bash
+sqlite3 ~/Desktop/NetraPi/src/main/db/netrapi.db \
+  "SELECT id, init_local_stored, s3_stored, s3_key FROM trip_segment ORDER BY id;"
+```
+
+Finished trips ready to drain: `init_local_stored=1` and `s3_stored` null.
+
+---
+
+## Run capture (without systemd)
+
+From the repo root, with the edge venv active:
+
+```bash
 python src/main/edge/main.py
 ```
 
-HDMI shows a boot-health overlay (TPU, Wi-Fi, Render, mode), then the live preview. Ctrl+C stops.
+Or from `src/main/edge`: `source venv/bin/activate` then `python main.py`.
+HDMI shows a boot-health overlay, then the live preview. Ctrl+C stops.
 
 ## Boot health
 
@@ -30,25 +126,9 @@ Offline means local SQLite + MP4s only. The process never upgrades to online lat
 
 ## Online vs offline
 
-**Online:** session/event JSON and event clips upload during the drive. A keep-alive thread hits `GET /health` every 5 minutes so Render does not idle-sleep. Three failed pings in a row drop this process to offline (no more ingest, no more pings). Trip files still wait for drain.
+**Online:** session/event JSON and event clips upload during the drive. A keep-alive thread hits `GET /health` every 5 minutes so Render does not idle-sleep. Three failed pings in a row drop this process to offline (no more ingest, no more pings). Trip files still wait for drain (see Operations above).
 
-**Offline:** local only. After you have Wi-Fi, drain leftovers:
-
-```bash
-python src/main/edge/main.py --drain-trips both
-python src/main/edge/main.py --drain-trips clips
-python src/main/edge/main.py --drain-trips trips
-```
-
-Pair drain with a scoped local delete of files already in S3 (does not delete S3 objects):
-
-```bash
-python src/main/edge/main.py --drain-trips both --delete-after-drain both
-python src/main/edge/main.py --drain-trips clips --delete-after-drain clips
-python src/main/edge/main.py --drain-trips trips --delete-after-drain trips
-```
-
-`--delete-after-drain` can be narrower than drain, e.g. `--drain-trips both --delete-after-drain clips`. Drain wakes Render via `/health` first, then uploads, then deletes. It does not run capture or TPU checks. `--delete-after-drain` requires `--drain-trips`.
+**Offline:** local only. After Wi-Fi is back, use `--drain-trips` as above.
 
 ## CLI
 
@@ -62,7 +142,7 @@ python src/main/edge/main.py --drain-trips trips --delete-after-drain trips
 
 ## What you see
 
-- Overlay + terminal: TPU, Wi-Fi, Render wait, mode
-- Online: ingest log lines as events upload
-- Drain: counts of clips and/or trip segments uploaded
-- Health log: `src/main/edge/logs/health.log`
+- Overlay / journal: TPU, Wi-Fi, Render wait, mode
+- Online: `[ingest] event N (rolling-stop|…) …` as events sync / upload
+- Drain: `[drain]` inventory + `[ingest] trip_segment … uploaded`
+- Health log file: `src/main/edge/logs/health.log`

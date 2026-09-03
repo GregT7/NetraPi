@@ -91,7 +91,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     _configure_import_path()
     from config.loader import AppConfig, ConfigError
-    from db.database import init_engine
+    from db.database import DatabaseUrlError, ensure_sqlite_schema
     from netrapi import build_pipeline
     from netrapi.backend_auth import apply_edge_env
     from netrapi.exceptions import NetraPiError
@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.drain_trips or args.delete_uploaded_local or args.delete_all_local:
             from netrapi.cloud_ingest import try_cloud_ingest
 
-            init_engine()
+            ensure_sqlite_schema()
             ingest = try_cloud_ingest()
             if ingest is None:
                 print(
@@ -163,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
         app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
-        init_engine()
+        ensure_sqlite_schema()
         from netrapi.health import KeepAlive, run_boot_health
 
         health = run_boot_health(app_config)
@@ -193,6 +193,9 @@ def main(argv: list[str] | None = None) -> int:
                 keepalive.stop()
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
+        return 1
+    except DatabaseUrlError as exc:
+        print(f"Database error: {exc}", file=sys.stderr)
         return 1
     except NetraPiError as exc:
         print(f"Pipeline error: {exc}", file=sys.stderr)

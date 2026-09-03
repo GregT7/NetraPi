@@ -26,7 +26,7 @@ python -m alembic -c ..\db\alembic.ini downgrade base
 
 On Linux/Pi, use `../db/alembic.ini`.
 
-`upgrade head` only runs new steps. It does not delete existing rows. Wipe the file only if you want a brand-new empty DB, then `upgrade head` again.
+`upgrade head` only runs new steps. It does not delete existing rows. Wipe the file only if you want a brand-new empty DB, then `upgrade head` again. Edge `main.py` calls `ensure_sqlite_schema()` (SQLite-only) on capture/drain so you usually do not need the CLI on the Pi; the commands above remain for inspect, downgrade, and wipe/rebuild.
 
 Create gitignored `src/main/edge/.env` with `DATABASE_URL=sqlite:///netrapi.db`. There is no committed example file. `DATABASE_URL` is required — there is no SQLite fallback. Relative sqlite paths resolve to `netrapi.db` in **this** directory (`src/main/db/`), not next to the env file. The edge process reads `edge/.env` only — not `src/main/backend/.env`. Alembic uses process `DATABASE_URL` when set (Compose, Render, TP-40), otherwise `edge/.env`.
 

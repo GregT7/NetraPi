@@ -18,6 +18,7 @@ from db.models import (
     ApproachParameters,
     AutoClassification,
     Classification,
+    ClassificationType,
     Clip,
     DrivingSession,
     Event,
@@ -346,6 +347,10 @@ class CloudIngest:
                 raise CloudIngestError(
                     f"auto_classification for event {event_id} not in local SQLite"
                 )
+            type_row = session.get(
+                ClassificationType, classification.classification_type_id
+            )
+            type_value = type_row.value if type_row is not None else "unknown"
             payload: dict[str, Any] = {
                 "id": event.id,
                 "driving_session_id": event.driving_session_id,
@@ -417,22 +422,30 @@ class CloudIngest:
         self._json_request("POST", "/api/netrapi/driving-event", payload)
         if clip_id is None:
             print(
-                f"[ingest] event {event_id} has no clip yet; skip S3",
+                f"[ingest] event {event_id} ({type_value}) has no clip yet; skip S3",
                 flush=True,
             )
             return
         if already_stored:
             print(
-                f"[ingest] event {event_id} clip {clip_id} already uploaded; skip S3",
+                f"[ingest] event {event_id} ({type_value}) clip {clip_id} "
+                f"already uploaded; skip S3",
                 flush=True,
             )
             return
         if not clip_path:
-            print(f"[ingest] event {event_id} has no clip path; skip S3", flush=True)
+            print(
+                f"[ingest] event {event_id} ({type_value}) has no clip path; skip S3",
+                flush=True,
+            )
             return
         path = Path(clip_path)
         if not path.is_file():
-            print(f"[ingest] clip missing on disk ({path}); skip S3", flush=True)
+            print(
+                f"[ingest] event {event_id} ({type_value}) clip missing on disk "
+                f"({path}); skip S3",
+                flush=True,
+            )
             return
         issued = self._json_request(
             "POST",
@@ -447,7 +460,8 @@ class CloudIngest:
         )
         self._mark_local_clip_uploaded(clip_id, str(object_key), Path(clip_path))
         print(
-            f"[ingest] event {event_id} clip {clip_id} uploaded ({object_key})",
+            f"[ingest] event {event_id} ({type_value}) clip {clip_id} "
+            f"uploaded ({object_key})",
             flush=True,
         )
 
