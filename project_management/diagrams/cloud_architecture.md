@@ -132,7 +132,7 @@ Do not point the Pi process at `backend/.env`. Do not run Alembic against Supaba
 
 ## 5. Schema migrations (local vs cloud)
 
-One Alembic tree under [`src/main/db/migrations/`](../../src/main/db/migrations/). The target is whichever `.env` the **process that runs `upgrade`** loaded (`edge/.env` for Pi SQLite; Compose override for test Postgres; `backend/.env` / Render env for Supabase). FastAPI routes do not migrate. `upgrade head` is idempotent and does not wipe rows.
+One Alembic tree under [`src/main/db/migrations/`](../../src/main/db/migrations/). The target is whichever `.env` the **process that runs `upgrade`** loaded (`edge/.env` for Pi SQLite; Compose override for test Postgres; `backend/.env` / Render env for Supabase). FastAPI routes do not migrate. `upgrade head` is idempotent and does not wipe rows. Seed revision **0002** omits explicit primary keys (looks up FKs after insert) so PostgreSQL SERIAL sequences stay aligned with seeded rows.
 
 | Store | Who runs `upgrade` | URL |
 | --- | --- | --- |

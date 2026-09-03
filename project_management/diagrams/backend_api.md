@@ -155,7 +155,7 @@ Requires `X-API-Key`. Proves Postgres (`SELECT 1`) and S3 (`HeadBucket` on the c
 
 Find or create a frozen config snapshot. Fingerprint is the operational JSON (camera modes + selected mode, preview, detector + allowed class **values**, event-manager triggers, approach, motion/ROI/Farneback, kNN paths + features, recording/display, trip, buzzer, health). `master_config.name` / `created_at` / `note` and all row `id`s are ignored. Edge **loads** JSON at startup (`AppConfig`); this call only records which snapshot a session used (decision 58).
 
-If the fingerprint matches any existing snapshot (including Alembic seed id 1 from live `src/main/edge/config`), return that `id` and **do not insert**. If it differs, insert a new `master_config` plus children and return the new `id`.
+If the fingerprint matches any existing snapshot (including the Alembic `edge-json` seed from live `src/main/edge/config`), return that `id` and **do not insert**. If it differs, insert a new `master_config` plus children and return the new `id`.
 
 Pi `RecordingManager` resolve order: local SQLite find-or-create from the JSON dir, then this POST (so `driving-session.master_config_id` exists in Postgres), then `start_session` with that id. `CloudIngest.sync_session` repeats the POST so Wi‑Fi drain still has the FK.
 
@@ -174,7 +174,7 @@ Pi `RecordingManager` resolve order: local SQLite find-or-create from the JSON d
 
 Drive started. One row. Session must exist before any `driving-event` for that drive.
 
-Unknown `master_config_id` is **400**. Call §5.2 first so the snapshot exists. Unchanged live JSON reuses Alembic seed id 1.
+Unknown `master_config_id` is **400**. Call §5.2 first so the snapshot exists. Unchanged live JSON reuses the Alembic `edge-json` seed snapshot.
 
 **Minimal body**
 

@@ -1435,7 +1435,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Prerequisites**
   - Alembic 0004 and snapshot wiring.
 - **Steps**
-  1. Upgrade to head; seed id 1 has a `health_config` row.
+  1. Upgrade to head; the `edge-json` seed has a `health_config` row.
   2. Fingerprint live JSON including `health.json`.
   3. Change a health timeout and confirm a new snapshot is inserted (`src/tests/integration/tp_62`).
 - **Pass criteria**

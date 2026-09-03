@@ -2,38 +2,14 @@
 
 Capture, detect, and record stop-sign events on the Raspberry Pi.
 
-## Operations: systemd + drain
-
 Capture can run under **systemd** (manual start only on this Pi). Trip MP4s
 (and any leftover clips) are uploaded with a **separate** `main.py --drain-trips`
-command — not by the systemd unit.
+command — not by the systemd unit. `main.py` runs Alembic `upgrade head` on the
+local SQLite URL at start (capture and drain).
 
-### Prerequisites
+---
 
-- Edge venv at `src/main/edge/venv`
-- `src/main/edge/.env` with `DATABASE_URL`, `NETRAPI_API_URL`, `NETRAPI_API_KEY`
-  (`DATABASE_URL` is local SQLite only, e.g. `sqlite:///netrapi.db`)
-- Camera + Coral attached; HDMI session logged in if you want the OpenCV preview
-  (`DISPLAY=:0`)
-
-`main.py` runs Alembic `upgrade head` on the SQLite URL at start (capture and
-drain). No manual migrate step for normal drives.
-
-### Install the unit (once)
-
-From the **repo root**:
-
-```bash
-sudo cp src/main/edge/netrapi-edge.service /etc/systemd/system/
-sudo systemctl daemon-reload
-```
-
-Unit paths are for user `terrelgat` and this clone under
-`/home/terrelgat/Desktop/NetraPi`. Edit the unit if those change, then
-`daemon-reload` again.
-
-**Do not** `systemctl enable netrapi-edge` unless you want capture at every boot.
-State should stay `disabled`.
+## Everyday
 
 ### Drive: start / watch / stop capture
 
@@ -47,6 +23,10 @@ sudo systemctl stop netrapi-edge
 - `start` / `stop` do not enable boot auto-start.
 - Logs for the **service** go to the journal (not your interactive terminal).
 - After code changes under `edge/`, `sudo systemctl restart netrapi-edge` to pick them up.
+
+Without systemd (edge venv active): from repo root `python src/main/edge/main.py`,
+or from `src/main/edge` run `python main.py`. HDMI shows a boot-health overlay,
+then the live preview. Ctrl+C stops.
 
 ### After a drive: drain to S3
 
@@ -100,18 +80,37 @@ Finished trips ready to drain: `init_local_stored=1` and `s3_stored` null.
 
 ---
 
-## Run capture (without systemd)
+## Setup (once)
 
-From the repo root, with the edge venv active:
+### Prerequisites
+
+- Edge venv at `src/main/edge/venv`
+- `src/main/edge/.env` with `DATABASE_URL`, `NETRAPI_API_URL`, `NETRAPI_API_KEY`
+  (`DATABASE_URL` is local SQLite only, e.g. `sqlite:///netrapi.db`)
+- Camera + Coral attached; HDMI session logged in if you want the OpenCV preview
+  (`DISPLAY=:0`)
+
+### Install the unit
+
+From the **repo root**:
 
 ```bash
-python src/main/edge/main.py
+sudo cp src/main/edge/netrapi-edge.service /etc/systemd/system/
+sudo systemctl daemon-reload
 ```
 
-Or from `src/main/edge`: `source venv/bin/activate` then `python main.py`.
-HDMI shows a boot-health overlay, then the live preview. Ctrl+C stops.
+Unit paths are for user `terrelgat` and this clone under
+`/home/terrelgat/Desktop/NetraPi`. Edit the unit if those change, then
+`daemon-reload` again.
 
-## Boot health
+**Do not** `systemctl enable netrapi-edge` unless you want capture at every boot.
+State should stay `disabled`.
+
+---
+
+## Reference
+
+### Boot health
 
 Health always runs before capture. `--verify-tpu` is gone.
 
@@ -124,13 +123,13 @@ Health always runs before capture. `--verify-tpu` is gone.
 
 Offline means local SQLite + MP4s only. The process never upgrades to online later. Online can drop to offline if keep-alive fails.
 
-## Online vs offline
+### Online vs offline
 
-**Online:** session/event JSON and event clips upload during the drive. A keep-alive thread hits `GET /health` every 5 minutes so Render does not idle-sleep. Three failed pings in a row drop this process to offline (no more ingest, no more pings). Trip files still wait for drain (see Operations above).
+**Online:** session/event JSON and event clips upload during the drive. A keep-alive thread hits `GET /health` every 5 minutes so Render does not idle-sleep. Three failed pings in a row drop this process to offline (no more ingest, no more pings). Trip files still wait for drain (see Everyday above).
 
 **Offline:** local only. After Wi-Fi is back, use `--drain-trips` as above.
 
-## CLI
+### CLI
 
 | Flag | Meaning |
 | ---- | ------- |
@@ -140,7 +139,7 @@ Offline means local SQLite + MP4s only. The process never upgrades to online lat
 | `--delete-uploaded-local` | Unlink local MP4s already in S3 (no drain) |
 | `--delete-all-local` | Unlink finished local MP4s (does not delete S3) |
 
-## What you see
+### What you see
 
 - Overlay / journal: TPU, Wi-Fi, Render wait, mode
 - Online: `[ingest] event N (rolling-stop|…) …` as events sync / upload
