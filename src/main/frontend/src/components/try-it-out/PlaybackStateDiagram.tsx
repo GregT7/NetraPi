@@ -11,27 +11,6 @@ export const PLAYBACK_STATE_IDS = [
 
 export type PlaybackStateId = (typeof PLAYBACK_STATE_IDS)[number]
 
-export const DUMMY_PHASE_SECONDS = 12
-
-export function dummyTransitions(
-  classification = 'rolling-stop',
-  duration = DUMMY_PHASE_SECONDS,
-): PlaybackTransitionsFile {
-  const span = duration > 1 ? duration : DUMMY_PHASE_SECONDS
-  const t0 = Math.round(span * 0.33 * 10) / 10
-  const sampleEnd =
-    Math.round(Math.min(span * 0.75, t0 + Math.max(3, span * 0.35)) * 10) / 10
-  return {
-    classification,
-    schema_version: 1,
-    states: [
-      { t: 0, id: 'Monitoring' },
-      { t: t0, id: 'SampleMotion' },
-      { t: sampleEnd, id: outcomeStateId(classification) },
-    ],
-  }
-}
-
 const STATE_LABELS: Record<PlaybackStateId, string> = {
   CompleteStop: 'Complete Stop',
   Monitoring: 'Monitoring',
@@ -203,7 +182,7 @@ function DownEdge({
 }
 
 export default function PlaybackStateDiagram({ stateId }: PlaybackStateDiagramProps) {
-  const current = isPlaybackStateId(stateId) ? stateId : 'Monitoring'
+  const current = isPlaybackStateId(stateId) ? stateId : null
   const previous = useRef(current)
   const [flash, setFlash] = useState('')
 

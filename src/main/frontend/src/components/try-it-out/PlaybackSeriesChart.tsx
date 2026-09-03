@@ -1,6 +1,7 @@
 import { type RefObject } from 'react'
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -9,34 +10,70 @@ import {
   YAxis,
 } from 'recharts'
 
-type ChartPoint = { t: number; value: number }
+type SeriesPoint = { t: number; value: number }
 
 type PlaybackSeriesChartProps = {
-  color: string
+  areaPoints: SeriesPoint[]
   emptyLabel: string
+  motionPoints: SeriesPoint[]
+  playheadOff: boolean
   playheadRef: RefObject<HTMLDivElement | null>
-  points: ChartPoint[]
-  title: string
   xMax: number
-  yLabel: string
 }
 
+type ChartRow = { t: number; area?: number; motion?: number }
+
 const AXIS_TEXT = { fill: '#d4d4d8', fontSize: 11 }
+const AREA_COLOR = '#38bdf8'
+const MOTION_COLOR = '#fbbf24'
 
 function formatValue(value: number | string) {
   const n = Number(value)
   return Number.isFinite(n) ? n.toFixed(2) : String(value)
 }
 
+function mergeSeries(areaPoints: SeriesPoint[], motionPoints: SeriesPoint[]): ChartRow[] {
+  const byT = new Map<number, ChartRow>()
+  for (const point of areaPoints) {
+    byT.set(point.t, { t: point.t, area: point.value })
+  }
+  for (const point of motionPoints) {
+    const existing = byT.get(point.t)
+    if (existing) {
+      existing.motion = point.value
+    } else {
+      byT.set(point.t, { t: point.t, motion: point.value })
+    }
+  }
+  return [...byT.values()]
+    .filter((row) => row.t >= 0)
+    .sort((left, right) => left.t - right.t)
+}
+
+function windowedSeries(points: ChartRow[], xMax: number): ChartRow[] {
+  const rows = points.filter((row) => row.t <= xMax)
+  if (rows.length === 0) {
+    return rows
+  }
+  if (rows[0].t > 0) {
+    rows.unshift({ t: 0 })
+  }
+  if (rows[rows.length - 1].t < xMax) {
+    rows.push({ t: xMax })
+  }
+  return rows
+}
+
 export default function PlaybackSeriesChart({
-  color,
+  areaPoints,
   emptyLabel,
+  motionPoints,
+  playheadOff,
   playheadRef,
-  points,
-  title,
   xMax,
-  yLabel,
 }: PlaybackSeriesChartProps) {
+  const domainMax = Math.max(xMax, 0.01)
+  const points = windowedSeries(mergeSeries(areaPoints, motionPoints), domainMax)
   if (points.length === 0) {
     return (
       <div className="flex h-full items-center justify-center px-3 text-center text-sm text-zinc-400">
@@ -44,29 +81,42 @@ export default function PlaybackSeriesChart({
       </div>
     )
   }
-  const domainMax = Math.max(xMax, points[points.length - 1]?.t ?? 0, 0.01)
   return (
-    <div className="relative h-full min-h-0">
+    <div className="relative h-full min-h-0 overflow-hidden">
       <p className="absolute left-0 right-0 top-0 z-10 text-center text-xs font-medium text-zinc-200">
-        {title}
+        Sign Area and Motion
       </p>
       <div className="h-full pt-5">
         <ResponsiveContainer height="100%" width="100%">
-          <LineChart data={points} margin={{ bottom: 4, left: 4, right: 8, top: 8 }}>
+          <LineChart
+            data={points}
+            margin={{ bottom: 4, left: 4, right: 8, top: 8 }}
+          >
             <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
             <XAxis
+              allowDataOverflow
               dataKey="t"
               domain={[0, domainMax]}
+              includeHidden
               stroke="#a1a1aa"
               tick={AXIS_TEXT}
               tickFormatter={formatValue}
               type="number"
             />
             <YAxis
-              stroke={color}
+              stroke={AREA_COLOR}
               tick={AXIS_TEXT}
               tickFormatter={formatValue}
               width={40}
+              yAxisId="area"
+            />
+            <YAxis
+              orientation="right"
+              stroke={MOTION_COLOR}
+              tick={AXIS_TEXT}
+              tickFormatter={formatValue}
+              width={40}
+              yAxisId="motion"
             />
             <Tooltip
               contentStyle={{
@@ -76,27 +126,46 @@ export default function PlaybackSeriesChart({
                 fontSize: 12,
               }}
               formatter={(value) => formatValue(value as number)}
-              labelFormatter={(label) => `Time (s): ${formatValue(label)}`}
+              labelFormatter={(label) => `Time (s): ${formatValue(label as number)}`}
+            />
+            <Legend
+              align="center"
+              iconSize={10}
+              verticalAlign="bottom"
+              wrapperStyle={{ color: '#d4d4d8', fontSize: 11, paddingTop: 0 }}
             />
             <Line
-              dataKey="value"
+              connectNulls
+              dataKey="area"
               dot={false}
               isAnimationActive={false}
-              name={yLabel}
-              stroke={color}
+              name="Sign Area (% of Frame)"
+              stroke={AREA_COLOR}
               strokeWidth={2}
               type="monotone"
+              yAxisId="area"
+            />
+            <Line
+              connectNulls
+              dataKey="motion"
+              dot={false}
+              isAnimationActive={false}
+              name="Motion (px / Frame)"
+              stroke={MOTION_COLOR}
+              strokeWidth={2}
+              type="monotone"
+              yAxisId="motion"
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
       <div
         aria-hidden
-        className="pointer-events-none absolute bottom-5 top-7 w-px bg-zinc-50"
+        className={`pointer-events-none absolute bottom-8 top-7 w-px bg-zinc-50 ${
+          playheadOff ? 'invisible' : ''
+        }`}
         ref={playheadRef}
-        style={{ left: '48px' }}
       />
-      <span className="sr-only">{yLabel}</span>
     </div>
   )
 }

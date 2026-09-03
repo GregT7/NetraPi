@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   fetchPublicClips,
   mintPublicClipUrl,
@@ -7,11 +7,7 @@ import {
   type PublicClipRow,
 } from '@/api/publicPlayback'
 import PlaybackSeriesChart from './PlaybackSeriesChart'
-import PlaybackStateDiagram, {
-  DUMMY_PHASE_SECONDS,
-  dummyTransitions,
-  stateIdAtTime,
-} from './PlaybackStateDiagram'
+import PlaybackStateDiagram, { stateIdAtTime } from './PlaybackStateDiagram'
 
 const PAGE_SIZE = 5
 const MINT_DEBOUNCE_MS = 300
@@ -59,9 +55,8 @@ export default function TryItOut() {
     null,
   )
   const [classification, setClassification] = useState('')
-  const [showMotion, setShowMotion] = useState(false)
-  const [stateId, setStateId] = useState('Monitoring')
-  const [duration, setDuration] = useState(0)
+  const [stateId, setStateId] = useState('')
+  const [playheadOff, setPlayheadOff] = useState(false)
   const mintAbort = useRef<AbortController | null>(null)
   const mintCache = useRef<Map<number, CachedMint>>(new Map())
   const mintDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -71,15 +66,16 @@ export default function TryItOut() {
   const liveStatusTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
   const playheadRef = useRef<HTMLDivElement>(null)
+  const playheadOffRef = useRef(false)
   const allowedTime = useRef(0)
   const originHold = useRef(false)
 
   function resetToMonitoring() {
     originHold.current = true
     allowedTime.current = 0
-    setStateId('Monitoring')
-    setShowMotion(false)
-    setDuration(0)
+    playheadOffRef.current = false
+    setPlayheadOff(false)
+    setStateId('')
     const video = videoRef.current
     if (!video) {
       return
@@ -178,37 +174,21 @@ export default function TryItOut() {
   const rangeStart = clips.length === 0 ? 0 : pageStart + 1
   const rangeEnd = pageStart + pageClips.length
   const t0 = areas?.t0_s ?? motion?.t0_s ?? 0
-  const sampleEnd = areas?.sample_end_s ?? motion?.sample_end_s ?? t0
+  const sampleEnd = Number(areas?.sample_end_s ?? motion?.sample_end_s ?? t0)
   const areaPoints = seriesPoints(areas, 'area', 100)
   const motionPoints = seriesPoints(motion, 'score')
-  const xMax = Math.max(
-    duration,
-    sampleEnd,
-    areaPoints[areaPoints.length - 1]?.t ?? 0,
-    motionPoints[motionPoints.length - 1]?.t ?? 0,
-  )
+  const xMax = Math.max(sampleEnd + 3, 0.01)
   const hasTelemetry = areas != null || motion != null
-  const phaseFile = useMemo(() => {
-    if (transitions?.states?.length) {
-      return transitions
-    }
-    return dummyTransitions(
-      classification || 'rolling-stop',
-      videoUrl ? duration : DUMMY_PHASE_SECONDS,
-    )
-  }, [classification, duration, transitions, videoUrl])
 
   useEffect(() => {
-    if (!detailed) {
+    if (!detailed || !videoUrl) {
       return
     }
     let frame = 0
     const tick = () => {
       const video = videoRef.current
       let time: number
-      if (!selectedId) {
-        time = (performance.now() / 1000) % DUMMY_PHASE_SECONDS
-      } else if (originHold.current) {
+      if (originHold.current) {
         if (video && video.currentTime > 0.2) {
           try {
             video.currentTime = 0
@@ -224,24 +204,27 @@ export default function TryItOut() {
       }
       const head = playheadRef.current
       if (head && xMax > 0) {
-        const pct = Math.min(1, Math.max(0, time / xMax))
-        head.style.left = `calc(48px + ${pct} * (100% - 60px))`
+        const pct = Math.max(0, time / xMax)
+        head.style.left = `calc(48px + ${pct} * (100% - 96px))`
       }
-      const nextMotion = time >= t0
-      setShowMotion((current) => (current === nextMotion ? current : nextMotion))
+      const off = time >= xMax
+      if (playheadOffRef.current !== off) {
+        playheadOffRef.current = off
+        setPlayheadOff(off)
+      }
       const nextState = stateIdAtTime(
-        phaseFile,
+        transitions,
         time,
         t0,
         sampleEnd,
-        classification || 'rolling-stop',
+        classification,
       )
       setStateId((current) => (current === nextState ? current : nextState))
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [classification, detailed, phaseFile, sampleEnd, selectedId, t0, videoUrl, xMax])
+  }, [classification, detailed, sampleEnd, t0, transitions, videoUrl, xMax])
 
   useEffect(() => {
     const video = videoRef.current
@@ -569,7 +552,6 @@ export default function TryItOut() {
                   onLoadedMetadata={(event) => {
                     allowedTime.current = 0
                     event.currentTarget.currentTime = 0
-                    setDuration(event.currentTarget.duration || 0)
                   }}
                   playsInline
                   ref={videoRef}
@@ -593,21 +575,18 @@ export default function TryItOut() {
               <div className="min-h-0 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 p-2">
                 <PlaybackStateDiagram
                   key={selectedId || 'idle'}
-                  stateId={stateId}
+                  stateId={videoUrl ? stateId : ''}
                 />
               </div>
               <div className="overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 p-2">
                 {hasTelemetry ? (
                   <PlaybackSeriesChart
-                    color={showMotion ? '#fbbf24' : '#38bdf8'}
+                    areaPoints={areaPoints}
                     emptyLabel="No analysis data"
+                    motionPoints={motionPoints}
+                    playheadOff={playheadOff}
                     playheadRef={playheadRef}
-                    points={showMotion ? motionPoints : areaPoints}
-                    title={showMotion ? 'Motion' : 'Sign Area'}
                     xMax={xMax}
-                    yLabel={
-                      showMotion ? 'Motion (px / Frame)' : 'Sign Area (% of Frame)'
-                    }
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center px-3 text-center text-sm text-zinc-400">
