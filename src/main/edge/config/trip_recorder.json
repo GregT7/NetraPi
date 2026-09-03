@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "segments_dir": "src/main/data/trips",
   "segment_seconds": 300,
   "ffmpeg_crf": 20,

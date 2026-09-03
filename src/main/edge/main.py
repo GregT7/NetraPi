@@ -118,22 +118,31 @@ def main(argv: list[str] | None = None) -> int:
                 from netrapi.health import wake_render
 
                 app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
+                print(
+                    f"[drain] target={args.drain_trips}; waking Render via GET /health ...",
+                    flush=True,
+                )
                 if not wake_render(app_config):
                     print("Render GET /health failed; drain aborted", file=sys.stderr)
                     return 1
+                print("[drain] Render is up", flush=True)
                 if args.drain_trips in ("clips", "both"):
                     clips = ingest.drain_clips()
-                    print(f"drained {clips} clip(s)")
+                    print(f"[drain] finished clips: uploaded {clips}", flush=True)
                 if args.drain_trips in ("trips", "both"):
                     trips = ingest.drain_trip_segments()
-                    print(f"drained {trips} trip segment(s)")
+                    print(f"[drain] finished trips: uploaded {trips}", flush=True)
                 if args.delete_after_drain:
                     from netrapi.local_cleanup import delete_uploaded_local_media
 
+                    print(
+                        f"[drain] delete-after-drain target={args.delete_after_drain}",
+                        flush=True,
+                    )
                     cleaned = delete_uploaded_local_media(
                         ingest, target=args.delete_after_drain
                     )
-                    print(f"deleted {cleaned} uploaded local file(s)")
+                    print(f"[drain] deleted {cleaned} uploaded local file(s)", flush=True)
                 return 0
             if args.delete_uploaded_local:
                 from netrapi.local_cleanup import delete_uploaded_local_media

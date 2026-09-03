@@ -197,6 +197,12 @@ class CloudIngest:
                 flush=True,
             )
             return False
+        size_bytes = path.stat().st_size
+        print(
+            f"[ingest] trip_segment {segment_id}: PUT {path.name} "
+            f"({size_bytes} bytes) ...",
+            flush=True,
+        )
         issued = self._json_request(
             "POST",
             "/api/netrapi/s3-upload-url",
@@ -224,19 +230,35 @@ class CloudIngest:
         with get_session() as session:
             events = session.exec(select(Event).order_by(Event.id)).all()
             pending: list[int] = []
+            already = 0
+            unfinished = 0
             for event in events:
                 if event.id is None:
                     continue
                 clip = session.exec(select(Clip).where(Clip.event_id == event.id)).first()
                 if clip is None:
                     continue
-                if clip.init_local_stored is True and not (
-                    clip.s3_stored is True and bool(clip.s3_key)
-                ):
+                if clip.s3_stored is True and bool(clip.s3_key):
+                    already += 1
+                    continue
+                if clip.init_local_stored is True:
                     pending.append(event.id)
+                else:
+                    unfinished += 1
+        print(
+            f"[drain] clips: {len(pending)} pending, {already} already in S3"
+            + (f", {unfinished} without finished local file" if unfinished else ""),
+            flush=True,
+        )
+        if pending:
+            print(f"[drain] clip event ids: {pending}", flush=True)
         uploaded = 0
-        for event_id in pending:
+        for index, event_id in enumerate(pending, start=1):
             try:
+                print(
+                    f"[drain] clip {index}/{len(pending)}: sync_event({event_id})",
+                    flush=True,
+                )
                 self.sync_event(event_id)
                 uploaded += 1
             except Exception as exc:
@@ -247,16 +269,33 @@ class CloudIngest:
         """Upload finished trip files that are not yet in S3, one at a time."""
         with get_session() as session:
             rows = session.exec(select(TripSegment).order_by(TripSegment.id)).all()
-            pending = [
-                row.id
-                for row in rows
-                if row.id is not None
-                and row.init_local_stored is True
-                and not (row.s3_stored is True and bool(row.s3_key))
-            ]
+            pending: list[int] = []
+            already = 0
+            unfinished = 0
+            for row in rows:
+                if row.id is None:
+                    continue
+                if row.s3_stored is True and bool(row.s3_key):
+                    already += 1
+                    continue
+                if row.init_local_stored is True:
+                    pending.append(row.id)
+                else:
+                    unfinished += 1
+        print(
+            f"[drain] trips: {len(pending)} pending, {already} already in S3"
+            + (f", {unfinished} unfinished (still open / not saved)" if unfinished else ""),
+            flush=True,
+        )
+        if pending:
+            print(f"[drain] trip_segment ids: {pending}", flush=True)
         uploaded = 0
-        for segment_id in pending:
+        for index, segment_id in enumerate(pending, start=1):
             try:
+                print(
+                    f"[drain] trip {index}/{len(pending)}: upload_trip_segment({segment_id})",
+                    flush=True,
+                )
                 if self.upload_trip_segment(segment_id):
                     uploaded += 1
             except Exception as exc:
