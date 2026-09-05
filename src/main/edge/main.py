@@ -32,7 +32,11 @@ def _resolve_runtime_paths(app_config, repo_root: Path):
     return replace(
         app_config,
         recording_manager=replace(recording_manager, clips_dir=resolve(recording_manager.clips_dir)),
-        trip_recorder=replace(app_config.trip_recorder, segments_dir=resolve(app_config.trip_recorder.segments_dir)),
+        trip_recorder=replace(
+            app_config.trip_recorder,
+            segments_dir=resolve(app_config.trip_recorder.segments_dir),
+            logs_dir=resolve(app_config.trip_recorder.logs_dir),
+        ),
         detector=replace(
             detector,
             model_path=resolve(detector.model_path),

@@ -247,7 +247,24 @@ def test_trip_recorder_config_from_json():
 
     assert config.enabled is True
     assert config.segments_dir == Path("data/trips")
+    assert config.logs_dir == Path("src/main/data/logs")
+    assert config.stats_interval_s == 15.0
     assert config.segment_seconds == 300
+
+
+def test_trip_recorder_config_logs_dir_override():
+    config = TripRecorderConfig.from_json(
+        {
+            "enabled": True,
+            "segments_dir": "data/trips",
+            "logs_dir": "data/logs",
+            "stats_interval_s": 30,
+            "segment_seconds": 300,
+            "ffmpeg_crf": 20,
+        }
+    )
+    assert config.logs_dir == Path("data/logs")
+    assert config.stats_interval_s == 30.0
 
 
 def test_trip_recorder_config_defaults_disabled():

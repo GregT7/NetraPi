@@ -9,6 +9,7 @@ from config.types import ApproachConfig, EventManagerConfig, MotionConfig
 from netrapi.buffer import FrameBuffer
 from netrapi.buffer.classification import Classification
 from netrapi.events.approach import diagnose_approach_drop
+from netrapi.events.approach.approach_drop_results import ApproachDropEvent
 from netrapi.events.driving_event import ApproachSnapshot, DrivingEvent, PlaybackSeries
 from netrapi.events.enums import EventPhase
 from netrapi.events.classify import (
@@ -63,6 +64,7 @@ class EventManager:
         self._motion_tracker = LiveMotionTracker(motion)
         self._latch_fps: float = fallback_fps
         self._ready_to_evaluate = False
+        self._last_latched_approach: ApproachDropEvent | None = None
 
     @property
     def config(self) -> EventManagerConfig:
@@ -82,6 +84,11 @@ class EventManager:
         """True after CollectPostDrop window completes — call evaluate() this lap."""
         return self._ready_to_evaluate
 
+    @property
+    def last_latched_approach(self) -> ApproachDropEvent | None:
+        """ApproachDropEvent from the most recent Watching → CollectPostDrop latch."""
+        return self._last_latched_approach
+
     def reset(self) -> None:
         self._phase = EventPhase.WATCHING
         self._area_history.clear()
@@ -93,9 +100,13 @@ class EventManager:
         self._motion_tracker.reset()
         self._latch_fps = self._fallback_fps
         self._ready_to_evaluate = False
+        self._last_latched_approach = None
 
-    def observe(self, pre_buffer: FrameBuffer, *, now: float | None = None) -> None:
-        """Per-lap collection and FSM. Never classifies."""
+    def observe(self, pre_buffer: FrameBuffer, *, now: float | None = None) -> bool:
+        """Per-lap collection and FSM. Never classifies.
+
+        Returns True when an approach is latched this call (Watching → CollectPostDrop).
+        """
         if self._phase not in (EventPhase.WATCHING, EventPhase.COLLECT_POST_DROP):
             raise EventError(f"unrecognized event phase: {self._phase!r}")
 
@@ -103,16 +114,16 @@ class EventManager:
         try:
             record = pre_buffer.latest()
         except BufferError:
-            return
+            return False
 
         frame_bgr = record.display if record.display is not None else record.raw
 
         if self._phase is EventPhase.WATCHING:
-            area = max_stop_sign_area(record.classifications)
-            self._observe_watching(area=area, frame_bgr=frame_bgr, clock=clock)
-            return
+            self._observe_watching(area=max_stop_sign_area(record.classifications), frame_bgr=frame_bgr, clock=clock)
+            return self._phase is EventPhase.COLLECT_POST_DROP
 
         self._observe_collect(frame_bgr=frame_bgr, clock=clock)
+        return False
 
     def evaluate(self) -> DrivingEvent:
         """Classify from latched histories. Call only when ready_to_evaluate."""
@@ -236,6 +247,7 @@ class EventManager:
         self._detect_frame = len(self._areas_snapshot) - 1
         self._anchor_t = clock
         self._latch_fps = fps
+        self._last_latched_approach = diagnosis.event
         self._area_history.clear()
         self._motion_history.clear()
         self._motion_tracker.prime(frame_bgr)

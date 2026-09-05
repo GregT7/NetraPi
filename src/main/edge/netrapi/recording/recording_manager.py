@@ -22,6 +22,7 @@ from netrapi.recording.playback_json import write_playback_sidecars
 from netrapi.recording.util.encoding_fps import clip_encoding_fps
 from netrapi.recording.recorder import Recorder
 from netrapi.recording.trip_recorder import TripRecorder
+from netrapi.trip_log import TripSessionLog
 
 
 class RecordingManager:
@@ -54,6 +55,7 @@ class RecordingManager:
         self._local_store = local_store
         self._cloud_ingest = cloud_ingest
         self._boot_issues: list[str] = []
+        self._trip_log: TripSessionLog | None = None
 
         self._clip_active = False
         self._running = False
@@ -70,6 +72,34 @@ class RecordingManager:
             trip_recorder.set_on_segment_saved(self._persist_saved_segment)
         if local_store is not None and hasattr(trip_recorder, "set_on_segment_opened"):
             trip_recorder.set_on_segment_opened(self._prime_open_segment)
+
+    def _emit(self, message: str) -> None:
+        if self._trip_log is not None:
+            self._trip_log.write(message)
+        else:
+            print(message, flush=True)
+
+    def _open_trip_log(self, session_id: int | None) -> None:
+        self._close_trip_log()
+        trip_cfg = self._app_config.trip_recorder
+        self._trip_log = TripSessionLog.open(
+            trip_cfg.logs_dir,
+            session_id=session_id,
+            stats_interval_s=trip_cfg.stats_interval_s,
+        )
+        self._trip_recorder.set_log(self._trip_log.write)
+        if self._cloud_ingest is not None and hasattr(self._cloud_ingest, "set_log"):
+            self._cloud_ingest.set_log(self._trip_log.write)
+
+    def _close_trip_log(self) -> None:
+        if self._trip_log is None:
+            return
+        log = self._trip_log
+        self._trip_log = None
+        self._trip_recorder.set_log(None)
+        if self._cloud_ingest is not None and hasattr(self._cloud_ingest, "set_log"):
+            self._cloud_ingest.set_log(None)
+        log.close()
 
     @property
     def app_config(self) -> AppConfig:
@@ -109,7 +139,7 @@ class RecordingManager:
     def disable_cloud(self, reason: str) -> None:
         if self._cloud_ingest is None:
             return
-        print(f"[health] disabling cloud ingest: {reason}", flush=True)
+        self._emit(f"[health] disabling cloud ingest: {reason}")
         self._cloud_ingest = None
         self._record_exception(reason, is_fatal=False)
 
@@ -150,10 +180,15 @@ class RecordingManager:
                     start_time=datetime.now(),
                     master_config_id=master_config_id,
                 )
+                self._open_trip_log(self._driving_session_id)
+                self._emit(f"[session] driving_session {self._driving_session_id} started")
                 self._try_ingest("sync_session", self._driving_session_id)
                 for message in self._boot_issues:
                     self._record_exception(message, is_fatal=False)
                 self._boot_issues.clear()
+            else:
+                self._open_trip_log(None)
+                self._emit("[session] started (no local store)")
             laps = 0
             while self._running:
                 if should_stop and should_stop():
@@ -176,6 +211,8 @@ class RecordingManager:
                     self._driving_session_id, end_time=datetime.now()
                 )
                 self._try_ingest("sync_session", self._driving_session_id)
+                self._emit(f"[session] driving_session {self._driving_session_id} ended")
+            self._close_trip_log()
 
     def run_one_lap(self, *, full_record: bool = False) -> ClipResult | None:
         record = self._capture_frame_record()
@@ -194,10 +231,24 @@ class RecordingManager:
             if self._event_manager.needs_detection:
                 classifications = self._detector.classify(record.raw)
                 self.pre_buffer.latest().patch_classifications(classifications)
-            self._event_manager.observe(self.pre_buffer)
+            if self._event_manager.observe(self.pre_buffer):
+                latched = self._event_manager.last_latched_approach
+                if latched is not None:
+                    self._emit(
+                        f"[approach] detected peak={latched.peak_area_pct:.2f}% "
+                        f"approach={latched.approach_duration_s:.2f}s "
+                        f"drop={latched.drop_duration_s:.2f}s "
+                        f"score={latched.score:.3f}"
+                    )
+                else:
+                    self._emit("[approach] detected")
             if self._event_manager.ready_to_evaluate:
                 event = self._event_manager.evaluate()
                 self._buzzer.beep(event)
+                self._emit(
+                    f"[event] {event.type.model_label} "
+                    f"unsafe={event.is_unsafe}"
+                )
                 self._commit_evaluated_event(event)
                 if (
                     event.is_unsafe
@@ -378,6 +429,7 @@ class RecordingManager:
         return self._open_trip_segment_id, max(0.0, offset)
 
     def _record_exception(self, message: str, *, is_fatal: bool) -> None:
+        self._emit(f"[exception] {'fatal' if is_fatal else 'warn'}: {message}")
         if self._local_store is None or self._driving_session_id is None:
             return
         try:
@@ -388,7 +440,7 @@ class RecordingManager:
                 is_fatal=is_fatal,
             )
         except Exception as exc:
-            print(f"[exception] persist failed: {exc}", flush=True)
+            self._emit(f"[exception] persist failed: {exc}")
             return
         self._try_ingest("sync_operational_exception", exception_id)
 
@@ -398,7 +450,7 @@ class RecordingManager:
         try:
             getattr(self._cloud_ingest, method_name)(*args)
         except Exception as exc:
-            print(f"[ingest] {method_name} failed: {exc}", flush=True)
+            self._emit(f"[ingest] {method_name} failed: {exc}")
             if method_name != "sync_operational_exception":
                 self._record_exception(
                     f"ingest {method_name} failed: {exc}", is_fatal=False

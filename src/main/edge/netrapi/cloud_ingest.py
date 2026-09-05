@@ -109,9 +109,20 @@ class CloudIngest:
         *,
         json_request: JsonRequest | None = None,
         put_bytes: PutBytes | None = None,
+        on_log: Callable[[str], None] | None = None,
     ) -> None:
         self._json_request = json_request or self._json_request_http
         self._put_bytes = put_bytes or _http_put
+        self._on_log = on_log
+
+    def set_log(self, on_log: Callable[[str], None] | None) -> None:
+        self._on_log = on_log
+
+    def _emit(self, message: str) -> None:
+        if self._on_log is not None:
+            self._on_log(message)
+        else:
+            print(message, flush=True)
 
     def _json_request_http(
         self, method: str, path: str, body: dict[str, Any] | None
@@ -174,35 +185,30 @@ class CloudIngest:
         self.sync_session(session_id)
         self.sync_trip_segment(segment_id)
         if already_stored:
-            print(
+            self._emit(
                 f"[ingest] trip_segment {segment_id} already uploaded; skip S3",
-                flush=True,
             )
             return True
         if not finished:
-            print(
+            self._emit(
                 f"[ingest] trip_segment {segment_id} not finished locally; skip S3",
-                flush=True,
             )
             return False
         if not local_path:
-            print(
+            self._emit(
                 f"[ingest] trip_segment {segment_id} has no local path; skip S3",
-                flush=True,
             )
             return False
         path = Path(local_path)
         if not path.is_file():
-            print(
+            self._emit(
                 f"[ingest] trip file missing on disk ({path}); skip S3",
-                flush=True,
             )
             return False
         size_bytes = path.stat().st_size
-        print(
+        self._emit(
             f"[ingest] trip_segment {segment_id}: PUT {path.name} "
             f"({size_bytes} bytes) ...",
-            flush=True,
         )
         issued = self._json_request(
             "POST",
@@ -220,9 +226,8 @@ class CloudIngest:
             {"trip_segment_id": segment_id, "object_key": object_key},
         )
         self._mark_local_trip_uploaded(segment_id, str(object_key), path)
-        print(
+        self._emit(
             f"[ingest] trip_segment {segment_id} uploaded ({object_key})",
-            flush=True,
         )
         return True
 
@@ -246,24 +251,22 @@ class CloudIngest:
                     pending.append(event.id)
                 else:
                     unfinished += 1
-        print(
+        self._emit(
             f"[drain] clips: {len(pending)} pending, {already} already in S3"
             + (f", {unfinished} without finished local file" if unfinished else ""),
-            flush=True,
         )
         if pending:
-            print(f"[drain] clip event ids: {pending}", flush=True)
+            self._emit(f"[drain] clip event ids: {pending}")
         uploaded = 0
         for index, event_id in enumerate(pending, start=1):
             try:
-                print(
+                self._emit(
                     f"[drain] clip {index}/{len(pending)}: sync_event({event_id})",
-                    flush=True,
                 )
                 self.sync_event(event_id)
                 uploaded += 1
             except Exception as exc:
-                print(f"[ingest] event {event_id} drain failed: {exc}", flush=True)
+                self._emit(f"[ingest] event {event_id} drain failed: {exc}")
         return uploaded
 
     def drain_trip_segments(self) -> int:
@@ -283,26 +286,23 @@ class CloudIngest:
                     pending.append(row.id)
                 else:
                     unfinished += 1
-        print(
+        self._emit(
             f"[drain] trips: {len(pending)} pending, {already} already in S3"
             + (f", {unfinished} unfinished (still open / not saved)" if unfinished else ""),
-            flush=True,
         )
         if pending:
-            print(f"[drain] trip_segment ids: {pending}", flush=True)
+            self._emit(f"[drain] trip_segment ids: {pending}")
         uploaded = 0
         for index, segment_id in enumerate(pending, start=1):
             try:
-                print(
+                self._emit(
                     f"[drain] trip {index}/{len(pending)}: upload_trip_segment({segment_id})",
-                    flush=True,
                 )
                 if self.upload_trip_segment(segment_id):
                     uploaded += 1
             except Exception as exc:
-                print(
+                self._emit(
                     f"[ingest] trip_segment {segment_id} drain failed: {exc}",
-                    flush=True,
                 )
         return uploaded
 
@@ -421,30 +421,26 @@ class CloudIngest:
             )
         self._json_request("POST", "/api/netrapi/driving-event", payload)
         if clip_id is None:
-            print(
+            self._emit(
                 f"[ingest] event {event_id} ({type_value}) has no clip yet; skip S3",
-                flush=True,
             )
             return
         if already_stored:
-            print(
+            self._emit(
                 f"[ingest] event {event_id} ({type_value}) clip {clip_id} "
                 f"already uploaded; skip S3",
-                flush=True,
             )
             return
         if not clip_path:
-            print(
+            self._emit(
                 f"[ingest] event {event_id} ({type_value}) has no clip path; skip S3",
-                flush=True,
             )
             return
         path = Path(clip_path)
         if not path.is_file():
-            print(
+            self._emit(
                 f"[ingest] event {event_id} ({type_value}) clip missing on disk "
                 f"({path}); skip S3",
-                flush=True,
             )
             return
         issued = self._json_request(
@@ -459,10 +455,9 @@ class CloudIngest:
             {"clip_id": clip_id, "object_key": object_key},
         )
         self._mark_local_clip_uploaded(clip_id, str(object_key), Path(clip_path))
-        print(
+        self._emit(
             f"[ingest] event {event_id} ({type_value}) clip {clip_id} "
             f"uploaded ({object_key})",
-            flush=True,
         )
 
     def _put_clip_objects(self, issued: dict[str, Any], clip_path: Path) -> str:

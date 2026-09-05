@@ -21,6 +21,7 @@ def test_resolve_runtime_paths_from_repo_relative():
     assert resolved.knn.stage1_model_path.is_file()
     assert resolved.recording_manager.clips_dir == (REPO_ROOT / "src/main/data/clips").resolve()
     assert resolved.trip_recorder.segments_dir == (REPO_ROOT / "src/main/data/trips").resolve()
+    assert resolved.trip_recorder.logs_dir == (REPO_ROOT / "src/main/data/logs").resolve()
 
 
 def test_parse_args_defaults():
