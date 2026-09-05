@@ -115,7 +115,6 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return 1
             if args.drain:
-                from config.loader import AppConfig
                 from netrapi.health import wake_render
 
                 app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
@@ -136,18 +135,27 @@ def main(argv: list[str] | None = None) -> int:
                 if args.delete_uploaded:
                     from netrapi.local_cleanup import delete_uploaded_local_media
 
+                    app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
                     print("[drain] delete-uploaded after drain", flush=True)
-                    cleaned = delete_uploaded_local_media(ingest)
+                    cleaned = delete_uploaded_local_media(
+                        ingest,
+                        clips_dir=app_config.recording_manager.clips_dir,
+                        trips_dir=app_config.trip_recorder.segments_dir,
+                    )
                     print(f"[drain] deleted {cleaned} uploaded local file(s)", flush=True)
-                return 0
-            if args.delete_uploaded:
-                from netrapi.local_cleanup import delete_uploaded_local_media
-
-                cleaned = delete_uploaded_local_media(ingest)
-                print(f"deleted {cleaned} uploaded local file(s)")
                 return 0
             app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
             app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
+            if args.delete_uploaded:
+                from netrapi.local_cleanup import delete_uploaded_local_media
+
+                cleaned = delete_uploaded_local_media(
+                    ingest,
+                    clips_dir=app_config.recording_manager.clips_dir,
+                    trips_dir=app_config.trip_recorder.segments_dir,
+                )
+                print(f"deleted {cleaned} uploaded local file(s)")
+                return 0
             from netrapi.local_cleanup import delete_all_local_media
 
             cleaned = delete_all_local_media(

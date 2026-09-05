@@ -135,6 +135,9 @@ def test_parse_args_drain_pairs_with_delete_uploaded():
 def test_main_delete_uploaded_skips_pipeline():
     from main import main
 
+    app_config = MagicMock()
+    app_config.recording_manager.clips_dir = Path("/clips")
+    app_config.trip_recorder.segments_dir = Path("/trips")
     with (
         patch("netrapi.backend_auth.apply_edge_env"),
         patch("db.database.ensure_sqlite_schema"),
@@ -143,14 +146,16 @@ def test_main_delete_uploaded_skips_pipeline():
             "netrapi.local_cleanup.delete_uploaded_local_media", return_value=3
         ) as cleanup,
         patch("netrapi.build_pipeline") as build,
-        patch("config.loader.AppConfig.load") as load_config,
+        patch("config.loader.AppConfig.load", return_value=app_config),
+        patch("main._resolve_runtime_paths", side_effect=lambda cfg, _root: cfg),
     ):
         ingest = MagicMock()
         try_ingest.return_value = ingest
         assert main(["--delete-uploaded"]) == 0
-    cleanup.assert_called_once_with(ingest)
+    cleanup.assert_called_once_with(
+        ingest, clips_dir=Path("/clips"), trips_dir=Path("/trips")
+    )
     build.assert_not_called()
-    load_config.assert_not_called()
 
 
 def test_main_delete_all_skips_pipeline():
@@ -309,13 +314,17 @@ def test_main_drain_then_delete_uploaded():
     order: list[str] = []
     ingest.drain_clips.side_effect = lambda: order.append("clips") or 1
     ingest.drain_trip_segments.side_effect = lambda: order.append("trips") or 2
+    app_config = MagicMock()
+    app_config.recording_manager.clips_dir = Path("/clips")
+    app_config.trip_recorder.segments_dir = Path("/trips")
     with (
         patch("netrapi.backend_auth.apply_edge_env"),
         patch("db.database.ensure_sqlite_schema"),
         patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
         patch("netrapi.health.wake_render", return_value=True),
         patch("netrapi.build_pipeline") as build,
-        patch("config.loader.AppConfig.load", return_value=MagicMock()),
+        patch("config.loader.AppConfig.load", return_value=app_config),
+        patch("main._resolve_runtime_paths", side_effect=lambda cfg, _root: cfg),
         patch(
             "netrapi.local_cleanup.delete_uploaded_local_media", return_value=3
         ) as cleanup,
@@ -323,7 +332,9 @@ def test_main_drain_then_delete_uploaded():
         cleanup.side_effect = lambda *_a, **_k: order.append("delete") or 3
         assert main(["--drain", "both", "--delete-uploaded"]) == 0
     assert order == ["clips", "trips", "delete"]
-    cleanup.assert_called_once_with(ingest)
+    cleanup.assert_called_once_with(
+        ingest, clips_dir=Path("/clips"), trips_dir=Path("/trips")
+    )
     build.assert_not_called()
 
 

@@ -25,11 +25,41 @@ def _remove_file(path: str | None) -> bool:
     return True
 
 
+def _remove_empty_dir(path: Path) -> bool:
+    try:
+        next(path.iterdir())
+    except StopIteration:
+        pass
+    except OSError as exc:
+        print(f"[cleanup] could not inspect {path}: {exc}", flush=True)
+        return False
+    else:
+        return False
+    try:
+        path.rmdir()
+    except OSError as exc:
+        print(f"[cleanup] could not delete empty dir {path}: {exc}", flush=True)
+        return False
+    print(f"[cleanup] empty dir removed ({path})", flush=True)
+    return True
+
+
+def _prune_empty_dirs(directory: Path | None) -> int:
+    if directory is None or not directory.is_dir():
+        return 0
+    nested = [path for path in directory.rglob("*") if path.is_dir()]
+    removed = 0
+    for path in sorted(nested, key=lambda item: len(item.parts), reverse=True):
+        if _remove_empty_dir(path):
+            removed += 1
+    return removed
+
+
 def _remove_local(path: str | None) -> bool:
     if not path:
         return True
     file = Path(path)
-    if file.is_file() and file.name == "clip.mp4":
+    if file.name == "clip.mp4":
         parent = file.parent
         for name in SIDECAR_NAMES:
             sidecar = parent / name
@@ -37,10 +67,8 @@ def _remove_local(path: str | None) -> bool:
                 return False
         if not _remove_file(str(file)):
             return False
-        try:
-            parent.rmdir()
-        except OSError:
-            pass
+        if parent.name.startswith("clip_"):
+            _remove_empty_dir(parent)
         return True
     return _remove_file(path)
 
@@ -128,12 +156,22 @@ def _iter_media(
     return refs
 
 
-def delete_uploaded_local_media(ingest: CloudIngest, *, target: str = "both") -> int:
+def delete_uploaded_local_media(
+    ingest: CloudIngest,
+    *,
+    target: str = "both",
+    clips_dir: Path | None = None,
+    trips_dir: Path | None = None,
+) -> int:
     """Delete local clip/trip MP4s that are already in S3. Does not delete S3 objects."""
     cleaned = 0
     for kind, row_id, local_path in _iter_media(uploaded_only=True, target=target):
         if _cleanup_row(ingest, kind=kind, row_id=row_id, local_path=local_path):
             cleaned += 1
+    if target in {"clips", "both"}:
+        _prune_empty_dirs(clips_dir)
+    if target in {"trips", "both"}:
+        _prune_empty_dirs(trips_dir)
     return cleaned
 
 
@@ -172,4 +210,6 @@ def delete_all_local_media(
             cleaned += 1
     cleaned += _sweep_orphans(clips_dir, keep)
     cleaned += _sweep_orphans(trips_dir, keep)
+    _prune_empty_dirs(clips_dir)
+    _prune_empty_dirs(trips_dir)
     return cleaned

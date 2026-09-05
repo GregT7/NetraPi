@@ -66,8 +66,8 @@ flowchart TB
 |----------|---------|--------|
 | **`--full-record`** / **`--no-full-record`** | config value | Passed to **`run_kwargs`**; overrides **`trip_recorder.json`** **`enabled`** |
 | **`--drain {clips,trips,both}`** | (off) | Maintenance upload; does not run capture |
-| **`--delete-uploaded`** | (off) | Alone or after `--drain`: unlink local MP4s already in S3 |
-| **`--delete-all`** | (off) | Unlink finished local MP4s (does not delete S3) |
+| **`--delete-uploaded`** | (off) | Alone or after `--drain`: unlink local MP4s already in S3; prune empty clip/trip folders |
+| **`--delete-all`** | (off) | Unlink finished local MP4s and empty clip/trip folders (does not delete S3) |
 
 **Happy path:** **`main`** → import path → **`parse_args`** → **`AppConfig.load`** → **`_resolve_runtime_paths`** → **`build_pipeline`** → (optional TPU verify) → **`pipeline.run`** → exit **0**.
 

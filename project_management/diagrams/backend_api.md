@@ -413,7 +413,7 @@ JSON only. After the Pi deletes a local clip or trip MP4, it tells FastAPI so Po
 }
 ```
 
-Edge entry points (no capture loop): `main.py --delete-uploaded` (only rows with `s3_stored` true) and `main.py --delete-all` (all finished local MP4s, plus leftover files in the clips/trips directories). Unfinished recordings are left on disk.
+Edge entry points (no capture loop): `main.py --delete-uploaded` (only rows with `s3_stored` true) and `main.py --delete-all` (all finished local MP4s, plus leftover files in the clips/trips directories). Both also remove empty clip/trip folders. Unfinished recordings are left on disk.
 
 ---
 

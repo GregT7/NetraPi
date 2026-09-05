@@ -20,8 +20,8 @@ source venv/bin/activate
 python main.py --drain both
 python main.py --drain both --delete-uploaded
 
-python main.py --delete-uploaded   # already in S3
-python main.py --delete-all        # all finished locals; S3 untouched
+python main.py --delete-uploaded   # already in S3; empty clip/trip folders too
+python main.py --delete-all        # all finished locals; empty folders; S3 untouched
 
 # pending trips
 sqlite3 ~/Desktop/NetraPi/src/main/db/netrapi.db \
@@ -36,6 +36,6 @@ Logs: `journalctl` live · `src/main/data/logs/trip_session_*/` (`trip.log`, `st
 
 - Clips upload online during the drive; **trips** need `--drain`.
 - Capture does not block on Render: cloud ingest runs on a background FIFO queue; session end flushes that queue before exit.
-- `--drain … --delete-uploaded` drains first, then unlinks local MP4s already in S3. Never deletes S3 objects.
+- `--drain … --delete-uploaded` drains first, then unlinks local MP4s already in S3 and removes empty clip/trip folders. Never deletes S3 objects.
 - TPU fail → exit. No Wi‑Fi / Render → OFFLINE capture still runs.
 - Flags: `--full-record` / `--no-full-record`, `--drain {clips,trips,both}`, `--delete-uploaded`, `--delete-all`

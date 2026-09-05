@@ -259,3 +259,43 @@ def test_delete_uploaded_local_removes_clip_directory(tmp_path: Path) -> None:
         assert row.init_local_deleted is True
         assert row.local_path is None
     assert any(item[1].endswith("confirm-local-delete") for item in calls)
+
+
+def test_delete_uploaded_prunes_leftover_empty_dirs(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
+    _upgrade(url)
+    clips_dir = tmp_path / "clips"
+    trips_dir = tmp_path / "trips"
+    leftover = clips_dir / "clip_5_20260903_185707"
+    leftover.mkdir(parents=True)
+    trips_dir.mkdir()
+    ingest, _calls = _ingest()
+
+    cleaned = delete_uploaded_local_media(
+        ingest, clips_dir=clips_dir, trips_dir=trips_dir
+    )
+    assert cleaned == 0
+    assert clips_dir.is_dir()
+    assert trips_dir.is_dir()
+    assert not leftover.is_dir()
+
+
+def test_delete_all_prunes_leftover_empty_dirs(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
+    _upgrade(url)
+    clips_dir = tmp_path / "clips"
+    trips_dir = tmp_path / "trips"
+    leftover_clip = clips_dir / "clip_5_20260903_185707"
+    leftover_trip = trips_dir / "empty_trip_dir"
+    leftover_clip.mkdir(parents=True)
+    leftover_trip.mkdir(parents=True)
+    ingest, _calls = _ingest()
+
+    cleaned = delete_all_local_media(
+        ingest, clips_dir=clips_dir, trips_dir=trips_dir
+    )
+    assert cleaned == 0
+    assert clips_dir.is_dir()
+    assert trips_dir.is_dir()
+    assert not leftover_clip.is_dir()
+    assert not leftover_trip.is_dir()
