@@ -1342,7 +1342,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 *Tests: TP-57 to TP-62*
 
-> **Focus:** Synchronous edge boot health before capture; cheap `GET /health` vs authenticated `GET /api/netrapi/ready`; one-way online/offline; Render keep-alive; `--drain-trips {clips,trips,both}` and optional `--delete-after-drain {clips,trips,both}` after offline drives. Unit: `src/tests/unit/edge/netrapi/test_boot_health.py`, `src/tests/unit/backend/app/routes/test_ready.py`, drain/delete in `test_main.py` / `test_local_cleanup.py`. Integration: `src/tests/integration/tp_57`–`tp_62`.
+> **Focus:** Synchronous edge boot health before capture; cheap `GET /health` vs authenticated `GET /api/netrapi/ready`; one-way online/offline; Render keep-alive; `--drain {clips,trips,both}` and optional `--drain … --delete-uploaded` after offline drives. Unit: `src/tests/unit/edge/netrapi/test_boot_health.py`, `src/tests/unit/backend/app/routes/test_ready.py`, drain/delete in `test_main.py` / `test_local_cleanup.py`. Integration: `src/tests/integration/tp_57`–`tp_62`.
 
 ### TP-57: TPU smoke abort
 - **Description**: Verifies a failed Coral TFLite dummy invoke aborts `main.py` before capture.
@@ -1407,25 +1407,25 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - After three failures, `cloud_ingest` is None, keep-alive stops, capture continues, mode does not return to online.
 
 ### TP-61: Drain clips, trips, or both
-- **Description**: Verifies `--drain-trips` requires `clips`, `trips`, or `both`, wakes Render via `/health`, uploads the selected pending media, and may `--delete-after-drain {clips,trips,both}` after a successful drain.
+- **Description**: Verifies `--drain` requires `clips`, `trips`, or `both`, wakes Render via `/health`, uploads the selected pending media, and may `--delete-uploaded` after a successful drain.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.10, M-6.11
 - **Prerequisites**
   - Drain target argument implemented.
 - **Steps**
-  1. Parse `--drain-trips` without a target (error).
+  1. Parse `--drain` without a target (error).
   2. `clips` drains pending event JSON + clip PUT.
   3. `trips` drains trip segments.
   4. `both` does clips then trips.
-  5. `--delete-after-drain` without `--drain-trips` (error).
-  6. After a successful drain, `--delete-after-drain clips|trips|both` unlinks only that local media already in S3.
+  5. `--drain` with `--delete-all` (error).
+  6. After a successful drain, `--delete-uploaded` unlinks local media already in S3.
   7. Run `src/tests/integration/tp_61`.
 - **Pass criteria**
   - Capture loop is not started.
   - Counts print to stdout.
   - `/health` is polled before upload.
-  - Delete runs only after a successful drain and honors clips/trips/both.
+  - Delete runs only after a successful drain when `--delete-uploaded` is set.
 
 ### TP-62: Health settings snapshot
 - **Description**: Verifies `health.json` is loaded at runtime and snapshotted as `health_config` (Alembic 0004), included in the master-config fingerprint.
@@ -1608,7 +1608,7 @@ Covered now:
 - edge ↔ deployed backend E2E (no frontend; verification only)
 - Sprint 7 harnesses under `src/tests/integration/tp_50`–`tp_56` against https://netrapi.onrender.com
 - Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
-- Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain-trips clips|trips|both` + `--delete-after-drain`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
+- Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain clips|trips|both` + `--delete-uploaded`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
 - Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP (`test_public_clip.py`, `TryItOut.test.tsx`)
 - Sprint 10: per-clip S3 directory (`clip.mp4` + `areas.json` + `motion.json` + `transitions.json`), public mint inlines sidecar JSON, Try-it-out detailed/simple toggle (`test_playback_json.py`, `test_s3_upload.py`, `TryItOut.test.tsx`)
 

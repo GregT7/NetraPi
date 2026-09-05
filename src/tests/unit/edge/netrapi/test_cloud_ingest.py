@@ -129,8 +129,8 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
 
     put_calls: list[tuple] = []
 
-    def put_bytes(put_url: str, payload: bytes, content_type: str) -> None:
-        put_calls.append((put_url, payload, content_type))
+    def put_file(put_url: str, path: Path, content_type: str) -> None:
+        put_calls.append((put_url, path.read_bytes(), content_type))
 
     with get_session() as session:
         driving = insert_driving_session(session, start_time=started)
@@ -161,8 +161,8 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
         event_id = event.id
         session_id = driving.id
 
-    CloudIngest(json_request=json_request, put_bytes=put_bytes).sync_session(session_id)
-    CloudIngest(json_request=json_request, put_bytes=put_bytes).sync_event(event_id)
+    CloudIngest(json_request=json_request, put_file=put_file).sync_session(session_id)
+    CloudIngest(json_request=json_request, put_file=put_file).sync_event(event_id)
 
     paths = [item[1] for item in calls]
     assert "/api/netrapi/master-config" in paths
@@ -201,7 +201,7 @@ def test_sync_event_skips_put_when_already_stored(tmp_path: Path) -> None:
         calls.append(path)
         return {"ok": True}
 
-    def put_bytes(*_args):
+    def put_file(*_args):
         raise AssertionError("already-stored clip must not PUT to S3")
 
     with get_session() as session:
@@ -227,7 +227,7 @@ def test_sync_event_skips_put_when_already_stored(tmp_path: Path) -> None:
         session.add(clip)
         session.commit()
 
-    CloudIngest(json_request=json_request, put_bytes=put_bytes).sync_event(event_id)
+    CloudIngest(json_request=json_request, put_file=put_file).sync_event(event_id)
     assert "/api/netrapi/driving-event" in calls
     assert "/api/netrapi/s3-upload-url" not in calls
     assert "/api/netrapi/confirm-s3-upload" not in calls
@@ -243,7 +243,7 @@ def test_sync_event_metadata_only_skips_s3(tmp_path: Path) -> None:
         calls.append((method, path, body))
         return {"ok": True}
 
-    def put_bytes(*_args):
+    def put_file(*_args):
         raise AssertionError("metadata-only event must not PUT to S3")
 
     with get_session() as session:
@@ -257,7 +257,7 @@ def test_sync_event_metadata_only_skips_s3(tmp_path: Path) -> None:
         session.commit()
         event_id = event.id
 
-    CloudIngest(json_request=json_request, put_bytes=put_bytes).sync_event(event_id)
+    CloudIngest(json_request=json_request, put_file=put_file).sync_event(event_id)
     paths = [item[1] for item in calls]
     assert "/api/netrapi/driving-event" in paths
     assert "/api/netrapi/s3-upload-url" not in paths
@@ -277,7 +277,7 @@ def test_sync_trip_segment_does_not_put(tmp_path: Path) -> None:
         calls.append(path)
         return {}
 
-    def put_bytes(*_args):
+    def put_file(*_args):
         raise AssertionError("trip segment must not PUT to S3 during ingest")
 
     with get_session() as session:
@@ -293,7 +293,7 @@ def test_sync_trip_segment_does_not_put(tmp_path: Path) -> None:
         session.commit()
         segment_id = row.id
 
-    CloudIngest(json_request=json_request, put_bytes=put_bytes).sync_trip_segment(
+    CloudIngest(json_request=json_request, put_file=put_file).sync_trip_segment(
         segment_id
     )
     assert calls == ["/api/netrapi/trip-segment"]
@@ -320,8 +320,8 @@ def test_upload_trip_segment_puts_and_marks_local(tmp_path: Path) -> None:
 
     put_calls: list[tuple] = []
 
-    def put_bytes(put_url: str, payload: bytes, content_type: str) -> None:
-        put_calls.append((put_url, payload, content_type))
+    def put_file(put_url: str, path: Path, content_type: str) -> None:
+        put_calls.append((put_url, path.read_bytes(), content_type))
 
     with get_session() as session:
         driving = insert_driving_session(session, start_time=started)
@@ -337,7 +337,7 @@ def test_upload_trip_segment_puts_and_marks_local(tmp_path: Path) -> None:
         segment_id = row.id
 
     uploaded = CloudIngest(
-        json_request=json_request, put_bytes=put_bytes
+        json_request=json_request, put_file=put_file
     ).upload_trip_segment(segment_id)
     assert uploaded is True
     paths = [item[1] for item in calls]
@@ -375,7 +375,7 @@ def test_upload_trip_segment_skips_put_when_already_stored(tmp_path: Path) -> No
         calls.append(path)
         return {"ok": True}
 
-    def put_bytes(*_args):
+    def put_file(*_args):
         raise AssertionError("already-stored trip must not PUT to S3")
 
     with get_session() as session:
@@ -398,7 +398,7 @@ def test_upload_trip_segment_skips_put_when_already_stored(tmp_path: Path) -> No
         session.commit()
 
     uploaded = CloudIngest(
-        json_request=json_request, put_bytes=put_bytes
+        json_request=json_request, put_file=put_file
     ).upload_trip_segment(segment_id)
     assert uploaded is True
     assert "/api/netrapi/trip-segment" in calls
@@ -429,7 +429,7 @@ def test_drain_trip_segments_uploads_finished_pending_only(tmp_path: Path) -> No
             }
         return {"ok": True}
 
-    def put_bytes(*_args) -> None:
+    def put_file(*_args) -> None:
         return None
 
     with get_session() as session:
@@ -470,7 +470,7 @@ def test_drain_trip_segments_uploads_finished_pending_only(tmp_path: Path) -> No
         session.commit()
 
     uploaded = CloudIngest(
-        json_request=json_request, put_bytes=put_bytes
+        json_request=json_request, put_file=put_file
     ).drain_trip_segments()
     assert uploaded == 1
     assert put_ids == [pending_id]
@@ -502,7 +502,7 @@ def test_drain_clips_uploads_pending(tmp_path: Path) -> None:
             }
         return {"ok": True}
 
-    def put_bytes(*_args) -> None:
+    def put_file(*_args) -> None:
         return None
 
     with get_session() as session:
@@ -564,7 +564,7 @@ def test_drain_clips_uploads_pending(tmp_path: Path) -> None:
         session.commit()
 
     uploaded = CloudIngest(
-        json_request=json_request, put_bytes=put_bytes
+        json_request=json_request, put_file=put_file
     ).drain_clips()
     assert uploaded == 1
     with get_session() as session:
@@ -578,6 +578,78 @@ def test_sync_session_missing_row_raises(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
     _upgrade(url)
     with pytest.raises(CloudIngestError, match="driving_session 99"):
-        CloudIngest(json_request=lambda *_: {}, put_bytes=lambda *_: None).sync_session(
+        CloudIngest(json_request=lambda *_: {}, put_file=lambda *_: None).sync_session(
             99
         )
+
+
+def test_progress_reader_emits_on_chunk_threshold(tmp_path: Path) -> None:
+    from netrapi.cloud_ingest import _ProgressReader
+
+    path = tmp_path / "blob.bin"
+    path.write_bytes(b"x" * 12_000)
+    messages: list[str] = []
+    with path.open("rb") as fh:
+        reader = _ProgressReader(
+            fh,
+            size=12_000,
+            label="blob.bin",
+            on_progress=messages.append,
+            log_every_bytes=4_000,
+            log_every_s=9999.0,
+        )
+        while True:
+            chunk = reader.read(3_000)
+            if not chunk:
+                break
+    assert any("PUT progress blob.bin" in message for message in messages)
+    assert any("(100%)" in message for message in messages)
+
+
+def test_http_put_file_streams_and_logs(tmp_path: Path) -> None:
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from netrapi.cloud_ingest import PUT_TIMEOUT_S, _http_put_file
+
+    assert PUT_TIMEOUT_S == 1200.0
+
+    received: dict[str, object] = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_PUT(self) -> None:  # noqa: N802
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            received["body"] = body
+            received["content_type"] = self.headers.get("Content-Type")
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *_args) -> None:
+            return None
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        path = tmp_path / "stream.mp4"
+        payload = b"streamed-video-bytes-0123456789"
+        path.write_bytes(payload)
+        messages: list[str] = []
+        port = server.server_address[1]
+        _http_put_file(
+            f"http://127.0.0.1:{port}/object",
+            path,
+            "video/mp4",
+            on_progress=messages.append,
+            timeout_s=30.0,
+        )
+    finally:
+        server.shutdown()
+        thread.join(timeout=5.0)
+
+    assert received.get("body") == payload
+    assert received.get("content_type") == "video/mp4"
+    assert any("PUT start stream.mp4" in message for message in messages)
+    assert any("PUT done stream.mp4" in message for message in messages)
+    assert any("streaming" in message for message in messages)

@@ -16,7 +16,7 @@ Give the Raspberry Pi a small set of HTTP calls so that it can:
 4. After a stop-sign encounter, persist **one driving event** and its children, then (if connected) **PUT the event clip to S3** (`s3-upload-url` → Pi PUT → `confirm-s3-upload`). Clips are 10–20 s and rare.
 5. **Later, on Wi‑Fi:** PUT **trip** files the same way (`trip_segment_id`). Video never transits Render. Trip MP4s never use cellular from the run cycle.
 
-The Pi does not hold AWS or Postgres credentials (decision 22). Device ingest uses header `X-API-Key` matching `NETRAPI_API_KEY` (TP-42; decision 46). The edge HTTP client is `netrapi.cloud_ingest.CloudIngest` (TP-49; decision 48): after each local SQLite write, the capture loop POSTs JSON and, for event clips, PUTs via a presigned URL. Before a session upsert, `sync_session` POSTs `master-config` so the FK exists (decision 56). `sync_trip_segment` is JSON-only. Trip files PUT later via `drain_trip_segments` / `main.py --drain-trips` (decision 54). Ingest failures are logged and do not abort the loop. Uploads stay **one at a time** (decision 21). **Event clips** may S3 during the drive; **trip segments** wait for Wi‑Fi (decision 33).
+The Pi does not hold AWS or Postgres credentials (decision 22). Device ingest uses header `X-API-Key` matching `NETRAPI_API_KEY` (TP-42; decision 46). The edge HTTP client is `netrapi.cloud_ingest.CloudIngest` (TP-49; decision 48): after each local SQLite write, the capture loop POSTs JSON and, for event clips, PUTs via a presigned URL. Before a session upsert, `sync_session` POSTs `master-config` so the FK exists (decision 56). `sync_trip_segment` is JSON-only. Trip files PUT later via `drain_trip_segments` / `main.py --drain` (decision 54). Ingest failures are logged and do not abort the loop. Uploads stay **one at a time** (decision 21). **Event clips** may S3 during the drive; **trip segments** wait for Wi‑Fi (decision 33).
 
 ---
 
@@ -58,7 +58,7 @@ Full-session trip files rotate about every **`segment_seconds`** (default **300*
 
 ## 4. Sequence
 
-**Drive:** session → prime trip rows (no trip PUT) → event JSON → **clip** PUT. **Later Wi‑Fi:** `drain_trip_segments` / `main.py --drain-trips` — **trip** PUT, one file at a time.
+**Drive:** session → prime trip rows (no trip PUT) → event JSON → **clip** PUT. **Later Wi‑Fi:** `drain_trip_segments` / `main.py --drain` — **trip** PUT, one file at a time.
 
 ```mermaid
 sequenceDiagram
@@ -413,7 +413,7 @@ JSON only. After the Pi deletes a local clip or trip MP4, it tells FastAPI so Po
 }
 ```
 
-Edge entry points (no capture loop): `main.py --delete-uploaded-local` (only rows with `s3_stored` true) and `main.py --delete-all-local` (all finished local MP4s, plus leftover files in the clips/trips directories). Unfinished recordings are left on disk.
+Edge entry points (no capture loop): `main.py --delete-uploaded` (only rows with `s3_stored` true) and `main.py --delete-all` (all finished local MP4s, plus leftover files in the clips/trips directories). Unfinished recordings are left on disk.
 
 ---
 

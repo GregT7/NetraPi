@@ -381,7 +381,7 @@ src/tests/
     ├── tp_58/                         ✅  offline Wi-Fi / internet (mocked boot)
     ├── tp_59/                         ✅  deployed GET /api/netrapi/ready
     ├── tp_60/                         ✅  online boot + keep-alive → offline
-    ├── tp_61/                         ✅  --drain-trips clips|trips|both + delete-after-drain
+    ├── tp_61/                         ✅  --drain clips|trips|both + delete-uploaded
     ├── tp_62/                         ✅  health.json snapshot (Alembic 0004)
     ├── at_7_1/                        ✅  mocked Pi pipeline → Render persist + ingest
     ├── at_7_2/                        ✅  camera + SPACE + stubbed events → cloud (dry-run)
@@ -401,6 +401,6 @@ src/tests/
 4. `src/main/edge/netrapi/detection/` + `events/` stub ✅ (TP-18/TP-19 unit tests)  
 5. `src/main/edge/main.py` + `netrapi-edge.service` ✅  
 6. `src/main/data/clips/` and `src/main/data/trips/` — 🏃 created on first write; keep `src/main/data/` in `.gitignore`  
-7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain-trips {clips,trips,both}`. After a successful drain: `--delete-after-drain {clips,trips,both}`. Standalone local MP4 cleanup: `--delete-uploaded-local` or `--delete-all-local`.  
+7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain {clips,trips,both}`. After a successful drain: `--delete-uploaded`. Standalone cleanup: `--delete-uploaded` or `--delete-all`.  
 8. Event port ✅ — approach / motion / features / stop_classifier + approach/motion/knn JSON + joblib models (design: [event_detection.md](event_detection.md))  
 9. Buzzer ✅ — `netrapi/buzzer/` + `buzzer.json` (PWM beep on configured events; soft-fail GPIO)

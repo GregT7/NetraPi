@@ -285,8 +285,8 @@ Event clips may PUT during the drive when online (small, infrequent). Trip segme
 | What | During the drive | Later, Wi-Fi |
 | --- | --- | --- |
 | Event clip | local file + `driving-event` JSON; then presigned PUT if online | retry PUT if the in-drive upload failed |
-| Trip segment | local file + `trip-segment` JSON prime (`s3_stored` null). No S3 PUT | `CloudIngest.drain_trip_segments` / `main.py --drain-trips`: one file at a time, presigned PUT + confirm |
-| Local MP4 cleanup | leave files on disk | `--delete-uploaded-local` (already in S3) or `--delete-all-local`; `confirm-local-delete` (S3 objects stay) |
+| Trip segment | local file + `trip-segment` JSON prime (`s3_stored` null). No S3 PUT | `CloudIngest.drain_trip_segments` / `main.py --drain`: one file at a time, presigned PUT + confirm |
+| Local MP4 cleanup | leave files on disk | `--delete-uploaded` (already in S3) or `--delete-all`; `confirm-local-delete` (S3 objects stay) |
 
 ---
 

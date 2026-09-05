@@ -17,11 +17,11 @@ python main.py
 cd ~/Desktop/NetraPi/src/main/edge
 source venv/bin/activate
 
-python main.py --drain-trips both
-python main.py --drain-trips both --delete-after-drain both
+python main.py --drain both
+python main.py --drain both --delete-uploaded
 
-python main.py --delete-uploaded-local   # local only; already in S3
-python main.py --delete-all-local        # all finished locals; S3 untouched
+python main.py --delete-uploaded   # already in S3
+python main.py --delete-all        # all finished locals; S3 untouched
 
 # pending trips
 sqlite3 ~/Desktop/NetraPi/src/main/db/netrapi.db \
@@ -34,7 +34,8 @@ Logs: `journalctl` live · `src/main/data/logs/trip_session_*/` (`trip.log`, `st
 
 ## Notes
 
-- Clips upload online during the drive; **trips** need `--drain-trips`.
-- `--delete-after-drain` only with `--drain-trips`. Never deletes S3 objects.
+- Clips upload online during the drive; **trips** need `--drain`.
+- Capture does not block on Render: cloud ingest runs on a background FIFO queue; session end flushes that queue before exit.
+- `--drain … --delete-uploaded` drains first, then unlinks local MP4s already in S3. Never deletes S3 objects.
 - TPU fail → exit. No Wi‑Fi / Render → OFFLINE capture still runs.
-- Flags: `--full-record` / `--no-full-record`, `--drain-trips {clips,trips,both}`, `--delete-after-drain {…}`, `--delete-uploaded-local`, `--delete-all-local`
+- Flags: `--full-record` / `--no-full-record`, `--drain {clips,trips,both}`, `--delete-uploaded`, `--delete-all`

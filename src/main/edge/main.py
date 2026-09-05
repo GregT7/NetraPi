@@ -58,35 +58,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Enable segmented full-trip recording (default: config value)",
     )
-    jobs = parser.add_mutually_exclusive_group()
-    jobs.add_argument(
-        "--drain-trips",
-        choices=["clips", "trips", "both"],
-        help="Upload pending clips, trip segments, or both (Wi-Fi). Does not run capture.",
-    )
-    jobs.add_argument(
-        "--delete-uploaded-local",
-        action="store_true",
-        help=(
-            "Delete local clip/trip MP4s already stored in S3. "
-            "Updates SQLite and cloud flags. Does not delete S3 objects."
-        ),
-    )
-    jobs.add_argument(
-        "--delete-all-local",
-        action="store_true",
-        help=(
-            "Delete all finished local clip/trip MP4s. "
-            "Updates SQLite and cloud flags. Does not delete S3 objects."
-        ),
-    )
     parser.add_argument(
-        "--delete-after-drain",
+        "--drain",
         choices=["clips", "trips", "both"],
         default=None,
         help=(
-            "After a successful --drain-trips, delete local MP4s already in S3 "
-            "(clips, trips, or both). Does not delete S3 objects."
+            "Upload pending clips, trip segments, or both (Wi-Fi). "
+            "Does not run capture. May be paired with --delete-uploaded."
+        ),
+    )
+    cleanup = parser.add_mutually_exclusive_group()
+    cleanup.add_argument(
+        "--delete-uploaded",
+        action="store_true",
+        help=(
+            "Delete local clip/trip MP4s already stored in S3. "
+            "With --drain, runs after a successful drain. "
+            "Updates SQLite and cloud flags. Does not delete S3 objects."
+        ),
+    )
+    cleanup.add_argument(
+        "--delete-all",
+        action="store_true",
+        help=(
+            "Delete all finished local clip/trip MP4s. "
+            "Cannot be combined with --drain. "
+            "Updates SQLite and cloud flags. Does not delete S3 objects."
         ),
     )
     return parser.parse_args(argv)
@@ -101,12 +98,12 @@ def main(argv: list[str] | None = None) -> int:
     from netrapi.exceptions import NetraPiError
 
     args = parse_args(argv)
-    if args.delete_after_drain and not args.drain_trips:
-        print("--delete-after-drain requires --drain-trips", file=sys.stderr)
+    if args.drain and args.delete_all:
+        print("--delete-all cannot be combined with --drain", file=sys.stderr)
         return 1
     try:
         apply_edge_env()
-        if args.drain_trips or args.delete_uploaded_local or args.delete_all_local:
+        if args.drain or args.delete_uploaded or args.delete_all:
             from netrapi.cloud_ingest import try_cloud_ingest
 
             ensure_sqlite_schema()
@@ -117,38 +114,33 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 return 1
-            if args.drain_trips:
+            if args.drain:
                 from config.loader import AppConfig
                 from netrapi.health import wake_render
 
                 app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
                 print(
-                    f"[drain] target={args.drain_trips}; waking Render via GET /health ...",
+                    f"[drain] target={args.drain}; waking Render via GET /health ...",
                     flush=True,
                 )
                 if not wake_render(app_config):
                     print("Render GET /health failed; drain aborted", file=sys.stderr)
                     return 1
                 print("[drain] Render is up", flush=True)
-                if args.drain_trips in ("clips", "both"):
+                if args.drain in ("clips", "both"):
                     clips = ingest.drain_clips()
                     print(f"[drain] finished clips: uploaded {clips}", flush=True)
-                if args.drain_trips in ("trips", "both"):
+                if args.drain in ("trips", "both"):
                     trips = ingest.drain_trip_segments()
                     print(f"[drain] finished trips: uploaded {trips}", flush=True)
-                if args.delete_after_drain:
+                if args.delete_uploaded:
                     from netrapi.local_cleanup import delete_uploaded_local_media
 
-                    print(
-                        f"[drain] delete-after-drain target={args.delete_after_drain}",
-                        flush=True,
-                    )
-                    cleaned = delete_uploaded_local_media(
-                        ingest, target=args.delete_after_drain
-                    )
+                    print("[drain] delete-uploaded after drain", flush=True)
+                    cleaned = delete_uploaded_local_media(ingest)
                     print(f"[drain] deleted {cleaned} uploaded local file(s)", flush=True)
                 return 0
-            if args.delete_uploaded_local:
+            if args.delete_uploaded:
                 from netrapi.local_cleanup import delete_uploaded_local_media
 
                 cleaned = delete_uploaded_local_media(ingest)
