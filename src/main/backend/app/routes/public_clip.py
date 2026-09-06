@@ -86,7 +86,7 @@ def _clip_labels(session, event_id: int, types: dict[int, str]) -> tuple[str, st
         elif row.kind == "manual":
             manual = label
     prediction = auto or "—"
-    return (manual or prediction, prediction)
+    return (manual or "-", prediction)
 
 
 def _format_clip_time(value) -> str:
@@ -119,7 +119,7 @@ def list_public_clips():
             .join(Event, Event.id == Clip.event_id)
             .where(Clip.s3_stored.is_(True))
             .where(Clip.s3_key.is_not(None))
-            .order_by(Event.time.asc())
+            .order_by(Event.time.desc())
             .limit(50)
         ).all()
         body = []

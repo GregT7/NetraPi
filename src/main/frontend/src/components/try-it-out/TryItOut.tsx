@@ -449,8 +449,10 @@ export default function TryItOut() {
                 </tr>
               ) : (
                 pageClips.map((clip) => {
-                  const matched = clip.classification === clip.label
+                  const unlabeled = clip.label === '-'
+                  const matched = !unlabeled && clip.classification === clip.label
                   const selected = selectedId === clip.id
+                  const unlabeledText = unlabeled ? 'text-sky-300' : 'text-zinc-200'
                   return (
                     <tr
                       aria-selected={selected}
@@ -470,10 +472,16 @@ export default function TryItOut() {
                       tabIndex={0}
                     >
                       <td className="px-4 py-3 text-amber-400">{clip.id}</td>
-                      <td className="px-4 py-3 text-zinc-200">{clip.dateTime}</td>
-                      <td className="px-4 py-3 text-zinc-200">{clip.label}</td>
+                      <td className={`px-4 py-3 ${unlabeledText}`}>{clip.dateTime}</td>
+                      <td className={`px-4 py-3 ${unlabeledText}`}>{clip.label}</td>
                       <td
-                        className={`px-4 py-3 ${matched ? 'text-emerald-400' : 'text-red-400'}`}
+                        className={`px-4 py-3 ${
+                          unlabeled
+                            ? 'text-sky-300'
+                            : matched
+                              ? 'text-emerald-400'
+                              : 'text-red-400'
+                        }`}
                       >
                         {clip.classification}
                       </td>

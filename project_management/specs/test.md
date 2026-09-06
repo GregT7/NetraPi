@@ -1452,7 +1452,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 > **Focus:** Unauthenticated public clip list and short-lived signed GET mint for Try-it-out. Design: [frontend_playback.md](../diagrams/frontend_playback.md). Unit: `src/tests/unit/backend/app/routes/test_public_clip.py`, `src/tests/unit/frontend/src/TryItOut.test.tsx`. Ingest signed GET remains TP-46.
 
 ### TP-63: Public confirmed-clip list
-- **Description**: Verifies `GET /api/public/clips` returns confirmed S3 clips without an API key, oldest event first, and leaves ingest routes keyed.
+- **Description**: Verifies `GET /api/public/clips` returns confirmed S3 clips without an API key, newest event first, and leaves ingest routes keyed.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-7.14, M-7.16, M-9.23, M-9.24
@@ -1461,11 +1461,12 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - At least one confirmed clip (or unit fixtures).
 - **Steps**
   1. `GET /api/public/clips` with no `X-API-Key`.
-  2. Confirm only `s3_stored` rows appear; timestamps are oldest-first; labels are display names.
+  2. Confirm only `s3_stored` rows appear; timestamps are newest-first; Label is the manual classification from the database (or `-` when none).
   3. Call an ingest route (`POST /api/netrapi/s3-download-url` or similar) without a key (401).
 - **Pass criteria**
   - List succeeds without an API key.
-  - Unconfirmed clips are omitted; order is ascending event time.
+  - Unconfirmed clips are omitted; order is descending event time.
+  - Label is `classification.kind = 'manual'` (display name), or `-` when that row is missing.
   - Ingest routes still 401 without the device key.
   - Unit coverage in `test_public_clip.py`.
 
@@ -1511,12 +1512,13 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Prerequisites**
   - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
 - **Steps**
-  1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`).
+  1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`). Unlabeled clips show `-` with sky text.
   2. Click a clip row; video `src` becomes the minted GET URL.
   3. Confirm **Detailed analysis** is checked by default (Style A: no native scrub bar; play overlay).
   4. Uncheck **Detailed analysis**; native controls appear and the same video `src` is kept (no second mint).
 - **Pass criteria**
   - No dummy table rows.
+  - Unlabeled clips (no manual classification) show `-` with sky text.
   - Click sets video `src` to the minted GET.
   - Style A is the default; toggling to Style B does not remint.
   - Unit coverage in `TryItOut.test.tsx`.

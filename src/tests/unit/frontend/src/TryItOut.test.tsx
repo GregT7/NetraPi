@@ -149,6 +149,29 @@ describe('TryItOut', () => {
     expect(screen.queryByText('clip-12')).toBeNull()
   })
 
+  it('shows unlabeled rows from the API as dash with sky text', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input).includes('/api/public/clips')) {
+          return jsonResponse({
+            clips: [clipRow(10, { classification: 'Rolling Stop', label: '-' })],
+            live_url_max: 20,
+            live_urls: 0,
+          })
+        }
+        return jsonResponse({ expires_in: 120, url: 'https://s3.example/clip.mp4' })
+      }),
+    )
+
+    render(<TryItOut />)
+    expect(await screen.findByText('clip-10')).toBeTruthy()
+    const dash = screen.getByText('-')
+    expect(dash).toBeTruthy()
+    expect(dash.className).toContain('text-sky-300')
+    expect(dash.closest('tr')?.className).not.toContain('bg-amber')
+  })
+
   it('refetches the live S3 count after the mint TTL', async () => {
     let listLiveUrls = 0
     const fetchMock = vi.fn((input: RequestInfo | URL) => {

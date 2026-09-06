@@ -36,6 +36,28 @@ _EVENT = {
     },
 }
 _EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
+_EVENT_NEWER = {
+    "id": 2,
+    "driving_session_id": 1,
+    "time": "2026-08-16T19:00:01Z",
+    "clip": {
+        "id": 11,
+        "fps": 30,
+        "order_number": 2,
+        "num_frames": 60,
+        "start_time": "2026-08-16T19:00:00Z",
+        "end_time": "2026-08-16T19:00:02Z",
+        "init_local_stored": True,
+        "local_path": "/tmp/clip-11.mp4",
+    },
+    "auto_classification": {
+        "kind": "auto",
+        "classification_type_id": 2,
+        "stage1_classification_type_id": 2,
+        "stage2_classification_type_id": 3,
+    },
+}
+_EXPECTED_KEY_NEWER = "Aug-2026/driving_session_id_1/clips/clip-11/clip.mp4"
 _PUBLIC = "/api/public/clip-download-url"
 
 
@@ -209,13 +231,58 @@ def test_public_list_returns_confirmed_clip(ingest_client: TestClient) -> None:
                 "clip_id": 10,
                 "id": "clip-10",
                 "dateTime": "2026-08-16 06:00 PM",
-                "label": "Rolling Stop",
+                "label": "-",
                 "classification": "Rolling Stop",
             }
         ],
         "live_urls": 0,
         "live_url_max": 20,
     }
+
+
+def test_public_list_orders_newest_event_first(ingest_client: TestClient) -> None:
+    _confirm_clip(ingest_client)
+    newer = ingest_client.post(
+        "/api/netrapi/driving-event", json=_EVENT_NEWER, headers=_HEADERS
+    )
+    assert newer.status_code == 200
+    with patch(
+        "app.routes.s3_upload.head_object",
+        return_value={"ContentLength": 13},
+    ):
+        confirmed = ingest_client.post(
+            "/api/netrapi/confirm-s3-upload",
+            json={"clip_id": 11, "object_key": _EXPECTED_KEY_NEWER},
+            headers=_HEADERS,
+        )
+    assert confirmed.status_code == 200
+    response = ingest_client.get("/api/public/clips")
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["clips"]] == ["clip-11", "clip-10"]
+    assert response.json()["clips"][0]["dateTime"] == "2026-08-16 07:00 PM"
+
+
+def test_public_list_label_comes_from_manual_classification(
+    ingest_client: TestClient,
+) -> None:
+    _confirm_clip(ingest_client)
+    labeled = ingest_client.post(
+        "/api/netrapi/driving-event",
+        json={
+            **_EVENT,
+            "manual_classification": {
+                "classification_type_id": 1,
+                "time_of_review": "2026-08-16T20:00:00Z",
+            },
+        },
+        headers=_HEADERS,
+    )
+    assert labeled.status_code == 200
+    response = ingest_client.get("/api/public/clips")
+    assert response.status_code == 200
+    row = response.json()["clips"][0]
+    assert row["label"] == "Complete Stop"
+    assert row["classification"] == "Rolling Stop"
 
 
 def test_cors_allows_local_vite_preflight(ingest_client: TestClient) -> None:
