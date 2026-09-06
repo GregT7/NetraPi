@@ -1,7 +1,9 @@
 {
-  "enabled": false,
+  "enabled": true,
   "segments_dir": "src/main/data/trips",
+  "logs_dir": "src/main/data/logs",
+  "stats_interval_s": 15,
   "segment_seconds": 300,
   "ffmpeg_crf": 20,
-  "note": "Trip segments buffer frames in RAM, then encode once per segment with ffmpeg H.264 (requires ffmpeg on PATH)."
+  "note": "Trip segments buffer frames in RAM, then encode once per segment with ffmpeg H.264 (requires ffmpeg on PATH). logs_dir holds per-session trip.log + stats.csv (not snapshotted to cloud)."
 }

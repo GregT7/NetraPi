@@ -8,10 +8,15 @@ from sqlmodel import SQLModel
 from app.auth.api_key import require_api_key
 from app.s3 import (
     CLIP_EXPIRES_SECONDS,
+    CLIP_SIDECAR_NAMES,
     DEFAULT_CONTENT_TYPE,
+    JSON_CONTENT_TYPE,
     TRIP_EXPIRES_SECONDS,
     S3NotConfiguredError,
+    clip_sidecar_key,
+    clip_sidecar_keys,
     head_object,
+    is_directory_clip_key,
     media_object_key,
     presign_get,
     presign_put,
@@ -114,12 +119,43 @@ def issue_s3_upload_url(payload: S3UploadUrlIn):
                 content_type=payload.content_type,
                 expires_in=expires_in,
             )
+            objects = [
+                {
+                    "name": object_key.rsplit("/", 1)[-1],
+                    "url": url,
+                    "object_key": object_key,
+                    "content_type": payload.content_type,
+                }
+            ]
+            if kind == "clip" and is_directory_clip_key(object_key):
+                for name in CLIP_SIDECAR_NAMES:
+                    sidecar_key = clip_sidecar_key(object_key, name)
+                    if sidecar_key is None:
+                        continue
+                    sidecar_url = presign_put(
+                        sidecar_key,
+                        content_type=JSON_CONTENT_TYPE,
+                        expires_in=expires_in,
+                    )
+                    objects.append(
+                        {
+                            "name": name,
+                            "url": sidecar_url,
+                            "object_key": sidecar_key,
+                            "content_type": JSON_CONTENT_TYPE,
+                        }
+                    )
         except S3NotConfiguredError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=str(exc),
             ) from exc
-        return {"url": url, "object_key": object_key, "method": "PUT"}
+        return {
+            "url": url,
+            "object_key": object_key,
+            "method": "PUT",
+            "objects": objects,
+        }
 
 
 @router.post("/confirm-s3-upload")
@@ -144,6 +180,16 @@ def confirm_s3_upload(payload: ConfirmS3UploadIn):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"S3 object not found: {payload.object_key}",
             )
+        if kind == "clip":
+            sidecars = clip_sidecar_keys(payload.object_key)
+            if sidecars:
+                for sidecar_key in sidecars:
+                    extra = head_object(sidecar_key)
+                    if extra is None:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"S3 object not found: {sidecar_key}",
+                        )
         row.s3_key = payload.object_key
         row.s3_stored = True
         size = found.get("ContentLength")

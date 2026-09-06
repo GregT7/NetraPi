@@ -10,6 +10,7 @@ from sqlmodel import Session, create_engine
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _EDGE_DIR = _PACKAGE_DIR.parent / "edge"
 ENV_PATH = _EDGE_DIR / ".env"
+ALEMBIC_INI = _PACKAGE_DIR / "alembic.ini"
 
 _engine: Engine | None = None
 _url_override: str | None = None
@@ -88,6 +89,32 @@ def init_engine(url: str | None = None) -> Engine:
             cursor.close()
 
     return _engine
+
+
+def ensure_sqlite_schema(url: str | None = None) -> Engine:
+    """Apply Alembic ``upgrade head`` for a SQLite URL, then open the engine.
+
+    Refuses non-SQLite URLs so edge never migrates Supabase/Compose Postgres.
+    Idempotent when already at head. Used by ``main.py`` on capture and drain.
+    """
+    if url is None:
+        url = load_database_url()
+    elif url.startswith("sqlite"):
+        url = resolve_sqlite_url(url)
+    if not url.startswith("sqlite"):
+        raise DatabaseUrlError(
+            "ensure_sqlite_schema only applies to SQLite "
+            "(edge local prod). Refusing non-SQLite DATABASE_URL."
+        )
+    if not ALEMBIC_INI.is_file():
+        raise RuntimeError(f"Alembic config not found: {ALEMBIC_INI}")
+
+    from alembic import command
+    from alembic.config import Config
+
+    set_database_url_override(url)
+    command.upgrade(Config(str(ALEMBIC_INI)), "head")
+    return init_engine(url)
 
 
 def get_session() -> Session:

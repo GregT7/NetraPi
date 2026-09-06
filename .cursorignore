@@ -20,7 +20,13 @@ serviceAccount.json
 
 # Heavy local artifacts (also gitignored)
 venv/
-vids/
 research/
-data/
+
 metrics/
+
+# Frontend generated trees — keep out of index, file search, and Agent context
+**/node_modules/
+src/main/frontend/node_modules/
+src/main/frontend/dist/
+**/dist/
+**/.vite/

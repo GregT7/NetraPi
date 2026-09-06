@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -218,6 +220,8 @@ def _event_manager_mock(
     event_manager = MagicMock()
     event_manager.evaluate.return_value = evaluate_return
     event_manager.needs_detection = needs_detection
+    event_manager.observe.return_value = False
+    event_manager.last_latched_approach = None
     if ready_to_evaluate is None:
         ready_to_evaluate = evaluate_return is not None
     event_manager.ready_to_evaluate = ready_to_evaluate
@@ -594,6 +598,7 @@ def test_finish_clip_attaches_clip_and_syncs(tmp_path: Path):
 
     store.attach_clip.assert_called_once()
     assert store.attach_clip.call_args.args[0] == 42
+    assert manager.flush_ingest(timeout_s=5.0)
     cloud.sync_event.assert_called_once_with(42)
 
 
@@ -614,6 +619,7 @@ def test_commit_evaluated_event_persists_metadata_without_clip(tmp_path: Path):
     kwargs = store.persist_event.call_args.kwargs
     assert kwargs["type_value"] == StopSignEnum.COMPLETE_STOP.model_label
     assert kwargs.get("clip_path") is None
+    assert manager.flush_ingest(timeout_s=5.0)
     cloud.sync_event.assert_called_once_with(11)
     assert manager._pending_event_id == 11
 
@@ -623,10 +629,11 @@ def test_safe_event_commits_without_begin_clip(tmp_path: Path):
     store = MagicMock()
     store.persist_event.return_value = 3
     cloud = MagicMock()
-    event_manager = MagicMock()
-    event_manager.needs_detection = False
-    event_manager.ready_to_evaluate = True
-    event_manager.evaluate.return_value = DrivingEvent(type=StopSignEnum.COMPLETE_STOP)
+    event_manager = _event_manager_mock(
+        evaluate_return=DrivingEvent(type=StopSignEnum.COMPLETE_STOP),
+        needs_detection=False,
+        ready_to_evaluate=True,
+    )
     manager = _recording_manager(
         _app_config(tmp_path),
         frame,
@@ -642,8 +649,46 @@ def test_safe_event_commits_without_begin_clip(tmp_path: Path):
     assert manager.clip_active is False
     store.persist_event.assert_called_once()
     store.attach_clip.assert_not_called()
+    assert manager.flush_ingest(timeout_s=5.0)
     cloud.sync_event.assert_called_once_with(3)
     assert manager._pending_event_id is None
+
+
+def test_unsafe_event_begins_clip_before_beep(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    store = MagicMock()
+    store.persist_event.return_value = 5
+    cloud = MagicMock()
+    buzzer = MagicMock()
+    event_manager = _event_manager_mock(
+        evaluate_return=DrivingEvent(type=StopSignEnum.RUN_THROUGH),
+        needs_detection=False,
+        ready_to_evaluate=True,
+    )
+    order: list[str] = []
+    manager = _recording_manager(
+        _app_config(tmp_path),
+        frame,
+        event_manager=event_manager,
+        local_store=store,
+        cloud_ingest=cloud,
+        buzzer=buzzer,
+    )
+    manager._driving_session_id = 7
+    original_begin = manager.begin_clip
+
+    def _begin_and_track() -> None:
+        order.append("begin_clip")
+        original_begin()
+
+    buzzer.beep.side_effect = lambda _event: order.append("beep")
+    with patch.object(manager, "begin_clip", side_effect=_begin_and_track):
+        manager.run_one_lap()
+
+    assert order[:2] == ["begin_clip", "beep"]
+    assert manager.clip_active is True
+    assert manager.flush_ingest(timeout_s=5.0)
+    cloud.sync_event.assert_called_once_with(5)
 
 
 def test_run_loop_closes_buzzer_when_lap_raises(tmp_path: Path):

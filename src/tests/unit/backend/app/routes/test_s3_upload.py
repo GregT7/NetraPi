@@ -36,7 +36,7 @@ _EVENT = {
         "stage2_classification_type_id": 3,
     },
 }
-_EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10.mp4"
+_EXPECTED_KEY = "Aug-2026/driving_session_id_1/clips/clip-10/clip.mp4"
 _EXPECTED_TRIP_KEY = "Aug-2026/driving_session_id_1/trips/trip-3.mp4"
 _TRIP = {
     "id": 3,
@@ -124,7 +124,12 @@ def test_s3_upload_url_returns_stable_key(ingest_client: TestClient) -> None:
     assert first.json()["object_key"] == second.json()["object_key"] == _EXPECTED_KEY
     assert first.json()["method"] == "PUT"
     assert first.json()["url"] == "https://s3.example/put"
-    assert presign.call_count == 2
+    assert len(first.json()["objects"]) == 4
+    assert first.json()["objects"][0]["name"] == "clip.mp4"
+    assert first.json()["objects"][1]["name"] == "areas.json"
+    assert first.json()["objects"][2]["name"] == "motion.json"
+    assert first.json()["objects"][3]["name"] == "transitions.json"
+    assert presign.call_count == 8
     with get_session() as session:
         clip = session.get(Clip, 10)
         assert clip is not None
@@ -216,7 +221,22 @@ def test_confirm_missing_object_returns_400(ingest_client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_confirm_wrong_key_returns_400(ingest_client: TestClient) -> None:
+def test_confirm_missing_sidecar_returns_400(ingest_client: TestClient) -> None:
+    _prime_clip(ingest_client)
+
+    def _head(object_key: str):
+        if object_key.endswith("clip.mp4"):
+            return {"ContentLength": 13}
+        return None
+
+    with patch("app.routes.s3_upload.head_object", side_effect=_head):
+        response = ingest_client.post(
+            "/api/netrapi/confirm-s3-upload",
+            json={"clip_id": 10, "object_key": _EXPECTED_KEY},
+            headers=_HEADERS,
+        )
+    assert response.status_code == 400
+    assert "areas.json" in response.json()["detail"]
     _prime_clip(ingest_client)
     response = ingest_client.post(
         "/api/netrapi/confirm-s3-upload",

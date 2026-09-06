@@ -6,6 +6,16 @@ from netrapi.events.enums import StopSignEnum
 
 
 @dataclass(frozen=True)
+class PlaybackSeries:
+    """Monotonic-clock area/motion samples for Style A clip replay."""
+
+    area_points: tuple[tuple[float, float], ...]
+    motion_points: tuple[tuple[float, float], ...]
+    anchor_t: float
+    evaluate_t: float
+
+
+@dataclass(frozen=True)
 class ApproachSnapshot:
     peak_area_pct: float
     approach_duration_s: float
@@ -22,6 +32,7 @@ class DrivingEvent:
     knn_stage1: tuple[float, ...] | None = None
     knn_stage2: tuple[float, ...] | None = None
     approach: ApproachSnapshot | None = None
+    playback_series: PlaybackSeries | None = None
 
     @property
     def is_unsafe(self) -> bool:

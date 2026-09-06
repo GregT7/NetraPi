@@ -15,12 +15,17 @@ from netrapi.buzzer import Buzzer
 from netrapi.capture import Camera, PreviewUI
 from netrapi.detection import Detector
 from netrapi.events import EventManager
-from netrapi.events.driving_event import DrivingEvent
+from netrapi.events.driving_event import DrivingEvent, PlaybackSeries
+from netrapi.ingest_worker import IngestWorker
 from netrapi.recording.clip_package import ClipPackage
 from netrapi.recording.clip_result import ClipResult
+from netrapi.recording.playback_json import write_playback_sidecars
 from netrapi.recording.util.encoding_fps import clip_encoding_fps
 from netrapi.recording.recorder import Recorder
 from netrapi.recording.trip_recorder import TripRecorder
+from netrapi.trip_log import TripSessionLog
+
+_INGEST_FLUSH_TIMEOUT_S = 120.0
 
 
 class RecordingManager:
@@ -53,6 +58,10 @@ class RecordingManager:
         self._local_store = local_store
         self._cloud_ingest = cloud_ingest
         self._boot_issues: list[str] = []
+        self._trip_log: TripSessionLog | None = None
+        self._ingest_worker: IngestWorker | None = None
+        if cloud_ingest is not None:
+            self._ingest_worker = IngestWorker(cloud_ingest, emit=self._emit)
 
         self._clip_active = False
         self._running = False
@@ -61,12 +70,46 @@ class RecordingManager:
         self._event_index = 0
         self._driving_session_id: int | None = None
         self._pending_event_id: int | None = None
+        self._pending_playback: PlaybackSeries | None = None
+        self._pending_classification: str | None = None
         self._open_trip_segment_id: int | None = None
         self._open_trip_segment_start: datetime | None = None
         if local_store is not None and hasattr(trip_recorder, "set_on_segment_saved"):
             trip_recorder.set_on_segment_saved(self._persist_saved_segment)
         if local_store is not None and hasattr(trip_recorder, "set_on_segment_opened"):
             trip_recorder.set_on_segment_opened(self._prime_open_segment)
+
+    def _emit(self, message: str) -> None:
+        if self._trip_log is not None:
+            self._trip_log.write(message)
+        else:
+            print(message, flush=True)
+
+    def _open_trip_log(self, session_id: int | None) -> None:
+        self._close_trip_log()
+        trip_cfg = self._app_config.trip_recorder
+        self._trip_log = TripSessionLog.open(
+            trip_cfg.logs_dir,
+            session_id=session_id,
+            stats_interval_s=trip_cfg.stats_interval_s,
+        )
+        self._trip_recorder.set_log(self._trip_log.write)
+        if self._cloud_ingest is not None and hasattr(self._cloud_ingest, "set_log"):
+            self._cloud_ingest.set_log(self._trip_log.write)
+        if self._ingest_worker is not None:
+            self._ingest_worker.set_emit(self._trip_log.write)
+
+    def _close_trip_log(self) -> None:
+        if self._trip_log is None:
+            return
+        log = self._trip_log
+        self._trip_log = None
+        self._trip_recorder.set_log(None)
+        if self._cloud_ingest is not None and hasattr(self._cloud_ingest, "set_log"):
+            self._cloud_ingest.set_log(None)
+        if self._ingest_worker is not None:
+            self._ingest_worker.set_emit(self._emit)
+        log.close()
 
     @property
     def app_config(self) -> AppConfig:
@@ -103,10 +146,18 @@ class RecordingManager:
     def set_boot_issues(self, messages: list[str]) -> None:
         self._boot_issues = list(messages)
 
+    def flush_ingest(self, timeout_s: float = _INGEST_FLUSH_TIMEOUT_S) -> bool:
+        """Wait for queued cloud ingest jobs (tests / session teardown)."""
+        if self._ingest_worker is None:
+            return True
+        return self._ingest_worker.flush(timeout_s=timeout_s)
+
     def disable_cloud(self, reason: str) -> None:
-        if self._cloud_ingest is None:
+        if self._cloud_ingest is None and self._ingest_worker is None:
             return
-        print(f"[health] disabling cloud ingest: {reason}", flush=True)
+        self._emit(f"[health] disabling cloud ingest: {reason}")
+        if self._ingest_worker is not None:
+            self._ingest_worker.clear_cloud()
         self._cloud_ingest = None
         self._record_exception(reason, is_fatal=False)
 
@@ -147,10 +198,15 @@ class RecordingManager:
                     start_time=datetime.now(),
                     master_config_id=master_config_id,
                 )
+                self._open_trip_log(self._driving_session_id)
+                self._emit(f"[session] driving_session {self._driving_session_id} started")
                 self._try_ingest("sync_session", self._driving_session_id)
                 for message in self._boot_issues:
                     self._record_exception(message, is_fatal=False)
                 self._boot_issues.clear()
+            else:
+                self._open_trip_log(None)
+                self._emit("[session] started (no local store)")
             laps = 0
             while self._running:
                 if should_stop and should_stop():
@@ -173,6 +229,15 @@ class RecordingManager:
                     self._driving_session_id, end_time=datetime.now()
                 )
                 self._try_ingest("sync_session", self._driving_session_id)
+                self._emit(f"[session] driving_session {self._driving_session_id} ended")
+            if not self.flush_ingest(_INGEST_FLUSH_TIMEOUT_S):
+                self._emit(
+                    f"[ingest] flush timed out after {_INGEST_FLUSH_TIMEOUT_S:.0f}s"
+                )
+            if self._ingest_worker is not None:
+                self._ingest_worker.close(flush_timeout_s=_INGEST_FLUSH_TIMEOUT_S)
+                self._ingest_worker = None
+            self._close_trip_log()
 
     def run_one_lap(self, *, full_record: bool = False) -> ClipResult | None:
         record = self._capture_frame_record()
@@ -191,19 +256,36 @@ class RecordingManager:
             if self._event_manager.needs_detection:
                 classifications = self._detector.classify(record.raw)
                 self.pre_buffer.latest().patch_classifications(classifications)
-            self._event_manager.observe(self.pre_buffer)
+            if self._event_manager.observe(self.pre_buffer):
+                latched = self._event_manager.last_latched_approach
+                if latched is not None:
+                    self._emit(
+                        f"[approach] detected peak={latched.peak_area_pct:.2f}% "
+                        f"approach={latched.approach_duration_s:.2f}s "
+                        f"drop={latched.drop_duration_s:.2f}s "
+                        f"score={latched.score:.3f}"
+                    )
+                else:
+                    self._emit("[approach] detected")
             if self._event_manager.ready_to_evaluate:
                 event = self._event_manager.evaluate()
-                self._buzzer.beep(event)
-                self._commit_evaluated_event(event)
-                if (
+                will_record = (
                     event.is_unsafe
                     or self._app_config.recording_manager.record_safe_events
-                ):
+                )
+                # Start post-roll before beep/persist/network so the clip has no hole.
+                if will_record:
                     self.begin_clip()
-                else:
-                    # Metadata already synced; no clip will call attach.
+                self._buzzer.beep(event)
+                self._emit(
+                    f"[event] {event.type.model_label} "
+                    f"unsafe={event.is_unsafe}"
+                )
+                self._commit_evaluated_event(event)
+                if not will_record:
                     self._pending_event_id = None
+                    self._pending_playback = None
+                    self._pending_classification = None
             return None
         else:
             self.post_buffer.append(record)
@@ -212,7 +294,7 @@ class RecordingManager:
             return None
 
     def _commit_evaluated_event(self, event: DrivingEvent) -> None:
-        """Persist event metadata (and sync) immediately; clip attach is separate."""
+        """Persist event metadata locally; cloud sync is queued off the capture thread."""
         if self._local_store is None or self._driving_session_id is None:
             return
         event_time = datetime.now()
@@ -239,6 +321,8 @@ class RecordingManager:
             trip_offset_seconds=trip_offset,
         )
         self._pending_event_id = event_id
+        self._pending_playback = event.playback_series
+        self._pending_classification = event.type.model_label
         self._try_ingest("sync_event", event_id)
 
     def _capture_frame_record(self) -> FrameRecord:
@@ -278,8 +362,16 @@ class RecordingManager:
             event_index=self._event_index,
         )
         result = self._recorder.write_clip(package, fps=encoding_fps)
+        write_playback_sidecars(
+            result.clip_path,
+            self._pending_playback,
+            pre_roll_seconds=self._app_config.recording_manager.pre_roll_seconds,
+            classification=self._pending_classification or "",
+        )
         event_id = self._pending_event_id
         self._pending_event_id = None
+        self._pending_playback = None
+        self._pending_classification = None
         if (
             self._local_store is not None
             and event_id is not None
@@ -363,6 +455,7 @@ class RecordingManager:
         return self._open_trip_segment_id, max(0.0, offset)
 
     def _record_exception(self, message: str, *, is_fatal: bool) -> None:
+        self._emit(f"[exception] {'fatal' if is_fatal else 'warn'}: {message}")
         if self._local_store is None or self._driving_session_id is None:
             return
         try:
@@ -373,18 +466,11 @@ class RecordingManager:
                 is_fatal=is_fatal,
             )
         except Exception as exc:
-            print(f"[exception] persist failed: {exc}", flush=True)
+            self._emit(f"[exception] persist failed: {exc}")
             return
         self._try_ingest("sync_operational_exception", exception_id)
 
     def _try_ingest(self, method_name: str, *args) -> None:
-        if self._cloud_ingest is None:
+        if self._ingest_worker is None:
             return
-        try:
-            getattr(self._cloud_ingest, method_name)(*args)
-        except Exception as exc:
-            print(f"[ingest] {method_name} failed: {exc}", flush=True)
-            if method_name != "sync_operational_exception":
-                self._record_exception(
-                    f"ingest {method_name} failed: {exc}", is_fatal=False
-                )
+        self._ingest_worker.submit(method_name, *args)

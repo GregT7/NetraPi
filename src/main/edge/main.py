@@ -32,7 +32,11 @@ def _resolve_runtime_paths(app_config, repo_root: Path):
     return replace(
         app_config,
         recording_manager=replace(recording_manager, clips_dir=resolve(recording_manager.clips_dir)),
-        trip_recorder=replace(app_config.trip_recorder, segments_dir=resolve(app_config.trip_recorder.segments_dir)),
+        trip_recorder=replace(
+            app_config.trip_recorder,
+            segments_dir=resolve(app_config.trip_recorder.segments_dir),
+            logs_dir=resolve(app_config.trip_recorder.logs_dir),
+        ),
         detector=replace(
             detector,
             model_path=resolve(detector.model_path),
@@ -54,35 +58,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Enable segmented full-trip recording (default: config value)",
     )
-    jobs = parser.add_mutually_exclusive_group()
-    jobs.add_argument(
-        "--drain-trips",
-        choices=["clips", "trips", "both"],
-        help="Upload pending clips, trip segments, or both (Wi-Fi). Does not run capture.",
-    )
-    jobs.add_argument(
-        "--delete-uploaded-local",
-        action="store_true",
-        help=(
-            "Delete local clip/trip MP4s already stored in S3. "
-            "Updates SQLite and cloud flags. Does not delete S3 objects."
-        ),
-    )
-    jobs.add_argument(
-        "--delete-all-local",
-        action="store_true",
-        help=(
-            "Delete all finished local clip/trip MP4s. "
-            "Updates SQLite and cloud flags. Does not delete S3 objects."
-        ),
-    )
     parser.add_argument(
-        "--delete-after-drain",
+        "--drain",
         choices=["clips", "trips", "both"],
         default=None,
         help=(
-            "After a successful --drain-trips, delete local MP4s already in S3 "
-            "(clips, trips, or both). Does not delete S3 objects."
+            "Upload pending clips, trip segments, or both (Wi-Fi). "
+            "Does not run capture. May be paired with --delete-uploaded."
+        ),
+    )
+    cleanup = parser.add_mutually_exclusive_group()
+    cleanup.add_argument(
+        "--delete-uploaded",
+        action="store_true",
+        help=(
+            "Delete local clip/trip MP4s already stored in S3. "
+            "With --drain, runs after a successful drain. "
+            "Updates SQLite and cloud flags. Does not delete S3 objects."
+        ),
+    )
+    cleanup.add_argument(
+        "--delete-all",
+        action="store_true",
+        help=(
+            "Delete all finished local clip/trip MP4s. "
+            "Cannot be combined with --drain. "
+            "Updates SQLite and cloud flags. Does not delete S3 objects."
         ),
     )
     return parser.parse_args(argv)
@@ -91,21 +92,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     _configure_import_path()
     from config.loader import AppConfig, ConfigError
-    from db.database import init_engine
+    from db.database import DatabaseUrlError, ensure_sqlite_schema
     from netrapi import build_pipeline
     from netrapi.backend_auth import apply_edge_env
     from netrapi.exceptions import NetraPiError
 
     args = parse_args(argv)
-    if args.delete_after_drain and not args.drain_trips:
-        print("--delete-after-drain requires --drain-trips", file=sys.stderr)
+    if args.drain and args.delete_all:
+        print("--delete-all cannot be combined with --drain", file=sys.stderr)
         return 1
     try:
         apply_edge_env()
-        if args.drain_trips or args.delete_uploaded_local or args.delete_all_local:
+        if args.drain or args.delete_uploaded or args.delete_all:
             from netrapi.cloud_ingest import try_cloud_ingest
 
-            init_engine()
+            ensure_sqlite_schema()
             ingest = try_cloud_ingest()
             if ingest is None:
                 print(
@@ -113,36 +114,48 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 return 1
-            if args.drain_trips:
-                from config.loader import AppConfig
+            if args.drain:
                 from netrapi.health import wake_render
 
                 app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
+                print(
+                    f"[drain] target={args.drain}; waking Render via GET /health ...",
+                    flush=True,
+                )
                 if not wake_render(app_config):
                     print("Render GET /health failed; drain aborted", file=sys.stderr)
                     return 1
-                if args.drain_trips in ("clips", "both"):
+                print("[drain] Render is up", flush=True)
+                if args.drain in ("clips", "both"):
                     clips = ingest.drain_clips()
-                    print(f"drained {clips} clip(s)")
-                if args.drain_trips in ("trips", "both"):
+                    print(f"[drain] finished clips: uploaded {clips}", flush=True)
+                if args.drain in ("trips", "both"):
                     trips = ingest.drain_trip_segments()
-                    print(f"drained {trips} trip segment(s)")
-                if args.delete_after_drain:
+                    print(f"[drain] finished trips: uploaded {trips}", flush=True)
+                if args.delete_uploaded:
                     from netrapi.local_cleanup import delete_uploaded_local_media
 
+                    app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
+                    print("[drain] delete-uploaded after drain", flush=True)
                     cleaned = delete_uploaded_local_media(
-                        ingest, target=args.delete_after_drain
+                        ingest,
+                        clips_dir=app_config.recording_manager.clips_dir,
+                        trips_dir=app_config.trip_recorder.segments_dir,
                     )
-                    print(f"deleted {cleaned} uploaded local file(s)")
-                return 0
-            if args.delete_uploaded_local:
-                from netrapi.local_cleanup import delete_uploaded_local_media
-
-                cleaned = delete_uploaded_local_media(ingest)
-                print(f"deleted {cleaned} uploaded local file(s)")
+                    print(f"[drain] deleted {cleaned} uploaded local file(s)", flush=True)
                 return 0
             app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
             app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
+            if args.delete_uploaded:
+                from netrapi.local_cleanup import delete_uploaded_local_media
+
+                cleaned = delete_uploaded_local_media(
+                    ingest,
+                    clips_dir=app_config.recording_manager.clips_dir,
+                    trips_dir=app_config.trip_recorder.segments_dir,
+                )
+                print(f"deleted {cleaned} uploaded local file(s)")
+                return 0
             from netrapi.local_cleanup import delete_all_local_media
 
             cleaned = delete_all_local_media(
@@ -154,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         app_config = AppConfig.load(DEFAULT_CONFIG_DIR.resolve())
         app_config = _resolve_runtime_paths(app_config, REPO_ROOT)
-        init_engine()
+        ensure_sqlite_schema()
         from netrapi.health import KeepAlive, run_boot_health
 
         health = run_boot_health(app_config)
@@ -184,6 +197,9 @@ def main(argv: list[str] | None = None) -> int:
                 keepalive.stop()
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
+        return 1
+    except DatabaseUrlError as exc:
+        print(f"Database error: {exc}", file=sys.stderr)
         return 1
     except NetraPiError as exc:
         print(f"Pipeline error: {exc}", file=sys.stderr)

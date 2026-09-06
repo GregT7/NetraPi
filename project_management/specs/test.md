@@ -1,7 +1,7 @@
 # NetraPi Test Plan (Updated for Full MVS Coverage)
 
 ## 1. Purpose
-Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, and deployment. Frontend and later evaluation UI tests are deferred until those layers exist.
+Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, deployment, and the public portfolio clip list/playback (Sprint 9). Filters, evaluation UI, and Vercel CI remain deferred.
 
 ## 2. How to Use This Plan
 This document is ordered by **sprint section** in this file (Sprint 1–5, then D–E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
@@ -16,10 +16,10 @@ Each test includes:
 ## 3. System Definitions
 - **Edge runtime**: Raspberry Pi 5, Coral USB TPU, camera, local scripts/services, local file storage, and local SQLite database
 - **Cloud storage**: private AWS S3 bucket used for full-session footage and event clips
-- **Backend API**: deployed cloud API that authenticates the edge device, issues temporary S3 upload URLs (presigned PUT), persists metadata to Postgres, and returns signed playback URLs
+- **Backend API**: deployed cloud API that authenticates the edge device, issues temporary S3 upload URLs (presigned PUT), persists metadata to Postgres, returns signed playback URLs for ingest, and mints short-lived public GET URLs for portfolio playback
 - **Database**: cloud-hosted PostgreSQL (via backend) storing structured metadata and S3 paths; local SQLite on the Pi for offline event metadata until an online upload completes
 - **Upload path**: when online, Pi authenticates to the backend → backend issues a short-lived S3 PUT URL and later writes Postgres metadata; Pi does not hold permanent AWS or Postgres credentials
-- **Frontend / UI**: deferred — portfolio tests will be added when frontend work starts
+- **Frontend / UI**: public Try-it-out clip list and signed playback mint (Sprint 9). Filters, evaluation UI, and Vercel CI remain deferred
 - **Ground-truth labeling**: manual review of collected footage to assign run-through, rolling stop, and complete stop categories for accuracy evaluation
 - **Event type**: one of **run-through**, **rolling stop**, or **complete stop** (model prediction or manual label)
 
@@ -1070,7 +1070,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Metadata does not bypass the backend (no Pi→Postgres direct write).
 
 ### TP-46: Private object access via signed GET
-- **Description**: Ensures uploaded objects are not public and are reachable via backend-issued signed GET URLs.
+- **Description**: Ensures uploaded objects are not public and are reachable via backend-issued signed GET URLs. This test is the **authenticated ingest** mint (`POST /api/netrapi/s3-download-url`). Unauthenticated public portfolio mint is TP-64.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.20, M-7.13
@@ -1342,7 +1342,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 *Tests: TP-57 to TP-62*
 
-> **Focus:** Synchronous edge boot health before capture; cheap `GET /health` vs authenticated `GET /api/netrapi/ready`; one-way online/offline; Render keep-alive; `--drain-trips {clips,trips,both}` and optional `--delete-after-drain {clips,trips,both}` after offline drives. Unit: `src/tests/unit/edge/netrapi/test_boot_health.py`, `src/tests/unit/backend/app/routes/test_ready.py`, drain/delete in `test_main.py` / `test_local_cleanup.py`. Integration: `src/tests/integration/tp_57`–`tp_62`.
+> **Focus:** Synchronous edge boot health before capture; cheap `GET /health` vs authenticated `GET /api/netrapi/ready`; one-way online/offline; Render keep-alive; `--drain {clips,trips,both}` and optional `--drain … --delete-uploaded` after offline drives. Unit: `src/tests/unit/edge/netrapi/test_boot_health.py`, `src/tests/unit/backend/app/routes/test_ready.py`, drain/delete in `test_main.py` / `test_local_cleanup.py`. Integration: `src/tests/integration/tp_57`–`tp_62`.
 
 ### TP-57: TPU smoke abort
 - **Description**: Verifies a failed Coral TFLite dummy invoke aborts `main.py` before capture.
@@ -1407,25 +1407,25 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - After three failures, `cloud_ingest` is None, keep-alive stops, capture continues, mode does not return to online.
 
 ### TP-61: Drain clips, trips, or both
-- **Description**: Verifies `--drain-trips` requires `clips`, `trips`, or `both`, wakes Render via `/health`, uploads the selected pending media, and may `--delete-after-drain {clips,trips,both}` after a successful drain.
+- **Description**: Verifies `--drain` requires `clips`, `trips`, or `both`, wakes Render via `/health`, uploads the selected pending media, and may `--delete-uploaded` after a successful drain.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-6.10, M-6.11
 - **Prerequisites**
   - Drain target argument implemented.
 - **Steps**
-  1. Parse `--drain-trips` without a target (error).
+  1. Parse `--drain` without a target (error).
   2. `clips` drains pending event JSON + clip PUT.
   3. `trips` drains trip segments.
   4. `both` does clips then trips.
-  5. `--delete-after-drain` without `--drain-trips` (error).
-  6. After a successful drain, `--delete-after-drain clips|trips|both` unlinks only that local media already in S3.
+  5. `--drain` with `--delete-all` (error).
+  6. After a successful drain, `--delete-uploaded` unlinks local media already in S3.
   7. Run `src/tests/integration/tp_61`.
 - **Pass criteria**
   - Capture loop is not started.
   - Counts print to stdout.
   - `/health` is polled before upload.
-  - Delete runs only after a successful drain and honors clips/trips/both.
+  - Delete runs only after a successful drain when `--delete-uploaded` is set.
 
 ### TP-62: Health settings snapshot
 - **Description**: Verifies `health.json` is loaded at runtime and snapshotted as `health_config` (Alembic 0004), included in the master-config fingerprint.
@@ -1435,7 +1435,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Prerequisites**
   - Alembic 0004 and snapshot wiring.
 - **Steps**
-  1. Upgrade to head; seed id 1 has a `health_config` row.
+  1. Upgrade to head; the `edge-json` seed has a `health_config` row.
   2. Fingerprint live JSON including `health.json`.
   3. Change a health timeout and confirm a new snapshot is inserted (`src/tests/integration/tp_62`).
 - **Pass criteria**
@@ -1445,9 +1445,157 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
+# Sprint 9 — Public portfolio clip list and playback
+
+*Tests: TP-63 to TP-66*
+
+> **Focus:** Unauthenticated public clip list and short-lived signed GET mint for Try-it-out. Design: [frontend_playback.md](../diagrams/frontend_playback.md). Unit: `src/tests/unit/backend/app/routes/test_public_clip.py`, `src/tests/unit/frontend/src/TryItOut.test.tsx`. Ingest signed GET remains TP-46.
+
+### TP-63: Public confirmed-clip list
+- **Description**: Verifies `GET /api/public/clips` returns confirmed S3 clips without an API key, newest event first, and leaves ingest routes keyed.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.14, M-7.16, M-9.23, M-9.24
+- **Prerequisites**
+  - Public clip list route implemented.
+  - At least one confirmed clip (or unit fixtures).
+- **Steps**
+  1. `GET /api/public/clips` with no `X-API-Key`.
+  2. Confirm only `s3_stored` rows appear; timestamps are newest-first; Label is the manual classification from the database (or `-` when none).
+  3. Call an ingest route (`POST /api/netrapi/s3-download-url` or similar) without a key (401).
+- **Pass criteria**
+  - List succeeds without an API key.
+  - Unconfirmed clips are omitted; order is descending event time.
+  - Label is `classification.kind = 'manual'` (display name), or `-` when that row is missing.
+  - Ingest routes still 401 without the device key.
+  - Unit coverage in `test_public_clip.py`.
+
+### TP-64: Public mint vs ingest mint
+- **Description**: Verifies the public mint issues a 2-minute GET and does not use the ingest API key. Keyed Pi ingest mint remains TP-46.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-7.13, M-7.16, M-7.17, M-9.22
+- **Prerequisites**
+  - Public mint implemented.
+  - A confirmed clip exists (or unit fixtures).
+- **Steps**
+  1. `POST /api/public/clip-download-url` with `{ clip_id }` and no API key.
+  2. Confirm `expires_in` is 120 seconds; unconfirmed clip returns 400.
+  3. `POST /api/netrapi/s3-download-url` without a key (401).
+- **Pass criteria**
+  - Public `expires_in` is 120.
+  - Unconfirmed object returns 400; missing clip 404.
+  - Ingest download is 401 without the key.
+  - Unit coverage in `test_public_clip.py`.
+
+### TP-65: Public mint limits
+- **Description**: Verifies the public mint rejects a 21st live GET signature and an 11th mint from the same IP in 60 seconds.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-7.18
+- **Prerequisites**
+  - Public mint limits implemented (`app/public_limits.py`).
+- **Steps**
+  1. Issue live public URLs until the global cap (20, or a lowered unit cap).
+  2. Issue one more (429).
+  3. Issue more than 10 mint requests from one IP in 60 seconds (429).
+- **Pass criteria**
+  - 21st concurrent live URL → 429.
+  - 11th mint per IP per 60 seconds → 429.
+  - Unit coverage in `test_public_clip.py`.
+
+### TP-66: Try it out browse and play
+- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows) and that selecting a row sets the video `src` to a minted GET URL.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-7.14, M-9.22, M-9.23, M-9.24, M-9.25, M-9.26
+- **Prerequisites**
+  - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
+- **Steps**
+  1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`). Unlabeled clips show `-` with sky text.
+  2. Click a clip row; video `src` becomes the minted GET URL.
+  3. Confirm **Detailed analysis** is checked by default (Style A: no native scrub bar; play overlay).
+  4. Uncheck **Detailed analysis**; native controls appear and the same video `src` is kept (no second mint).
+- **Pass criteria**
+  - No dummy table rows.
+  - Unlabeled clips (no manual classification) show `-` with sky text.
+  - Click sets video `src` to the minted GET.
+  - Style A is the default; toggling to Style B does not remint.
+  - Unit coverage in `TryItOut.test.tsx`.
+
+---
+
+# Sprint 10 — Clip telemetry sidecars and detailed playback
+
+*Tests: TP-67 to TP-70*
+
+> **Focus:** Persist area/motion/transition series as JSON next to each event clip (local directory + S3 prefix `.../clips/clip-{id}/`). Public mint still spends one live GET slot for the MP4 and inlines sidecar JSON. Unit: `test_playback_json.py`, `test_s3.py`, `test_s3_upload.py`, `test_public_clip.py`, `test_cloud_ingest.py`, `TryItOut.test.tsx`.
+
+### TP-67: Local clip directory with playback JSON
+- **Description**: Verifies an evaluated event writes `clip.mp4`, `areas.json`, `motion.json`, and `transitions.json` in one local clip directory, with clip-relative timestamps.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-6.12
+- **Prerequisites**
+  - `EventManager` snapshots playback series; `Recorder` writes `clip_{n}_{stamp}/clip.mp4`.
+- **Steps**
+  1. Evaluate a latched event; confirm `playback_series` is present.
+  2. Write a clip; confirm the MP4 sits in a per-clip directory.
+  3. Confirm `areas.json` / `motion.json` use `t0_s` relative to clip start.
+  4. Confirm `transitions.json` lists Monitoring → SampleMotion → classification state at those times.
+- **Pass criteria**
+  - Local layout is `clip_{n}_{stamp}/clip.mp4` plus the three JSON files.
+  - Unit coverage in `test_event_manager.py`, `test_recorder.py`, `test_playback_json.py`.
+
+### TP-68: Clip upload URL issues four objects
+- **Description**: Verifies `POST /api/netrapi/s3-upload-url` for a clip returns the video key `.../clips/clip-{id}/clip.mp4` plus presigned PUTs for `areas.json`, `motion.json`, and `transitions.json`.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-6.12, M-7.15, M-8.13
+- **Prerequisites**
+  - Directory clip keys implemented in `s3.py`.
+- **Steps**
+  1. Issue upload URLs for a primed clip.
+  2. Confirm `object_key` is `.../clip-10/clip.mp4` and `objects` has four entries.
+  3. Confirm a second call returns the same video key.
+- **Pass criteria**
+  - Trip keys stay `{kind}-{id}.mp4`.
+  - Unit coverage in `test_s3.py` and `test_s3_upload.py`.
+
+### TP-69: Confirm requires video and sidecar objects
+- **Description**: Verifies `confirm-s3-upload` HEADs `clip.mp4`, `areas.json`, `motion.json`, and `transitions.json` before setting `s3_stored`.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-6.12, M-8.11, M-8.13
+- **Prerequisites**
+  - Sidecar HEAD implemented on confirm.
+- **Steps**
+  1. Confirm when all four objects exist (`s3_stored` true; `s3_key` is the video key).
+  2. Confirm when the video exists but a sidecar is missing (400).
+- **Pass criteria**
+  - Missing sidecar → 400.
+  - Edge ingest PUTs four local files (`test_cloud_ingest.py`).
+  - Unit coverage in `test_s3_upload.py`.
+
+### TP-70: Public mint inlines sidecar JSON
+- **Description**: Verifies the public mint returns `areas`, `motion`, and `transitions` JSON from S3 without spending extra live URL slots. Legacy flat `clip-{id}.mp4` keys still mint video with sidecar fields null.
+- **Test level**: Unit
+- **Verification approach**: Test
+- **Reqs**: M-7.13, M-7.18, M-8.13, M-9.26
+- **Prerequisites**
+  - Public mint reads sidecar objects via `get_object_json`.
+- **Steps**
+  1. Mint a directory-key clip; response includes `areas`/`motion`/`transitions` (or null if missing).
+  2. Confirm `live_urls` increases by 1 (video GET only).
+- **Pass criteria**
+  - Sidecar JSON is not a second public signature.
+  - Unit coverage in `test_public_clip.py`.
+
+---
+
 ## 8. Coverage Notes
-This plan currently covers through **Sprint 8** (edge boot health + online/offline + drain catch-up, plus Sprint 7 cloud E2E). Deferred for later test generation:
-- frontend / portfolio UI tests
+This plan currently covers through **Sprint 10** (clip telemetry sidecars + detailed Try-it-out playback). Sprint 9 frontend is **partial** (Try-it-out list/play unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
+- remaining frontend / portfolio UI tests (filters, eval UI)
 - full CI/CD matrix beyond backend deploy health
 - 10-hour collection and model-evaluation publication tests
 - dedicated edge managed-service (systemd) verification for M-10.10
@@ -1462,6 +1610,8 @@ Covered now:
 - edge ↔ deployed backend E2E (no frontend; verification only)
 - Sprint 7 harnesses under `src/tests/integration/tp_50`–`tp_56` against https://netrapi.onrender.com
 - Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
-- Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain-trips clips|trips|both` + `--delete-after-drain`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
+- Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain clips|trips|both` + `--delete-uploaded`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
+- Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP (`test_public_clip.py`, `TryItOut.test.tsx`)
+- Sprint 10: per-clip S3 directory (`clip.mp4` + `areas.json` + `motion.json` + `transitions.json`), public mint inlines sidecar JSON, Try-it-out detailed/simple toggle (`test_playback_json.py`, `test_s3_upload.py`, `TryItOut.test.tsx`)
 
-**TP range:** TP-01 through TP-62. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).
+**TP range:** TP-01 through TP-70. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

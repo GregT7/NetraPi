@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@/*": ["../../../main/frontend/src/*"],
+      "react/jsx-runtime": ["../../../main/frontend/node_modules/@types/react/jsx-runtime.d.ts"],
+      "*": ["../../../main/frontend/node_modules/*"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}

@@ -1,8 +1,8 @@
 """
-TP-61: Drain clips, trips, or both, then optional scoped local delete.
+TP-61: Drain clips, trips, or both, then optional --delete-uploaded.
 
 Checks CLI targets, drain order, /health wake before upload, and
-``--delete-after-drain {clips,trips,both}`` after a successful drain.
+``--drain … --delete-uploaded`` after a successful drain.
 """
 
 from __future__ import annotations
@@ -35,26 +35,26 @@ def _check_cli() -> None:
     from main import main as edge_main
     from main import parse_args
 
-    print("  1. --drain-trips without a target is an error", flush=True)
+    print("  1. --drain without a target is an error", flush=True)
     try:
-        parse_args(["--drain-trips"])
+        parse_args(["--drain"])
     except SystemExit:
         pass
     else:
-        raise RuntimeError("--drain-trips without a target should exit")
+        raise RuntimeError("--drain without a target should exit")
 
-    print("  2. --delete-after-drain without --drain-trips exits 1", flush=True)
-    if edge_main(["--delete-after-drain", "both"]) != 1:
-        raise RuntimeError("--delete-after-drain without --drain-trips should exit 1")
+    print("  2. --drain with --delete-all exits 1", flush=True)
+    if edge_main(["--drain", "both", "--delete-all"]) != 1:
+        raise RuntimeError("--drain with --delete-all should exit 1")
 
-    print("  3. clips / trips / both drain in order; both then scoped delete", flush=True)
+    print("  3. clips / trips / both drain in order; both then delete-uploaded", flush=True)
     ingest = MagicMock()
     order: list[str] = []
     ingest.drain_clips.side_effect = lambda: order.append("clips") or 1
     ingest.drain_trip_segments.side_effect = lambda: order.append("trips") or 2
     with (
         patch("netrapi.backend_auth.apply_edge_env"),
-        patch("db.database.init_engine"),
+        patch("db.database.ensure_sqlite_schema"),
         patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
         patch("netrapi.health.wake_render", return_value=True),
         patch("netrapi.build_pipeline") as build,
@@ -62,22 +62,22 @@ def _check_cli() -> None:
         patch("netrapi.local_cleanup.delete_uploaded_local_media") as cleanup,
     ):
         cleanup.side_effect = lambda *_a, **_k: order.append("delete") or 1
-        if edge_main(["--drain-trips", "clips"]) != 0:
+        if edge_main(["--drain", "clips"]) != 0:
             raise RuntimeError("clips drain should exit 0")
         if ingest.drain_trip_segments.called:
             raise RuntimeError("clips drain should not upload trips")
         ingest.drain_clips.reset_mock()
         ingest.drain_trip_segments.reset_mock()
-        if edge_main(["--drain-trips", "trips"]) != 0:
+        if edge_main(["--drain", "trips"]) != 0:
             raise RuntimeError("trips drain should exit 0")
         if ingest.drain_clips.called:
             raise RuntimeError("trips drain should not upload clips")
         order.clear()
-        if edge_main(["--drain-trips", "both", "--delete-after-drain", "clips"]) != 0:
-            raise RuntimeError("both drain + delete-after-drain should exit 0")
+        if edge_main(["--drain", "both", "--delete-uploaded"]) != 0:
+            raise RuntimeError("both drain + delete-uploaded should exit 0")
         if order != ["clips", "trips", "delete"]:
             raise RuntimeError(f"expected clips, trips, delete; got {order}")
-        cleanup.assert_called_with(ingest, target="clips")
+        cleanup.assert_called_with(ingest)
         if build.called:
             raise RuntimeError("drain must not start capture")
 
@@ -85,14 +85,14 @@ def _check_cli() -> None:
     ingest = MagicMock()
     with (
         patch("netrapi.backend_auth.apply_edge_env"),
-        patch("db.database.init_engine"),
+        patch("db.database.ensure_sqlite_schema"),
         patch("netrapi.cloud_ingest.try_cloud_ingest", return_value=ingest),
         patch("netrapi.health.wake_render", return_value=False),
         patch("netrapi.build_pipeline"),
         patch("config.loader.AppConfig.load", return_value=MagicMock()),
         patch("netrapi.local_cleanup.delete_uploaded_local_media") as cleanup,
     ):
-        if edge_main(["--drain-trips", "both", "--delete-after-drain", "both"]) != 1:
+        if edge_main(["--drain", "both", "--delete-uploaded"]) != 1:
             raise RuntimeError("wake failure should exit 1")
         ingest.drain_clips.assert_not_called()
         ingest.drain_trip_segments.assert_not_called()
@@ -121,7 +121,7 @@ def _check_scoped_delete(tmp_dir: Path) -> None:
         calls.append((method, path, body))
         return {"ok": True}
 
-    ingest = CloudIngest(json_request=json_request, put_bytes=lambda *_: None)
+    ingest = CloudIngest(json_request=json_request, put_file=lambda *_: None)
     with get_session() as session:
         driving = insert_driving_session(session, start_time=started)
         event = insert_local_event(
@@ -165,7 +165,7 @@ def _check_scoped_delete(tmp_dir: Path) -> None:
 
 
 def main() -> int:
-    print("TP-61: Drain clips, trips, or both + delete-after-drain", flush=True)
+    print("TP-61: Drain clips, trips, or both + delete-uploaded", flush=True)
     _check_cli()
     tmp_dir = SCRIPT_DIR / "_tmp"
     tmp_dir.mkdir(exist_ok=True)
@@ -176,7 +176,7 @@ def main() -> int:
         for leftover in tmp_dir.glob("*"):
             leftover.unlink(missing_ok=True)
         tmp_dir.rmdir()
-    print("PASS: drain targets, wake-before-upload, scoped delete-after-drain", flush=True)
+    print("PASS: drain targets, wake-before-upload, delete-uploaded after drain", flush=True)
     return 0
 
 

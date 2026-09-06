@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, BinaryIO, Optional
 from urllib.parse import urljoin
 
 from sqlmodel import select
@@ -18,6 +19,7 @@ from db.models import (
     ApproachParameters,
     AutoClassification,
     Classification,
+    ClassificationType,
     Clip,
     DrivingSession,
     Event,
@@ -31,11 +33,15 @@ from netrapi.exceptions import CloudIngestError, IngestAuthError
 
 # Optional[...] (not X | None): this alias is evaluated at import time on Python 3.9.
 JsonRequest = Callable[[str, str, Optional[dict[str, Any]]], dict[str, Any]]
-PutBytes = Callable[[str, bytes, str], None]
+PutFile = Callable[[str, Path, str], None]
 
 JSON_TIMEOUT_S = 30.0
 PUT_TIMEOUT_S = 600.0
+PUT_PROGRESS_EVERY_BYTES = 5 * 1024 * 1024
+PUT_PROGRESS_EVERY_S = 15.0
 CLIP_CONTENT_TYPE = "video/mp4"
+JSON_CONTENT_TYPE = "application/json"
+UPLOAD_DONE_SEPARATOR = "-" * 72
 
 
 def _iso(value: datetime) -> str:
@@ -45,6 +51,75 @@ def _iso(value: datetime) -> str:
             return text + "Z"
         return text
     return text.replace("+00:00", "Z")
+
+
+def _format_mb(num_bytes: int) -> str:
+    return f"{num_bytes / (1024 * 1024):.1f}"
+
+
+def _format_mbps(num_bytes: int, elapsed_s: float) -> str:
+    if elapsed_s <= 0:
+        return "—"
+    return f"{(num_bytes * 8) / (elapsed_s * 1_000_000):.2f}"
+
+
+def _is_json_upload(name: str, content_type: str) -> bool:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    return name.endswith(".json") or media_type == JSON_CONTENT_TYPE
+
+
+class _ProgressReader:
+    """File-like wrapper that reports PUT upload progress via on_progress."""
+
+    def __init__(
+        self,
+        fh: BinaryIO,
+        *,
+        size: int,
+        label: str,
+        on_progress: Callable[[str], None] | None,
+        log_every_bytes: int = PUT_PROGRESS_EVERY_BYTES,
+        log_every_s: float = PUT_PROGRESS_EVERY_S,
+    ) -> None:
+        self._fh = fh
+        self._size = size
+        self._label = label
+        self._on_progress = on_progress
+        self._sent = 0
+        self._last_log_bytes = 0
+        self._started = time.monotonic()
+        self._last_log_at = self._started
+        self._log_every_bytes = max(1, log_every_bytes)
+        self._log_every_s = max(1.0, log_every_s)
+
+    def read(self, size: int = -1) -> bytes:
+        chunk = self._fh.read(size)
+        if chunk:
+            self._sent += len(chunk)
+            self._maybe_log(force=self._sent >= self._size)
+        return chunk
+
+    def __len__(self) -> int:
+        return self._size
+
+    def _maybe_log(self, *, force: bool = False) -> None:
+        if self._on_progress is None:
+            return
+        now = time.monotonic()
+        bytes_due = self._sent - self._last_log_bytes >= self._log_every_bytes
+        time_due = now - self._last_log_at >= self._log_every_s
+        if not force and not bytes_due and not time_due:
+            return
+        elapsed = max(now - self._started, 1e-6)
+        pct = (100.0 * self._sent / self._size) if self._size else 100.0
+        self._on_progress(
+            f"[ingest] PUT progress {self._label}: "
+            f"{_format_mb(self._sent)}/{_format_mb(self._size)} MB "
+            f"({pct:.0f}%) {_format_mbps(self._sent, elapsed)} Mbps "
+            f"elapsed={elapsed:.0f}s"
+        )
+        self._last_log_bytes = self._sent
+        self._last_log_at = now
 
 
 def _http_json(method: str, url: str, body: dict[str, Any] | None) -> dict[str, Any]:
@@ -72,23 +147,54 @@ def _http_json(method: str, url: str, body: dict[str, Any] | None) -> dict[str, 
     return parsed
 
 
-def _http_put(url: str, payload: bytes, content_type: str) -> None:
-    request = urllib.request.Request(
-        url,
-        data=payload,
-        method="PUT",
-        headers={"Content-Type": content_type},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=PUT_TIMEOUT_S) as response:
-            status = getattr(response, "status", 200)
-            if status not in {200, 204}:
-                raise CloudIngestError(f"PUT {url} -> {status}")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise CloudIngestError(f"PUT -> {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise CloudIngestError(f"PUT failed: {exc}") from exc
+def _http_put_file(
+    url: str,
+    path: Path,
+    content_type: str,
+    *,
+    on_progress: Callable[[str], None] | None = None,
+    timeout_s: float = PUT_TIMEOUT_S,
+) -> None:
+    size = path.stat().st_size
+    label = path.name
+    started = time.monotonic()
+    if on_progress is not None:
+        on_progress(
+            f"[ingest] PUT start {label}: {_format_mb(size)} MB "
+            f"({size} bytes), streaming, timeout={timeout_s:.0f}s"
+        )
+    with path.open("rb") as fh:
+        body = _ProgressReader(
+            fh,
+            size=size,
+            label=label,
+            on_progress=on_progress,
+        )
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method="PUT",
+            headers={
+                "Content-Type": content_type,
+                "Content-Length": str(size),
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_s) as response:
+                status = getattr(response, "status", 200)
+                if status not in {200, 204}:
+                    raise CloudIngestError(f"PUT {url} -> {status}")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise CloudIngestError(f"PUT -> {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise CloudIngestError(f"PUT failed: {exc}") from exc
+    elapsed = max(time.monotonic() - started, 1e-6)
+    if on_progress is not None:
+        on_progress(
+            f"[ingest] PUT done {label}: {_format_mb(size)} MB in {elapsed:.0f}s "
+            f"({_format_mbps(size, elapsed)} Mbps avg)"
+        )
 
 
 class CloudIngest:
@@ -106,10 +212,41 @@ class CloudIngest:
         self,
         *,
         json_request: JsonRequest | None = None,
-        put_bytes: PutBytes | None = None,
+        put_file: PutFile | None = None,
+        put_bytes: PutFile | None = None,
+        on_log: Callable[[str], None] | None = None,
     ) -> None:
         self._json_request = json_request or self._json_request_http
-        self._put_bytes = put_bytes or _http_put
+        # put_bytes kept as a deprecated alias for put_file (tests / call sites).
+        self._put_file = put_file or put_bytes
+        self._on_log = on_log
+
+    def set_log(self, on_log: Callable[[str], None] | None) -> None:
+        self._on_log = on_log
+
+    def _emit(self, message: str) -> None:
+        if self._on_log is not None:
+            self._on_log(message)
+        else:
+            print(message, flush=True)
+
+    def _emit_upload_separator(self) -> None:
+        self._emit(UPLOAD_DONE_SEPARATOR)
+
+    def _put_path(
+        self, url: str, path: Path, content_type: str, *, quiet: bool = False
+    ) -> None:
+        """Stream a local file to a presigned PUT URL (or call injected put_file)."""
+        if self._put_file is not None:
+            self._put_file(url, path, content_type)
+            return
+        _http_put_file(
+            url,
+            path,
+            content_type,
+            on_progress=None if quiet else self._emit,
+            timeout_s=PUT_TIMEOUT_S,
+        )
 
     def _json_request_http(
         self, method: str, path: str, body: dict[str, Any] | None
@@ -172,30 +309,27 @@ class CloudIngest:
         self.sync_session(session_id)
         self.sync_trip_segment(segment_id)
         if already_stored:
-            print(
+            self._emit(
                 f"[ingest] trip_segment {segment_id} already uploaded; skip S3",
-                flush=True,
             )
             return True
         if not finished:
-            print(
+            self._emit(
                 f"[ingest] trip_segment {segment_id} not finished locally; skip S3",
-                flush=True,
             )
             return False
         if not local_path:
-            print(
+            self._emit(
                 f"[ingest] trip_segment {segment_id} has no local path; skip S3",
-                flush=True,
             )
             return False
         path = Path(local_path)
         if not path.is_file():
-            print(
+            self._emit(
                 f"[ingest] trip file missing on disk ({path}); skip S3",
-                flush=True,
             )
             return False
+        size_bytes = path.stat().st_size
         issued = self._json_request(
             "POST",
             "/api/netrapi/s3-upload-url",
@@ -205,17 +339,21 @@ class CloudIngest:
         object_key = issued.get("object_key")
         if not put_url or not object_key:
             raise CloudIngestError(f"s3-upload-url missing url/object_key: {issued!r}")
-        self._put_bytes(str(put_url), path.read_bytes(), CLIP_CONTENT_TYPE)
+        self._emit(
+            f"[ingest] trip_segment {segment_id}: uploading {path.name} "
+            f"({size_bytes} bytes) -> s3 key {object_key}"
+        )
+        self._put_path(str(put_url), path, CLIP_CONTENT_TYPE)
         self._json_request(
             "POST",
             "/api/netrapi/confirm-s3-upload",
             {"trip_segment_id": segment_id, "object_key": object_key},
         )
         self._mark_local_trip_uploaded(segment_id, str(object_key), path)
-        print(
+        self._emit(
             f"[ingest] trip_segment {segment_id} uploaded ({object_key})",
-            flush=True,
         )
+        self._emit_upload_separator()
         return True
 
     def drain_clips(self) -> int:
@@ -223,45 +361,73 @@ class CloudIngest:
         with get_session() as session:
             events = session.exec(select(Event).order_by(Event.id)).all()
             pending: list[int] = []
+            already = 0
+            unfinished = 0
             for event in events:
                 if event.id is None:
                     continue
                 clip = session.exec(select(Clip).where(Clip.event_id == event.id)).first()
                 if clip is None:
                     continue
-                if clip.init_local_stored is True and not (
-                    clip.s3_stored is True and bool(clip.s3_key)
-                ):
+                if clip.s3_stored is True and bool(clip.s3_key):
+                    already += 1
+                    continue
+                if clip.init_local_stored is True:
                     pending.append(event.id)
+                else:
+                    unfinished += 1
+        self._emit(
+            f"[drain] clips: {len(pending)} pending, {already} already in S3"
+            + (f", {unfinished} without finished local file" if unfinished else ""),
+        )
+        if pending:
+            self._emit(f"[drain] clip event ids: {pending}")
         uploaded = 0
-        for event_id in pending:
+        for index, event_id in enumerate(pending, start=1):
             try:
+                self._emit(
+                    f"[drain] clip {index}/{len(pending)}: sync_event({event_id})",
+                )
                 self.sync_event(event_id)
                 uploaded += 1
             except Exception as exc:
-                print(f"[ingest] event {event_id} drain failed: {exc}", flush=True)
+                self._emit(f"[ingest] event {event_id} drain failed: {exc}")
         return uploaded
 
     def drain_trip_segments(self) -> int:
         """Upload finished trip files that are not yet in S3, one at a time."""
         with get_session() as session:
             rows = session.exec(select(TripSegment).order_by(TripSegment.id)).all()
-            pending = [
-                row.id
-                for row in rows
-                if row.id is not None
-                and row.init_local_stored is True
-                and not (row.s3_stored is True and bool(row.s3_key))
-            ]
+            pending: list[int] = []
+            already = 0
+            unfinished = 0
+            for row in rows:
+                if row.id is None:
+                    continue
+                if row.s3_stored is True and bool(row.s3_key):
+                    already += 1
+                    continue
+                if row.init_local_stored is True:
+                    pending.append(row.id)
+                else:
+                    unfinished += 1
+        self._emit(
+            f"[drain] trips: {len(pending)} pending, {already} already in S3"
+            + (f", {unfinished} unfinished (still open / not saved)" if unfinished else ""),
+        )
+        if pending:
+            self._emit(f"[drain] trip_segment ids: {pending}")
         uploaded = 0
-        for segment_id in pending:
+        for index, segment_id in enumerate(pending, start=1):
             try:
+                self._emit(
+                    f"[drain] trip {index}/{len(pending)}: upload_trip_segment({segment_id})",
+                )
                 if self.upload_trip_segment(segment_id):
                     uploaded += 1
             except Exception as exc:
-                print(
+                self._emit(
                     f"[ingest] trip_segment {segment_id} drain failed: {exc}",
-                    flush=True,
                 )
         return uploaded
 
@@ -306,6 +472,10 @@ class CloudIngest:
                 raise CloudIngestError(
                     f"auto_classification for event {event_id} not in local SQLite"
                 )
+            type_row = session.get(
+                ClassificationType, classification.classification_type_id
+            )
+            type_value = type_row.value if type_row is not None else "unknown"
             payload: dict[str, Any] = {
                 "id": event.id,
                 "driving_session_id": event.driving_session_id,
@@ -376,44 +546,96 @@ class CloudIngest:
             )
         self._json_request("POST", "/api/netrapi/driving-event", payload)
         if clip_id is None:
-            print(
-                f"[ingest] event {event_id} has no clip yet; skip S3",
-                flush=True,
+            self._emit(
+                f"[ingest] event {event_id} ({type_value}) has no clip yet; skip S3",
             )
             return
         if already_stored:
-            print(
-                f"[ingest] event {event_id} clip {clip_id} already uploaded; skip S3",
-                flush=True,
+            self._emit(
+                f"[ingest] event {event_id} ({type_value}) clip {clip_id} "
+                f"already uploaded; skip S3",
             )
             return
         if not clip_path:
-            print(f"[ingest] event {event_id} has no clip path; skip S3", flush=True)
+            self._emit(
+                f"[ingest] event {event_id} ({type_value}) has no clip path; skip S3",
+            )
             return
         path = Path(clip_path)
         if not path.is_file():
-            print(f"[ingest] clip missing on disk ({path}); skip S3", flush=True)
+            self._emit(
+                f"[ingest] event {event_id} ({type_value}) clip missing on disk "
+                f"({path}); skip S3",
+            )
             return
         issued = self._json_request(
             "POST",
             "/api/netrapi/s3-upload-url",
             {"clip_id": clip_id, "content_type": CLIP_CONTENT_TYPE},
         )
-        put_url = issued.get("url")
         object_key = issued.get("object_key")
-        if not put_url or not object_key:
-            raise CloudIngestError(f"s3-upload-url missing url/object_key: {issued!r}")
-        self._put_bytes(str(put_url), path.read_bytes(), CLIP_CONTENT_TYPE)
+        if object_key:
+            self._emit(
+                f"[ingest] event {event_id} ({type_value}) clip {clip_id}: "
+                f"uploading {path.name} -> s3 key {object_key}"
+            )
+        object_key = self._put_clip_objects(issued, path)
         self._json_request(
             "POST",
             "/api/netrapi/confirm-s3-upload",
             {"clip_id": clip_id, "object_key": object_key},
         )
         self._mark_local_clip_uploaded(clip_id, str(object_key), Path(clip_path))
-        print(
-            f"[ingest] event {event_id} clip {clip_id} uploaded ({object_key})",
-            flush=True,
+        self._emit(
+            f"[ingest] event {event_id} ({type_value}) clip {clip_id} "
+            f"uploaded ({object_key})",
         )
+        self._emit_upload_separator()
+
+    def _put_clip_objects(self, issued: dict[str, Any], clip_path: Path) -> str:
+        object_key = issued.get("object_key")
+        objects = issued.get("objects")
+        if isinstance(objects, list) and objects:
+            videos: list[tuple[str, Path, str]] = []
+            sidecars: list[tuple[str, Path, str]] = []
+            for item in objects:
+                if not isinstance(item, dict):
+                    raise CloudIngestError(f"s3-upload-url object entry invalid: {item!r}")
+                name = item.get("name")
+                put_url = item.get("url")
+                content_type = str(item.get("content_type") or CLIP_CONTENT_TYPE)
+                if not put_url or not name:
+                    raise CloudIngestError(
+                        f"s3-upload-url object missing url/name: {item!r}"
+                    )
+                local = (
+                    clip_path
+                    if name == clip_path.name
+                    else clip_path.with_name(str(name))
+                )
+                if not local.is_file():
+                    raise CloudIngestError(f"missing local clip file ({local})")
+                entry = (str(put_url), local, content_type)
+                if _is_json_upload(str(name), content_type):
+                    sidecars.append(entry)
+                else:
+                    videos.append(entry)
+            for put_url, local, content_type in videos:
+                self._put_path(put_url, local, content_type)
+            if sidecars:
+                names = ", ".join(local.name for _, local, _ in sidecars)
+                self._emit(f"[ingest] uploading json: {names}")
+                for put_url, local, content_type in sidecars:
+                    self._put_path(put_url, local, content_type, quiet=True)
+                self._emit("[ingest] json uploaded")
+            if not object_key:
+                raise CloudIngestError(f"s3-upload-url missing object_key: {issued!r}")
+            return str(object_key)
+        put_url = issued.get("url")
+        if not put_url or not object_key:
+            raise CloudIngestError(f"s3-upload-url missing url/object_key: {issued!r}")
+        self._put_path(str(put_url), clip_path, CLIP_CONTENT_TYPE)
+        return str(object_key)
 
     def _mark_local_clip_uploaded(
         self, clip_id: int, object_key: str, clip_path: Path

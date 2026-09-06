@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -415,6 +415,9 @@ class TripRecorderConfig:
     segments_dir: Path
     segment_seconds: int
     ffmpeg_crf: int
+    # Runtime-only (not snapshotted to Postgres). Per-session trip.log + stats.csv.
+    logs_dir: Path = field(default_factory=lambda: Path("src/main/data/logs"))
+    stats_interval_s: float = 15.0
 
     @classmethod
     def from_json(cls, data: dict[str, Any], *, source: str = "trip_recorder.json") -> TripRecorderConfig:
@@ -438,12 +441,25 @@ class TripRecorderConfig:
         )
         if ffmpeg_crf < 0:
             raise ValueError(f"Field 'ffmpeg_crf' in {source} must be >= 0")
+        stats_interval_s = float(
+            _require_type(
+                data.get("stats_interval_s", 15.0),
+                (int, float),
+                "stats_interval_s",
+                source=source,
+            )
+        )
+        if stats_interval_s <= 0:
+            raise ValueError(f"Field 'stats_interval_s' in {source} must be greater than 0")
+        logs_raw = data.get("logs_dir", "src/main/data/logs")
 
         return cls(
             enabled=_require_type(data.get("enabled", False), bool, "enabled", source=source),
             segments_dir=_as_path(_require_key(data, "segments_dir", source=source), "segments_dir", source=source),
             segment_seconds=segment_seconds,
             ffmpeg_crf=ffmpeg_crf,
+            logs_dir=_as_path(logs_raw, "logs_dir", source=source),
+            stats_interval_s=stats_interval_s,
         )
 
 

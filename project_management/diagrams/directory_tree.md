@@ -137,18 +137,19 @@ src/main/
 │   ├── Dockerfile                     ✅  image for Render and local Compose
 │   ├── compose.yml                    ✅  local only — `docker compose up` from this dir (context `src/main`)
 │   ├── requirements.txt               ✅  fastapi / uvicorn / httpx / boto3 / db pins
-│   ├── .env                           🏃  gitignored; DATABASE_URL (Supabase URI) + NETRAPI_API_KEY + AWS
+│   ├── .env                           🏃  gitignored; DATABASE_URL + NETRAPI_API_KEY + AWS; optional CORS_ORIGINS
 │   ├── README.md                      ✅  local uvicorn / env keys (create `.env` by hand)
 │   ├── DOCKER.md                      ✅  Docker Desktop prereq; `docker build` + Compose (TP-37)
 │   └── app/
 │       ├── __init__.py                ✅  puts src/main on path for `db`
-│       ├── main.py                    ✅  lifespan + routers
-│       ├── config.py                  ✅  pydantic-settings: DATABASE_URL; NETRAPI_API_KEY; optional AWS + SUPABASE_DB_*
-│       ├── s3.py                      ✅  presign PUT/GET + HEAD; keys MMM-YYYY/driving_session_id_{id}/{clips|trips}/{clip|trip}-{id}.mp4
+│       ├── main.py                    ✅  lifespan + routers + CORS
+│       ├── config.py                  ✅  pydantic-settings: DATABASE_URL; NETRAPI_API_KEY; optional AWS, CORS_ORIGINS, SUPABASE_DB_*
+│       ├── s3.py                      ✅  presign PUT/GET + HEAD; ingest clip GET 15 min; public clip GET 2 min
+│       ├── public_limits.py           ✅  public mint: 10/min/IP + max 20 live URLs
 │       ├── auth/                      ✅  device API key (TP-42)
 │       │   ├── __init__.py            ✅
 │       │   └── api_key.py             ✅  X-API-Key on /api/netrapi/*
-│       └── routes/                    ✅  Pi ingest — [backend_api.md](backend_api.md)
+│       └── routes/                    ✅  Pi ingest — [backend_api.md](backend_api.md); public playback — [frontend_playback.md](frontend_playback.md)
 │           ├── __init__.py            ✅
 │           ├── health.py              ✅  GET /health (TP-35)
 │           ├── ready.py               ✅  GET /api/netrapi/ready (TP-59)
@@ -157,16 +158,53 @@ src/main/
 │           ├── trip_segment.py        ✅  POST /api/netrapi/trip-segment (JSON prime)
 │           ├── driving_event.py       ✅  POST /api/netrapi/driving-event (TP-36 / nested children)
 │           ├── operational_exception.py ✅  POST /api/netrapi/operational-exception
-│           └── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
+│           ├── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
+│           └── public_clip.py         ✅  GET /api/public/clips; POST /api/public/clip-download-url
 │
-└── frontend/                          📋  React on Vercel; no Dockerfile
-    ├── package.json                   📋
+└── frontend/                          ✅  Vite + React + TS + Tailwind SPA; no Dockerfile
+    ├── package.json                   ✅
+    ├── vite.config.ts                 ✅  Tailwind + Vitest; `/api` proxy to local FastAPI
+    ├── vercel.json                    ✅  SPA rewrite; Vercel project not connected yet
+    ├── README.md                      ✅
+    ├── index.html                     ✅
+    ├── public/
+    │   └── gifs/
+    │       └── .gitkeep               ✅  drop approach.gif etc. later
     └── src/
-        ├── App.tsx                    📋
+        ├── main.tsx                   ✅
+        ├── App.tsx                    ✅  single-page layout
+        ├── index.css                  ✅  Tailwind v4
+        ├── test-setup.ts              ✅  Testing Library jest-dom
         ├── components/
-        │   └── .gitkeep               📋
+        │   ├── layout/
+        │   │   └── SiteNav.tsx        ✅
+        │   ├── hero/
+        │   │   └── Hero.tsx           ✅
+        │   ├── overview/
+        │   │   └── Overview.tsx       ✅  stacked Mermaid hardware + software
+        │   ├── how-it-works/
+        │   │   ├── HowItWorks.tsx     ✅
+        │   │   ├── FeatureGuide.tsx   ✅
+        │   │   ├── KnnHierarchy.tsx   ✅
+        │   │   ├── AreaMotionChart.tsx ✅
+        │   │   └── ClusterScatter.tsx ✅
+        │   ├── demo/
+        │   │   └── Demo.tsx           ✅  YouTube placeholder
+        │   ├── try-it-out/
+        │   │   └── TryItOut.tsx       ✅  public mint + S3 playback
+        │   ├── links/
+        │   │   └── Links.tsx          ✅
+        │   ├── diagrams/
+        │   │   ├── MermaidDiagram.tsx ✅  mermaid.render + Iconify logos
+        │   │   ├── mermaidCharts.ts   ✅
+        │   │   ├── mermaidSetup.ts    ✅
+        │   │   ├── hardwareNodeCards.ts ✅  hover copy for hardware nodes
+        │   │   └── diagramIconPacks.ts ✅  Iconify subset for diagrams
+        │   └── data/
+        │       ├── clusterData.ts     ✅
+        │       └── ap050*.json        ✅  plot source data
         └── api/
-            └── .gitkeep               📋
+            └── publicPlayback.ts      ✅  GET /api/public/clips; POST clip-download-url
 ```
 
 ### Deploy vs local dev
@@ -177,7 +215,7 @@ src/main/
 | Local backend stack | `src/main/backend/compose.yml` | No — dev machine only |
 | Edge on Pi | `src/main/edge/netrapi-edge.service` + `main.py` | Yes — Pi (systemd) |
 | Edge / test Python deps | `src/create_env.sh` (Pi) or `src/create_env.bat` (Windows) | Yes — creates `venv/` in cwd |
-| Frontend | `src/main/frontend/` | Yes → Vercel |
+| Frontend | `src/main/frontend/` | Later → Vercel (playback talks to Render via `VITE_API_URL`) |
 
 No separate `deploy/` folder — each app keeps its own deploy artifact (`Dockerfile` in backend, `.service` in edge).
 
@@ -307,8 +345,9 @@ src/tests/
 │   │           └── test_s3_upload.py       ✅  ↔ s3_upload.py
 │   │
 │   └── frontend/
+│       ├── tsconfig.json              ✅  IDE types; packages resolve from frontend/node_modules
 │       └── src/
-│           └── App.test.tsx           📋  stub ↔ frontend/src/App.tsx
+│           └── App.test.tsx           ✅  ↔ frontend/src/App.tsx (Vitest via frontend package)
 │
 └── integration/
     ├── tp_26/                         ✅  stubbed event gate + clips
@@ -342,7 +381,7 @@ src/tests/
     ├── tp_58/                         ✅  offline Wi-Fi / internet (mocked boot)
     ├── tp_59/                         ✅  deployed GET /api/netrapi/ready
     ├── tp_60/                         ✅  online boot + keep-alive → offline
-    ├── tp_61/                         ✅  --drain-trips clips|trips|both + delete-after-drain
+    ├── tp_61/                         ✅  --drain clips|trips|both + delete-uploaded
     ├── tp_62/                         ✅  health.json snapshot (Alembic 0004)
     ├── at_7_1/                        ✅  mocked Pi pipeline → Render persist + ingest
     ├── at_7_2/                        ✅  camera + SPACE + stubbed events → cloud (dry-run)
@@ -362,6 +401,6 @@ src/tests/
 4. `src/main/edge/netrapi/detection/` + `events/` stub ✅ (TP-18/TP-19 unit tests)  
 5. `src/main/edge/main.py` + `netrapi-edge.service` ✅  
 6. `src/main/data/clips/` and `src/main/data/trips/` — 🏃 created on first write; keep `src/main/data/` in `.gitignore`  
-7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain-trips {clips,trips,both}`. After a successful drain: `--delete-after-drain {clips,trips,both}`. Standalone local MP4 cleanup: `--delete-uploaded-local` or `--delete-all-local`.  
+7. Optional full-trip mode: `main.py --full-record` + `trip_recorder.json` (`segment_seconds`, default 300). Wi‑Fi trip upload: `main.py --drain {clips,trips,both}`. After a successful drain: `--delete-uploaded`. Standalone cleanup: `--delete-uploaded` or `--delete-all`.  
 8. Event port ✅ — approach / motion / features / stop_classifier + approach/motion/knn JSON + joblib models (design: [event_detection.md](event_detection.md))  
 9. Buzzer ✅ — `netrapi/buzzer/` + `buzzer.json` (PWM beep on configured events; soft-fail GPIO)

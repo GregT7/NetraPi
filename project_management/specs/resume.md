@@ -18,6 +18,8 @@ These are the initial target bullets derived from the project overview proposal 
 - Collected 10+ hours of driving footage after system bring-up with fixed model settings, manual ground-truth labeling, and model accuracy evaluation.
 - Deployed a Dockerized FastAPI backend on Render for API key authentication, presigned upload URL issuance, metadata ingestion to Postgres, and analytics/video endpoints.
 - Stored videos in private AWS S3 buckets with signed URL access, and stored event metadata in Supabase PostgreSQL with linked S3 object paths.
+- Public demo playback lets visitors browse and play real collected event clips through short-lived signed GET URLs (2-minute TTL), capped at 20 concurrent signatures and rate-limited per client IP, so they can engage with actual footage while unbounded public GETs are less likely to produce a large AWS S3 bill.
+- Try-it-out detailed playback (default) will replay the stop-sign state machine next to area/motion graphs synchronized to the clip, using JSON sidecars (`areas.json`, `motion.json`, `transitions.json`) stored beside each video in S3.
 - Deployed a React + Tailwind dashboard on Vercel with event browsing, clip selection, accuracy metrics, and at least one evaluation visualization.
 - Set up GitHub Actions for lint, test, build, and deployment checks, and ran the edge app as a `systemd` service for reliable startup and recovery.
 
@@ -33,6 +35,7 @@ This section captures work completed or in progress beyond Section 1 targets.
 - Prototyped rolling-buffer event-clip extraction and multi-hour in-car recording endurance with OpenCV-based test scripts and recorded pass evidence.
 - Added real-time audible feedback with a GPIO buzzer that triggers when an unsafe stop-sign event is detected.
 - Defined requirements and acceptance tests in `mvs.md` and `test.md` (sprint sections through E), including narrowing scope to stop-sign events and model-accuracy evaluation.
+- Served real collected event clips in the public portfolio through short-lived signed GET URLs (2-minute TTL), capped at 20 concurrent signatures and rate-limited per client IP, so visitors can engage with actual footage while unbounded public GETs are less likely to produce a large AWS S3 bill.
 
 ## Section 3: Final Concise Resume Points
 This section contains the polished final set intended for direct resume use, written to be concise and high signal.

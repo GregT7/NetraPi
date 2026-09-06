@@ -5,14 +5,16 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import get_settings
+from app.config import cors_origin_list, get_settings
 from app.routes.driving_event import router as driving_event_router
 from app.routes.driving_session import router as driving_session_router
 from app.routes.health import router as health_router
 from app.routes.ready import router as ready_router
 from app.routes.master_config import router as master_config_router
 from app.routes.operational_exception import router as operational_exception_router
+from app.routes.public_clip import router as public_clip_router
 from app.routes.s3_upload import router as s3_upload_router
 from app.routes.trip_segment import router as trip_segment_router
 from db import database as db_mod
@@ -43,6 +45,12 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if docs_enabled else None,
         openapi_url="/openapi.json" if docs_enabled else None,
     )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origin_list(),
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
     application.include_router(health_router)
     application.include_router(ready_router)
     application.include_router(master_config_router)
@@ -51,6 +59,7 @@ def create_app() -> FastAPI:
     application.include_router(driving_event_router)
     application.include_router(operational_exception_router)
     application.include_router(s3_upload_router)
+    application.include_router(public_clip_router)
     return application
 
 

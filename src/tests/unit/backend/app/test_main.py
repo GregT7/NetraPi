@@ -30,13 +30,14 @@ def test_create_app_registers_health_and_ingest_routes():
     assert "/api/netrapi/s3-upload-url" in paths
     assert "/api/netrapi/confirm-s3-upload" in paths
     assert "/api/netrapi/s3-download-url" in paths
+    assert "/api/public/clip-download-url" in paths
+    assert "/api/public/clips" in paths
 
 
-def test_create_app_registers_s3_routes():
+def test_create_app_registers_public_playback_routes():
     paths = _route_paths(create_app())
-    assert "/api/netrapi/s3-upload-url" in paths
-    assert "/api/netrapi/confirm-s3-upload" in paths
-    assert "/api/netrapi/s3-download-url" in paths
+    assert "/api/public/clip-download-url" in paths
+    assert "/api/public/clips" in paths
 
 
 def test_lifespan_inits_and_disposes_engine(memory_database_url: str) -> None:
