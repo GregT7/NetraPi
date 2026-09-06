@@ -189,6 +189,61 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
         assert clip.file_size_bytes == len(b"fake-mp4")
 
 
+def test_put_clip_objects_logs_json_sidecars_once(tmp_path: Path) -> None:
+    clip_dir = tmp_path / "clip_1"
+    clip_dir.mkdir()
+    clip_path = clip_dir / "clip.mp4"
+    clip_path.write_bytes(b"mp4")
+    (clip_dir / "areas.json").write_text("{}", encoding="utf-8")
+    (clip_dir / "motion.json").write_text("{}", encoding="utf-8")
+    (clip_dir / "transitions.json").write_text("{}", encoding="utf-8")
+    messages: list[str] = []
+    put_names: list[str] = []
+
+    def put_file(_url: str, path: Path, _content_type: str) -> None:
+        put_names.append(path.name)
+
+    key = CloudIngest(
+        json_request=lambda *_: {},
+        put_file=put_file,
+        on_log=messages.append,
+    )._put_clip_objects(
+        {
+            "object_key": "Aug-2026/driving_session_id_1/clips/clip-1/clip.mp4",
+            "objects": [
+                {
+                    "name": "clip.mp4",
+                    "url": "https://s3.example/put-video",
+                    "content_type": "video/mp4",
+                },
+                {
+                    "name": "areas.json",
+                    "url": "https://s3.example/put-areas",
+                    "content_type": "application/json",
+                },
+                {
+                    "name": "motion.json",
+                    "url": "https://s3.example/put-motion",
+                    "content_type": "application/json",
+                },
+                {
+                    "name": "transitions.json",
+                    "url": "https://s3.example/put-transitions",
+                    "content_type": "application/json",
+                },
+            ],
+        },
+        clip_path,
+    )
+    assert key.endswith("clip.mp4")
+    assert put_names == ["clip.mp4", "areas.json", "motion.json", "transitions.json"]
+    assert messages == [
+        "[ingest] uploading json: areas.json, motion.json, transitions.json",
+        "[ingest] json uploaded",
+    ]
+    assert not any("PUT start" in message or "PUT progress" in message for message in messages)
+
+
 def test_sync_event_skips_put_when_already_stored(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'netrapi.db').resolve().as_posix()}"
     _upgrade(url)

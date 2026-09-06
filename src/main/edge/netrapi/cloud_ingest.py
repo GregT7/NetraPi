@@ -63,6 +63,11 @@ def _format_mbps(num_bytes: int, elapsed_s: float) -> str:
     return f"{(num_bytes * 8) / (elapsed_s * 1_000_000):.2f}"
 
 
+def _is_json_upload(name: str, content_type: str) -> bool:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    return name.endswith(".json") or media_type == JSON_CONTENT_TYPE
+
+
 class _ProgressReader:
     """File-like wrapper that reports PUT upload progress via on_progress."""
 
@@ -228,7 +233,9 @@ class CloudIngest:
     def _emit_upload_separator(self) -> None:
         self._emit(UPLOAD_DONE_SEPARATOR)
 
-    def _put_path(self, url: str, path: Path, content_type: str) -> None:
+    def _put_path(
+        self, url: str, path: Path, content_type: str, *, quiet: bool = False
+    ) -> None:
         """Stream a local file to a presigned PUT URL (or call injected put_file)."""
         if self._put_file is not None:
             self._put_file(url, path, content_type)
@@ -237,7 +244,7 @@ class CloudIngest:
             url,
             path,
             content_type,
-            on_progress=self._emit,
+            on_progress=None if quiet else self._emit,
             timeout_s=PUT_TIMEOUT_S,
         )
 
@@ -589,6 +596,8 @@ class CloudIngest:
         object_key = issued.get("object_key")
         objects = issued.get("objects")
         if isinstance(objects, list) and objects:
+            videos: list[tuple[str, Path, str]] = []
+            sidecars: list[tuple[str, Path, str]] = []
             for item in objects:
                 if not isinstance(item, dict):
                     raise CloudIngestError(f"s3-upload-url object entry invalid: {item!r}")
@@ -606,7 +615,19 @@ class CloudIngest:
                 )
                 if not local.is_file():
                     raise CloudIngestError(f"missing local clip file ({local})")
-                self._put_path(str(put_url), local, content_type)
+                entry = (str(put_url), local, content_type)
+                if _is_json_upload(str(name), content_type):
+                    sidecars.append(entry)
+                else:
+                    videos.append(entry)
+            for put_url, local, content_type in videos:
+                self._put_path(put_url, local, content_type)
+            if sidecars:
+                names = ", ".join(local.name for _, local, _ in sidecars)
+                self._emit(f"[ingest] uploading json: {names}")
+                for put_url, local, content_type in sidecars:
+                    self._put_path(put_url, local, content_type, quiet=True)
+                self._emit("[ingest] json uploaded")
             if not object_key:
                 raise CloudIngestError(f"s3-upload-url missing object_key: {issued!r}")
             return str(object_key)
