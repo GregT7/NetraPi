@@ -106,7 +106,7 @@ export default function AreaMotionChart() {
                     fontSize: 12,
                   }}
                   formatter={(value) => formatValue(value as number)}
-                  labelFormatter={(label) => `Time (s): ${formatValue(label)}`}
+                  labelFormatter={(label) => `Time (s): ${formatValue(label as number)}`}
                 />
                 <Legend
                   align="center"
