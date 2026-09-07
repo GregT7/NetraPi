@@ -2,7 +2,7 @@ import AreaMotionChart from './AreaMotionChart'
 import ClusterScatter from './ClusterScatter'
 import MermaidDiagram from '../diagrams/MermaidDiagram'
 import { EVENT_STATE_CHART } from '../diagrams/mermaidCharts'
-import { CLUSTER_POINTS } from '../data/clusterData'
+import { CLUSTER_POINTS } from '../charts/clusterData'
 
 export default function HowItWorks() {
   return (

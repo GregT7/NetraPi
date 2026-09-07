@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import series from '../data/ap050AreaMotion.json'
+import series from '../charts/areaMotion.json'
 
 type SeriesPoint = { t: number; area: number; motion: number }
 

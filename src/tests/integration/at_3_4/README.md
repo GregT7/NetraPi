@@ -47,7 +47,7 @@ Rebuild the per-clip feature table (labels + stage-1/2 vectors) from `data/` + `
 python src/tests/integration/at_3_4/export_ap_050_clip_features.py
 ```
 
-Writes `config/ap_050_clip_features.json` (safe to commit), the stage-2 Results scatter (rolling vs run-through only), a stage-1 PCA scatter (`ap050Stage1Pca.json`), and raw stage-1 feature rows (`ap050Stage1Features.json`, complete-stop vs rolling/run-through). Rebuild charts only from an existing table with `--from-json`.
+Writes `config/ap_050_clip_features.json` (safe to commit), the stage-2 Results scatter (rolling vs run-through only), a stage-1 PCA scatter (`stage1Pca.json`), and raw stage-1 feature rows (`stage1Features.json`, complete-stop vs rolling/run-through). Chart JSON lands in `src/main/frontend/src/components/charts/`. Rebuild charts only from an existing table with `--from-json`.
 
 Sync `config/` (and optionally `data/` for audit) to the Pi if they are not in your deployment bundle.
 

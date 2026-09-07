@@ -200,9 +200,12 @@ src/main/
         │   │   ├── mermaidSetup.ts    ✅
         │   │   ├── hardwareNodeCards.ts ✅  hover copy for hardware nodes
         │   │   └── diagramIconPacks.ts ✅  Iconify subset for diagrams
-        │   └── data/
+        │   └── charts/
         │       ├── clusterData.ts     ✅
-        │       └── ap050*.json        ✅  plot source data
+        │       ├── areaMotion.json    ✅  How It Works area/motion series
+        │       ├── clipPoints.json    ✅  rolling vs run-through scatter
+        │       ├── stage1Pca.json     ✅
+        │       └── stage1Features.json ✅
         └── api/
             └── publicPlayback.ts      ✅  GET /api/public/clips; POST clip-download-url
 ```

@@ -1,4 +1,4 @@
-import { LABEL_COLORS, LABEL_DISPLAY } from '../data/clusterData'
+import { LABEL_COLORS, LABEL_DISPLAY } from '../charts/clusterData'
 import { HARDWARE_NODE_CARDS } from '../diagrams/hardwareNodeCards'
 import MermaidDiagram from '../diagrams/MermaidDiagram'
 import { HARDWARE_CHART, SOFTWARE_CHART } from '../diagrams/mermaidCharts'

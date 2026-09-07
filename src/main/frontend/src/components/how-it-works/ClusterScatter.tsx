@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { LABEL_COLORS, LABEL_DISPLAY, LABEL_ORDER, type ClusterPoint } from '../data/clusterData'
+import { LABEL_COLORS, LABEL_DISPLAY, LABEL_ORDER, type ClusterPoint } from '../charts/clusterData'
 
 type ClusterScatterProps = {
   points: ClusterPoint[]

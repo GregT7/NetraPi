@@ -31,13 +31,20 @@ DEFAULT_DATA_DIR = SCRIPT_DIR / "data"
 DEFAULT_TAGS = REPO_ROOT / "vids" / "unsafe_events" / "clip_docs_compr.xlsx"
 DEFAULT_OUT = CONFIG_DIR / "ap_050_clip_features.json"
 DEFAULT_POINTS_OUT = (
-    REPO_ROOT / "src" / "main" / "frontend" / "src" / "components" / "ap050ClipPoints.json"
+    REPO_ROOT / "src" / "main" / "frontend" / "src" / "components" / "charts" / "clipPoints.json"
 )
 DEFAULT_PCA_OUT = (
-    REPO_ROOT / "src" / "main" / "frontend" / "src" / "components" / "ap050Stage1Pca.json"
+    REPO_ROOT / "src" / "main" / "frontend" / "src" / "components" / "charts" / "stage1Pca.json"
 )
 DEFAULT_STAGE1_FEATURES_OUT = (
-    REPO_ROOT / "src" / "main" / "frontend" / "src" / "components" / "ap050Stage1Features.json"
+    REPO_ROOT
+    / "src"
+    / "main"
+    / "frontend"
+    / "src"
+    / "components"
+    / "charts"
+    / "stage1Features.json"
 )
 
 CLIP_ID_RE = re.compile(r"clip_(\d+)_", re.IGNORECASE)

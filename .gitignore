@@ -13,6 +13,7 @@
 vids/
 research/
 venv/
+# Any directory named data/ (frontend chart JSON is components/charts/, not data/)
 data/
 metrics/
 *clip.mp4
