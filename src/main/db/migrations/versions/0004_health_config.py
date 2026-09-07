@@ -5,7 +5,7 @@ Revises: 0003
 Create Date: 2026-08-23 12:40:00.000000
 
 Frozen health.json settings as a 1:1 child of master_config.
-Backfills defaults for every existing snapshot (including seed id 1).
+Backfills defaults for every existing snapshot (including the Alembic `edge-json` seed).
 """
 from typing import Sequence, Union
 
@@ -37,7 +37,7 @@ _DEFAULTS = {
 def upgrade() -> None:
     op.create_table(
         "health_config",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("master_config_id", sa.Integer(), nullable=False),
         sa.Column("render_wait_s", sa.Float(), nullable=False),
         sa.Column("render_poll_s", sa.Float(), nullable=False),
@@ -53,7 +53,6 @@ def upgrade() -> None:
         sa.Column("keepalive_fail_limit", sa.Integer(), nullable=False),
         sa.Column("log_path", sa.String(), nullable=False),
         sa.ForeignKeyConstraint(["master_config_id"], ["master_config.id"]),
-        sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("master_config_id"),
     )
     bind = op.get_bind()

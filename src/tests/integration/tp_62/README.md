@@ -1,8 +1,9 @@
 # TP-62 — Health settings snapshot
 
 `health.json` is snapshotted as `health_config` (Alembic 0004) and included
-in the master-config fingerprint. Unchanged JSON reuses seed id 1. A timeout
-change inserts a new snapshot. Uses a temp SQLite DB (no Render, no Pi).
+in the master-config fingerprint. Unchanged JSON reuses the Alembic `edge-json`
+seed snapshot. A timeout change inserts a new snapshot. Uses a temp SQLite DB
+(no Render, no Pi).
 
 ## Activate venv (from repo root)
 

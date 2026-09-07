@@ -16,6 +16,10 @@ OnSegmentSaved = Callable[..., None]
 OnSegmentOpened = Callable[..., None]
 
 
+def _default_log(message: str) -> None:
+    print(message, flush=True)
+
+
 class TripRecorder:
     def __init__(
         self,
@@ -27,6 +31,7 @@ class TripRecorder:
         self._config = config
         self._on_segment_saved = on_segment_saved
         self._on_segment_opened = on_segment_opened
+        self._log: Callable[[str], None] = _default_log
         self._trip_started_at: datetime | None = None
         self._segment_started_at: float | None = None
         self._segment_wall_started_at: datetime | None = None
@@ -47,6 +52,9 @@ class TripRecorder:
     @property
     def is_started(self) -> bool:
         return self._active
+
+    def set_log(self, callback: Callable[[str], None] | None) -> None:
+        self._log = callback if callback is not None else _default_log
 
     def set_on_segment_saved(self, callback: OnSegmentSaved | None) -> None:
         self._on_segment_saved = callback
@@ -106,10 +114,9 @@ class TripRecorder:
         self._segment_wall_started_at = datetime.now()
         self._segment_frames = []
         self._segment_index += 1
-        print(
+        self._log(
             f"[trip] segment {self._segment_index:04d} buffering "
-            f"(target {self._config.segment_seconds}s wall) -> {self._current_path.name}",
-            flush=True,
+            f"(target {self._config.segment_seconds}s wall) -> {self._current_path.name}"
         )
         if self._on_segment_opened is not None and self._segment_wall_started_at is not None:
             self._on_segment_opened(
@@ -140,10 +147,9 @@ class TripRecorder:
             output_path=output_path,
             crf=self._config.ffmpeg_crf,
         )
-        print(
+        self._log(
             f"[trip] segment saved: {output_path.name} | {elapsed:.1f}s wall | "
-            f"{frame_count} frames | {fps:.2f} fps",
-            flush=True,
+            f"{frame_count} frames | {fps:.2f} fps"
         )
         if self._on_segment_saved is not None and self._segment_wall_started_at is not None:
             self._on_segment_saved(

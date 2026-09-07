@@ -37,8 +37,9 @@ def test_write_clip_encodes_pre_then_post(tmp_path: Path):
 
     assert result.pre_frame_count == 2
     assert result.post_frame_count == 1
-    assert result.clip_path.parent == tmp_path / "clips"
-    assert result.clip_path.suffix == ".mp4"
+    assert result.clip_path.parent.parent == tmp_path / "clips"
+    assert result.clip_path.name == "clip.mp4"
+    assert result.clip_path.parent.name.startswith("clip_1_")
     encode.assert_called_once()
     assert encode.call_args.kwargs["fps"] == pytest.approx(29.5)
     assert len(encode.call_args.kwargs["frames"]) == 3

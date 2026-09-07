@@ -126,6 +126,9 @@ def test_forced_latch_then_window_elapse_emits(tmp_path: Path):
     assert len(event.knn_stage1) == 4
     assert event.knn_stage2 is not None
     assert len(event.knn_stage2) == 2
+    assert event.playback_series is not None
+    assert event.playback_series.anchor_t == t0
+    assert len(event.playback_series.motion_points) >= 1
     assert manager.phase_name == "WATCHING"
     assert manager.ready_to_evaluate is False
 

@@ -53,7 +53,7 @@ Designed outcomes:
 2. Local write succeeds → `init_local_stored = true`; S3 flags still **null**; `local_path` = Pi file path; `file_size_bytes` = on-disk size when the file exists (clip at persist; trip when the segment is finished)
 3. Local write fails → `init_local_stored = false`; S3 flags still **null**; `local_path` null
 4. Upload to S3 succeeds → `s3_stored = true`, `s3_key` = S3 key on **both** Postgres (via `confirm-s3-upload`) and Pi SQLite (via `CloudIngest` after confirm). Clips confirm during the drive; trip files confirm in the Wi‑Fi drain. Postgres `file_size_bytes` from S3 `ContentLength`; `init_local_deleted` still **false**/null (local file still on the Pi)
-5. Local delete succeeds → `init_local_deleted = true`; `local_path` cleared. Edge jobs: `--delete-uploaded-local` (only if `s3_stored` is true) or `--delete-all-local`. Cloud flags via `POST /confirm-local-delete`; S3 objects stay.
+5. Local delete succeeds → `init_local_deleted = true`; `local_path` cleared. Edge jobs: `--delete-uploaded` (only if `s3_stored` is true) or `--delete-all`. Cloud flags via `POST /confirm-local-delete`; S3 objects stay.
 6. Upload to S3 fails → `s3_stored = false`; `init_local_deleted` stays **null**; `s3_key` stays null
 
 S3 success and local delete are separate attempts. Frontend playback uses `s3_key` when `s3_stored` is true (signed URL). Still needs uploading: `init_local_stored = true` and `s3_stored` is null or false. Still needs local cleanup: `s3_stored = true` and `init_local_deleted` is false.

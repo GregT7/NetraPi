@@ -1,25 +1,35 @@
-# NetraPi edge pipeline (systemd).
+# NetraPi edge pipeline (systemd) — manual start only (not enabled on boot).
 #
-# Install:
+# Install (once):
 #   sudo cp src/main/edge/netrapi-edge.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now netrapi-edge.service
 #
-# Edit WorkingDirectory, User, and ExecStart paths for your Pi clone and venv.
+# Use:
+#   sudo systemctl start netrapi-edge
+#   sudo systemctl stop netrapi-edge
+#   sudo systemctl status netrapi-edge
+#   journalctl -u netrapi-edge -f
+#
+# Do NOT run: systemctl enable netrapi-edge
+# (that would start the pipeline every boot)
 
 [Unit]
 Description=NetraPi edge capture, detection, and clip recording
-After=network.target
-Wants=network.target
+After=network-online.target graphical.session
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/NetraPi
-Environment=PYTHONPATH=src/main/edge
-ExecStart=/home/pi/NetraPi/venv/bin/python src/main/edge/main.py
-Restart=on-failure
-RestartSec=5
+User=terrelgat
+Group=terrelgat
+WorkingDirectory=/home/terrelgat/Desktop/NetraPi
+Environment=PYTHONPATH=/home/terrelgat/Desktop/NetraPi/src/main/edge
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/terrelgat/.Xauthority
+# Camera / Coral / OpenCV preview need the graphical session + USB devices.
+ExecStart=/home/terrelgat/Desktop/NetraPi/src/main/edge/venv/bin/python src/main/edge/main.py
+# Manual start: do not restart-loop if camera/TPU is missing.
+Restart=no
 
 [Install]
 WantedBy=multi-user.target
