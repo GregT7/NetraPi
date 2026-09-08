@@ -37,7 +37,7 @@ Do **not** design or implement these until frontend work starts:
 
 - One edge device.
 - Ingest routes under `/api/netrapi/*` require header `X-API-Key` (M-7.10, TP-42). `GET /health` stays open (TP-35 uvicorn, TP-37 Compose, Render). Swagger `/docs` `/redoc` `/openapi.json` are local/Compose only; off on Render (decision 59).
-- Same SQLModel tables locally (SQLite) and in cloud (Supabase Postgres). Alembic `0001`–`0002` seed `classification_type` / `object_label` / initial `master_config`. `POST /master-config` find-or-creates additional snapshots when live edge JSON differs (decision 56). `classification_type` / `object_label` are still not ingest APIs.
+- Same SQLModel tables locally (SQLite) and in cloud (Supabase Postgres). Alembic `0001`–`0006`: `0002` seeds `classification_type` / `object_label` / initial `master_config`; `0005` adds `clip.public_visible`; `0006` seeds `flag_def` and creates `clip_flag`. `POST /master-config` find-or-creates additional snapshots when live edge JSON differs (decision 56). `classification_type` / `object_label` / `flag_def` are still not ingest APIs.
 - Paths are **singular** when the call creates or acts on one record.
 - Build order matches Sprint 5/6 in [test.md](../specs/test.md): TP-34 `driving-session` → TP-35 `/health` → TP-36 `driving-event` (SQLite) → Compose (TP-37) → API key (TP-42) → `s3-upload-url` (TP-43) → Pi PUT to S3 → `confirm-s3-upload` (TP-47) → local E2E via `CloudIngest` (TP-49). `trip-segment` JSON prime matches TP-34/36 but has no dedicated TP yet.
 - FastAPI never receives video. Render only handles JSON + URL signing.
@@ -226,7 +226,7 @@ One stop-sign encounter. JSON is that `event` plus nested children — not the w
 | Nested piece | Role |
 | ------------ | ---- |
 | `event` | `id`, `driving_session_id`, `time` |
-| `clip` | Local clip row: `init_local_stored`, `file_size_bytes`, times, fps, frame counts. `s3_key` / `s3_stored` / `init_local_deleted` stay **null** until clip confirm / local-delete. Event retries do not wipe those flags or restore `local_path` after delete |
+| `clip` | Local clip row: `init_local_stored`, `file_size_bytes`, times, fps, frame counts. `s3_key` / `s3_stored` / `init_local_deleted` stay **null** until clip confirm / local-delete. `public_visible` defaults true (Alembic `0005`); hide with SQL, not ingest. Event retries do not wipe those flags or restore `local_path` after delete |
 | `classification` + `auto_classification` | Live pipeline label |
 | `knn_parameters` | Optional list of `{knn_feature_id, value}` (ids from that session’s `knn_config`) |
 | `approach_parameters` | Optional measurements; optional `fail_reasons` string list → `approach_fail_reason` |
@@ -425,11 +425,12 @@ What each ingest call is allowed to write. Full column lists: [schema_design.md]
 | ----- | ----------------- | ----------------- | -------------- | --------------- | ----------------- | ------------------- | ----- |
 | `master_config` + config children | find-or-create by fingerprint | 400 if id missing | no | no | no | no | Seed id 1 reused when live JSON matches |
 | `classification_type`, `object_label` | `object_label` get-or-create by value | no | no | no | no | no | `classification_type` stays Alembic-only |
+| `flag_def`, `clip_flag` | no | no | no | no | no | no | Alembic `0006` seed; tag with `tag_clip_flags.sql`. Public `GET /clips` reads `flags` |
 | `knn_feature` | yes (per snapshot) | no | no | no | no | no | Scoped to the session’s `knn_config` |
 | `driving_session` | no | yes | no | no | no | no | |
 | `operational_exception` | no | no | no | no | no | no | `POST /operational-exception` |
 | `event` | no | no | no | yes | no | no | One per call |
-| `clip` | no | no | no | yes (local flags + `file_size_bytes`) | no | `s3_key`, `s3_stored`, `file_size_bytes` | PUT during drive; `confirm-local-delete` sets `init_local_deleted` and clears `local_path` |
+| `clip` | no | no | no | yes (local flags + `file_size_bytes`) | no | `s3_key`, `s3_stored`, `file_size_bytes` | PUT during drive; `confirm-local-delete` sets `init_local_deleted` and clears `local_path`. `public_visible` is not an ingest field |
 | `classification`, `auto_classification`, `manual_classification` | no | no | no | yes | no | no | Manual optional |
 | `knn_parameter`, `approach_parameters`, `approach_fail_reason` | no | no | no | yes | no | no | Edge persist + ingest |
 | `event_trip_location` | no | no | no | optional | no | no | FK to primed `trip_segment` (row created when a trip segment opens) |

@@ -58,9 +58,9 @@ sequenceDiagram
   end
 ```
 
-Click a table row → POST that row’s Postgres `clip.id` to `POST /api/public/clip-download-url` (no API key) → set `<video src>` to the returned URL. The table debounces row selection and reuses an unexpired minted URL so click-through does not burn the per-IP rate or live-slot caps. The table is filled only by `GET /api/public/clips` (confirmed clips in cloud Postgres). There is no sample/dummy table.
+Click a table row → POST that row’s Postgres `clip.id` to `POST /api/public/clip-download-url` (no API key) → set `<video src>` to the returned URL. The table debounces row selection and reuses an unexpired minted URL so click-through does not burn the per-IP rate or live-slot caps. The table is filled only by `GET /api/public/clips` (confirmed, `public_visible` clips in cloud Postgres, each with a `flags` list). There is no sample/dummy table.
 
-Only **confirmed** clips mint: `s3_stored` true and `s3_key` set, otherwise 400 — same rule as ingest download.
+Only **confirmed and visible** clips mint: `s3_stored` true, `s3_key` set, and `public_visible` true. Unconfirmed → 400. Hidden (`public_visible` false) → 404.
 
 ---
 
@@ -119,15 +119,17 @@ Use CORS anyway. Do not treat it as authentication. The limits in [§3](#3-three
 Implemented:
 
 - `POST /api/public/clip-download-url` — 2-minute GET, 20 live slots, 10 mints/minute/IP
-- `GET /api/public/clips` — confirmed clips for the Try it out table
+- `GET /api/public/clips` — confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings)
 - CORS for `http://localhost:5173` and `http://127.0.0.1:5173` (add the Vercel origin via `CORS_ORIGINS` on Render)
 - Try it out click-to-play (`VITE_API_URL` on Vercel; Vite proxies `/api` to local FastAPI)
+- Try it out review-flag filters (Good scenario / Real world / Parking-lot; AND if more than one is on)
+- Overview Results live Overall vs Ideal accuracy from the same public clip list
 - Public mint inlines `areas`/`motion`/`transitions` JSON (one live slot for the MP4). Try it out detailed analysis is the default; simple video-only remains available. Detailed playback uses native HTML5 controls with seeking disabled.
 
 Not in this pass:
 
 - JWT / Google login
-- Filter/search beyond the confirmed-clip list
+- Date-range / event-type filters (M-9.20)
 
 ---
 
@@ -137,7 +139,7 @@ Not in this pass:
 | ---- | ---- |
 | [backend_api.md](backend_api.md) | Pi ingest, including authenticated `s3-download-url` |
 | [cloud_architecture.md](cloud_architecture.md) | Private S3, credentials, who talks to whom |
-| [mvs.md](../specs/mvs.md) M-7.13, M-7.14, M-9.22 | Signed URLs and frontend playback requirements |
+| [mvs.md](../specs/mvs.md) M-7.13, M-7.14, M-9.22, M-9.27, M-9.28 | Signed URLs, public visibility, and review-flag filters |
 | Decision 46 | Pi `X-API-Key`; `Authorization` free for later JWT |
 | Decision 50 | Ingest download mint; frontend can reuse `presign_get` later |
 | TP-46 | Unsigned object GET fails; signed GET succeeds |

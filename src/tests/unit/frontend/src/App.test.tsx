@@ -35,7 +35,7 @@ describe('App', () => {
       }).getAttribute('src'),
     ).toBe('/gifs/approach.gif?v=3')
     expect(
-      screen.getByText(/samples motion for five seconds/),
+      screen.getByText(/banner is only included in gifs/),
     ).toBeTruthy()
     expect(
       screen.getByRole('img', {
@@ -48,7 +48,7 @@ describe('App', () => {
       }).getAttribute('src'),
     ).toBe('/gifs/s3-persist.gif?v=1')
     expect(
-      screen.getByText(/saves the clip locally and uploads it to S3/),
+      screen.getByText(/went from the Pi in the car to S3/),
     ).toBeTruthy()
     expect(screen.queryByText('Finding a stop sign')).toBeNull()
     expect(screen.queryByText('Labeling the stop')).toBeNull()
@@ -90,16 +90,77 @@ describe('App', () => {
   })
 
   it('shows overview results and the try-it-out table', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input).includes('/api/public/clips')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                clips: [
+                  {
+                    classification: 'Complete Stop',
+                    clip_id: 10,
+                    dateTime: '2026-08-16 06:00 PM',
+                    driving_session_id: 1,
+                    flags: ['real_world', 'in_operating_envelope'],
+                    id: 'clip-10',
+                    label: 'Complete Stop',
+                  },
+                  {
+                    classification: 'Complete Stop',
+                    clip_id: 11,
+                    dateTime: '2026-08-16 07:00 PM',
+                    driving_session_id: 1,
+                    flags: ['real_world'],
+                    id: 'clip-11',
+                    label: 'Rolling Stop',
+                  },
+                ],
+                live_url_max: 20,
+                live_urls: 0,
+              }),
+              { headers: { 'Content-Type': 'application/json' }, status: 200 },
+            ),
+          )
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              expires_in: 120,
+              url: 'https://s3.example/clip.mp4',
+            }),
+            { headers: { 'Content-Type': 'application/json' }, status: 200 },
+          ),
+        )
+      }),
+    )
+
     render(<App />)
     const overview = document.getElementById('overview')
     expect(overview).toBeTruthy()
     expect(overview?.querySelector('#results')).toBeTruthy()
     expect(screen.getAllByRole('heading', { name: 'Results' }).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Unrelated: 96.2%/)).toBeTruthy()
-    expect(screen.getByText(/Complete Stop: 75.9%/)).toBeTruthy()
-    expect(screen.getByText(/Run-through Stop: 85.7%/)).toBeTruthy()
-    expect(screen.getByText(/Rolling Stop: 76.9%/)).toBeTruthy()
-    expect(screen.getByText(/83.3%/)).toBeTruthy()
+    expect(screen.getByText(/Unrelated: 96.2% \(26 clips\)/)).toBeTruthy()
+    expect(screen.getByText(/Complete Stop: 75.9% \(29 clips\)/)).toBeTruthy()
+    expect(screen.getByText(/Run-through Stop: 85.7% \(21 clips\)/)).toBeTruthy()
+    expect(screen.getByText(/Rolling Stop: 76.9% \(26 clips\)/)).toBeTruthy()
+    expect(screen.getByText(/83.3% \(102 clips\)/)).toBeTruthy()
+    expect(screen.getByText(/leave-one-out \(LOO\)/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Overall accuracy' })).toBeTruthy()
+    expect(
+      screen.getByText(
+        /Every labeled clip from the live evaluation. The model's prediction vs my review./,
+      ),
+    ).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Ideal accuracy' })).toBeTruthy()
+    expect(
+      screen.getByText(
+        /only clips in the right-most lane with the stop line close to the sign/,
+      ),
+    ).toBeTruthy()
+    expect(await screen.findByText('50% (1/2 clips predicted correctly)')).toBeTruthy()
+    expect(screen.getByText('100% (1/1 clips predicted correctly)')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'What It Is' })).toBeTruthy()
     expect(
       screen.getByText(/combination of "Netradyne" and "Pi"/),
@@ -109,14 +170,16 @@ describe('App', () => {
       screen.getByText(/Amazon affiliated DSP \(Delivery Service Partner\)/),
     ).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'What It Can Do' })).toBeTruthy()
+    expect(screen.getByText(/help users improve driving safety/)).toBeTruthy()
+    expect(screen.queryByText(/mishaps being public/)).toBeNull()
     expect(screen.getByRole('heading', { name: 'Try It Out' })).toBeTruthy()
     expect(screen.queryByText('Demo clip coming soon')).toBeNull()
     expect(screen.queryByTitle('NetraPi demo')).toBeNull()
     expect(screen.getByRole('columnheader', { name: 'Timestamp' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Session' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Prediction' })).toBeTruthy()
-    expect(await screen.findByText('Could not load clips from the database.')).toBeTruthy()
-    expect(screen.queryByText('clip-12')).toBeNull()
+    expect(await screen.findByText('clip-10')).toBeTruthy()
+    expect(screen.getByText('clip-11')).toBeTruthy()
   })
 
   it('shows how-it-works copy, state diagram, shark-fin chart, and rolling vs run-through plot', async () => {

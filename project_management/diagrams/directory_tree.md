@@ -45,11 +45,12 @@ src/main/
 │   ├── writes.py                      ✅  local session / event / clip / trip inserts
 │   ├── config_snapshot.py             ✅  fingerprint + find-or-create master_config from edge JSON
 │   ├── models.py                      ✅  operational + config tables
+│   ├── tag_clip_flags.sql             ✅  Supabase template to tag clip_flag (skips illegal mixes)
 │   ├── netrapi.db                     🏃  SQLite file (gitignored; created by alembic upgrade head)
 │   └── migrations/                    ✅  one Alembic tree; dialect from engine URL
 │       ├── env.py                     ✅  SQLModel metadata; loads edge/.env or process DATABASE_URL
 │       ├── script.py.mako             ✅
-│       └── versions/                  ✅  0001 schema + 0002 classification_type / edge-json snapshot + 0003 trip file_size_bytes + 0004 health_config
+│       └── versions/                  ✅  0001 schema; 0002 classification_type / edge-json; 0003 trip file_size_bytes; 0004 health_config; 0005 clip.public_visible; 0006 flag_def / clip_flag
 │
 ├── edge/                              ✅  Raspberry Pi — capture, detect, clip
 │   ├── README.md                      ✅  how to run capture, boot health, online/offline, drain
@@ -159,45 +160,45 @@ src/main/
 │           ├── driving_event.py       ✅  POST /api/netrapi/driving-event (TP-36 / nested children)
 │           ├── operational_exception.py ✅  POST /api/netrapi/operational-exception
 │           ├── s3_upload.py           ✅  POST s3-upload-url, confirm, s3-download-url, confirm-local-delete
-│           └── public_clip.py         ✅  GET /api/public/clips; POST /api/public/clip-download-url
+│           └── public_clip.py         ✅  GET /api/public/clips (flags[]); POST /api/public/clip-download-url
 │
 └── frontend/                          ✅  Vite + React + TS + Tailwind SPA; no Dockerfile
     ├── package.json                   ✅
     ├── vite.config.ts                 ✅  Tailwind + Vitest; `/api` proxy to local FastAPI
-    ├── vercel.json                    ✅  SPA rewrite; Vercel project not connected yet
+    ├── vercel.json                    ✅  SPA rewrite; Vercel project netrapi.vercel.app
     ├── README.md                      ✅
     ├── index.html                     ✅
     ├── public/
-    │   └── gifs/
-    │       └── .gitkeep               ✅  drop approach.gif etc. later
+    │   └── gifs/                      ✅  overview, hardware-setup, approach, classification, s3-persist
     └── src/
         ├── main.tsx                   ✅
         ├── App.tsx                    ✅  single-page layout
         ├── index.css                  ✅  Tailwind v4
         ├── test-setup.ts              ✅  Testing Library jest-dom
+        ├── lib/
+        │   └── clipAccuracy.ts        ✅  labeled match rate + ideal-scenario subset
         ├── components/
         │   ├── layout/
         │   │   └── SiteNav.tsx        ✅
         │   ├── hero/
         │   │   └── Hero.tsx           ✅
         │   ├── overview/
-        │   │   └── Overview.tsx       ✅  stacked Mermaid hardware + software
+        │   │   └── Overview.tsx       ✅  architecture + LOO grid + live Overall/Ideal Results
         │   ├── how-it-works/
         │   │   ├── HowItWorks.tsx     ✅
-        │   │   ├── FeatureGuide.tsx   ✅
-        │   │   ├── KnnHierarchy.tsx   ✅
         │   │   ├── AreaMotionChart.tsx ✅
         │   │   └── ClusterScatter.tsx ✅
-        │   ├── demo/
-        │   │   └── Demo.tsx           ✅  YouTube placeholder
         │   ├── try-it-out/
-        │   │   └── TryItOut.tsx       ✅  public mint + S3 playback
+        │   │   ├── TryItOut.tsx       ✅  public mint, flag filters, match rate
+        │   │   ├── PlaybackStateDiagram.tsx ✅
+        │   │   └── PlaybackSeriesChart.tsx ✅
         │   ├── links/
         │   │   └── Links.tsx          ✅
         │   ├── diagrams/
         │   │   ├── MermaidDiagram.tsx ✅  mermaid.render + Iconify logos
         │   │   ├── mermaidCharts.ts   ✅
         │   │   ├── mermaidSetup.ts    ✅
+        │   │   ├── mermaidPopup.ts    ✅
         │   │   ├── hardwareNodeCards.ts ✅  hover copy for hardware nodes
         │   │   └── diagramIconPacks.ts ✅  Iconify subset for diagrams
         │   └── charts/
@@ -207,7 +208,7 @@ src/main/
         │       ├── stage1Pca.json     ✅
         │       └── stage1Features.json ✅
         └── api/
-            └── publicPlayback.ts      ✅  GET /api/public/clips; POST clip-download-url
+            └── publicPlayback.ts      ✅  GET /api/public/clips (flags); POST clip-download-url
 ```
 
 ### Deploy vs local dev
@@ -218,7 +219,7 @@ src/main/
 | Local backend stack | `src/main/backend/compose.yml` | No — dev machine only |
 | Edge on Pi | `src/main/edge/netrapi-edge.service` + `main.py` | Yes — Pi (systemd) |
 | Edge / test Python deps | `src/create_env.sh` (Pi) or `src/create_env.bat` (Windows) | Yes — creates `venv/` in cwd |
-| Frontend | `src/main/frontend/` | Later → Vercel (playback talks to Render via `VITE_API_URL`) |
+| Frontend | `src/main/frontend/` | Yes → Vercel (`VITE_API_URL` → Render) |
 
 No separate `deploy/` folder — each app keeps its own deploy artifact (`Dockerfile` in backend, `.service` in edge).
 
@@ -345,12 +346,15 @@ src/tests/
 │   │           ├── test_driving_event.py   ✅  ↔ driving_event.py (nested children)
 │   │           ├── test_trip_segment.py    ✅  ↔ trip_segment.py
 │   │           ├── test_operational_exception.py ✅  ↔ operational_exception.py
-│   │           └── test_s3_upload.py       ✅  ↔ s3_upload.py
+│   │           ├── test_s3_upload.py       ✅  ↔ s3_upload.py
+│   │           └── test_public_clip.py     ✅  ↔ public_clip.py (list flags, hidden 404)
 │   │
 │   └── frontend/
 │       ├── tsconfig.json              ✅  IDE types; packages resolve from frontend/node_modules
 │       └── src/
-│           └── App.test.tsx           ✅  ↔ frontend/src/App.tsx (Vitest via frontend package)
+│           ├── App.test.tsx           ✅  ↔ frontend/src/App.tsx (Vitest via frontend package)
+│           ├── TryItOut.test.tsx      ✅  ↔ TryItOut flag filters + match rate
+│           └── clipAccuracy.test.ts   ✅  ↔ lib/clipAccuracy.ts
 │
 └── integration/
     ├── tp_26/                         ✅  stubbed event gate + clips

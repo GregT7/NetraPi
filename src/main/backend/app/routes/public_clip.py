@@ -23,7 +23,7 @@ from app.s3 import (
     presign_get,
 )
 from db.database import get_session
-from db.models import Classification, ClassificationType, Clip, Event
+from db.models import Classification, ClassificationType, Clip, ClipFlag, Event, FlagDef
 
 router = APIRouter(prefix="/api/public")
 
@@ -71,6 +71,20 @@ def _type_values(session) -> dict[int, str]:
         for row in session.exec(select(ClassificationType)).all()
         if row.id is not None
     }
+
+
+def _clip_flags(session, clip_ids: list[int]) -> dict[int, list[str]]:
+    flags: dict[int, list[str]] = {clip_id: [] for clip_id in clip_ids}
+    if not clip_ids:
+        return flags
+    rows = session.exec(
+        select(ClipFlag, FlagDef)
+        .join(FlagDef, FlagDef.id == ClipFlag.flag_def_id)
+        .where(ClipFlag.clip_id.in_(clip_ids))
+    ).all()
+    for flag, definition in rows:
+        flags.setdefault(flag.clip_id, []).append(definition.value)
+    return flags
 
 
 def _clip_labels(session, event_id: int, types: dict[int, str]) -> tuple[str, str]:
@@ -123,10 +137,17 @@ def list_public_clips():
             .order_by(Event.time.desc())
             .limit(50)
         ).all()
+        listed = [
+            (clip, event)
+            for clip, event in clips
+            if clip.s3_key and clip.id is not None
+        ]
+        flags_by_clip = _clip_flags(
+            session,
+            [clip.id for clip, _event in listed if clip.id is not None],
+        )
         body = []
-        for clip, event in clips:
-            if not clip.s3_key or clip.id is None:
-                continue
+        for clip, event in listed:
             label, prediction = _clip_labels(session, clip.event_id, types)
             body.append(
                 {
@@ -136,6 +157,7 @@ def list_public_clips():
                     "driving_session_id": event.driving_session_id,
                     "label": label,
                     "classification": prediction,
+                    "flags": flags_by_clip.get(clip.id, []),
                 }
             )
         return {"clips": body, **_live_url_status()}

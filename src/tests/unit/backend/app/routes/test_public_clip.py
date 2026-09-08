@@ -234,6 +234,7 @@ def test_public_list_returns_confirmed_clip(ingest_client: TestClient) -> None:
                 "driving_session_id": 1,
                 "label": "-",
                 "classification": "Rolling Stop",
+                "flags": [],
             }
         ],
         "live_urls": 0,
@@ -284,6 +285,31 @@ def test_public_list_label_comes_from_manual_classification(
     row = response.json()["clips"][0]
     assert row["label"] == "Complete Stop"
     assert row["classification"] == "Rolling Stop"
+
+
+def test_public_list_includes_clip_flags(ingest_client: TestClient) -> None:
+    _confirm_clip(ingest_client)
+    from db.database import get_session
+    from db.models import ClipFlag, FlagDef
+    from sqlmodel import select
+
+    with get_session() as session:
+        real_world = session.exec(
+            select(FlagDef).where(FlagDef.value == "real_world")
+        ).first()
+        envelope = session.exec(
+            select(FlagDef).where(FlagDef.value == "in_operating_envelope")
+        ).first()
+        assert real_world is not None and real_world.id is not None
+        assert envelope is not None and envelope.id is not None
+        session.add(ClipFlag(clip_id=10, flag_def_id=real_world.id))
+        session.add(ClipFlag(clip_id=10, flag_def_id=envelope.id))
+        session.commit()
+
+    response = ingest_client.get("/api/public/clips")
+    assert response.status_code == 200
+    row = response.json()["clips"][0]
+    assert sorted(row["flags"]) == ["in_operating_envelope", "real_world"]
 
 
 def test_public_list_omits_hidden_clip_and_mint_404s(

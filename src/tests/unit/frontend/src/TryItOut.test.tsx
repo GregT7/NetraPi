@@ -24,6 +24,7 @@ function clipRow(
     classification: string
     dateTime: string
     driving_session_id: number
+    flags: string[]
     label: string
   }>,
 ) {
@@ -32,6 +33,7 @@ function clipRow(
     clip_id: clipId,
     dateTime: extras?.dateTime ?? '2026-08-16 06:00 PM',
     driving_session_id: extras?.driving_session_id ?? 1,
+    flags: extras?.flags ?? [],
     id: `clip-${clipId}`,
     label: extras?.label ?? 'Complete Stop',
   }
@@ -223,6 +225,62 @@ describe('TryItOut', () => {
     expect(await screen.findByText('clip-10')).toBeTruthy()
     expect(
       screen.getByText('1 of 2 labeled clips match (50%). 1 unlabeled excluded.'),
+    ).toBeTruthy()
+  })
+
+  it('filters the table and match rate by clip flags', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input).includes('/api/public/clips')) {
+          return jsonResponse({
+            clips: [
+              clipRow(10, {
+                classification: 'Complete Stop',
+                flags: ['real_world', 'in_operating_envelope'],
+                label: 'Complete Stop',
+              }),
+              clipRow(11, {
+                classification: 'Complete Stop',
+                flags: ['real_world'],
+                label: 'Rolling Stop',
+              }),
+              clipRow(12, {
+                classification: 'Rolling Stop',
+                flags: ['synthetic'],
+                label: 'Rolling Stop',
+              }),
+            ],
+            live_url_max: 20,
+            live_urls: 0,
+          })
+        }
+        return jsonResponse({ expires_in: 120, url: 'https://s3.example/clip.mp4' })
+      }),
+    )
+
+    render(<TryItOut />)
+    expect(await screen.findByText('clip-10')).toBeTruthy()
+    expect(screen.getByText('clip-11')).toBeTruthy()
+    expect(screen.getByText('clip-12')).toBeTruthy()
+    expect(
+      screen.getByText('2 of 3 labeled clips match (67%). 0 unlabeled excluded.'),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Good scenario' }))
+    expect(screen.getByText('clip-10')).toBeTruthy()
+    expect(screen.queryByText('clip-11')).toBeNull()
+    expect(screen.queryByText('clip-12')).toBeNull()
+    expect(
+      screen.getByText('1 of 1 labeled clips match (100%). 0 unlabeled excluded.'),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Good scenario' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Parking-lot / synthetic' }))
+    expect(screen.getByText('clip-12')).toBeTruthy()
+    expect(screen.queryByText('clip-10')).toBeNull()
+    expect(
+      screen.getByText('1 of 1 labeled clips match (100%). 0 unlabeled excluded.'),
     ).toBeTruthy()
   })
 

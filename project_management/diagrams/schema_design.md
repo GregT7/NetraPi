@@ -11,6 +11,7 @@ Target ER for edge/cloud event metadata. Open constraints and review-time behavi
 - I want to play a clip in the frontend using a signed URL
 - I want to see the model's label next to my manual label and tell if they agree
 - I want overall and per-class accuracy after I finish review (including false positives and false negatives)
+- I want to tag clips with optional review flags (ideal operating envelope, real-world vs parking-lot) and score accuracy on those subsets
 - I want stage-1 and stage-2 kNN accuracy, not just the final label
 - I want to find false negatives (missed events) and false positives from the type list
 - I want counts of events per driving session
@@ -20,6 +21,14 @@ Target ER for edge/cloud event metadata. Open constraints and review-time behavi
 ## Definition data
 
 Lookup rows that do not change per session. Alembic revision `0002` inserts `classification_type` once, plus the initial `edge-json` config snapshot. Flags say which FKs may point at the row (`auto_stage1` / `auto_stage2` on `auto_classification`, `manual` on a manual `classification`).
+
+Alembic `0006` inserts `flag_def` lookup rows. Optional review tags live in `clip_flag` (presence of a row means the flag applies; absence means not reviewed / not this property). `in_operating_envelope` is the composite “ideal scenario” tag (right-most lane, sign on the right, halt line close to the sign). `real_world` and `synthetic` are mutually exclusive; do not combine `in_operating_envelope` with `synthetic`.
+
+| value | Purpose |
+|---|---|
+| `in_operating_envelope` | Ideal scene: right-most lane, sign on the right, halt line close to the sign. Real-world only. |
+| `real_world` | Public-road clip with a real stop sign. |
+| `synthetic` | Parking-lot / homemade-sign training clip. |
 
 | value | is_unsafe | auto_stage1 | auto_stage2 | manual | Purpose |
 |---|---|---|---|---|---|
@@ -67,7 +76,7 @@ Same flags on `trip_segment` for full-session files.
 - `stage1_classification_type_id` — always set: `complete-stop` or `rolling-or-run-through`
 - `stage2_classification_type_id` — set only when stage 1 is `rolling-or-run-through`: `rolling-stop` or `run-through`
 
-`classification_type` flags decide which FKs are allowed: stage 1 → `auto_stage1`, stage 2 → `auto_stage2`, manual review → `manual`. Frontend filters use `manual = true`.
+`classification_type` flags decide which FKs are allowed: stage 1 → `auto_stage1`, stage 2 → `auto_stage2`, manual review → `manual`. Date/type filters (M-9.20, not built) would use `manual = true`. Clip review tags (ideal scenario, real-world, parking-lot) are `flag_def` / `clip_flag`, not these booleans.
 
 ### Missed events
 
@@ -92,6 +101,8 @@ erDiagram
     event ||--o| event_trip_location: "may be in trip footage"
     event_trip_location }o--|| trip_segment: "points into"
     event ||--o| clip: "created a recording"
+    clip ||--o{ clip_flag: "may have"
+    clip_flag }o--|| flag_def: "is a"
     event ||--o{ classification: "has manual and potentially automatic"
     classification }o--|| classification_type: "has a"
     auto_classification |o--|| classification: "belongs to"
@@ -154,11 +165,24 @@ erDiagram
         boolean init_local_deleted
         boolean s3_stored
         int file_size_bytes
+        boolean public_visible
         int fps
         int order_number
         int num_frames
         datetime start_time
         datetime end_time
+    }
+
+    flag_def {
+        int id PK
+        String value
+        String note
+    }
+
+    clip_flag {
+        int id PK
+        int clip_id FK
+        int flag_def_id FK
     }
 
     classification {

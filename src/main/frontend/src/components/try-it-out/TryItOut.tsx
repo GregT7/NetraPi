@@ -11,11 +11,24 @@ import PlaybackStateDiagram, {
   playbackAccentClass,
   stateIdAtTime,
 } from './PlaybackStateDiagram'
+import {
+  FLAG_IN_OPERATING_ENVELOPE,
+  FLAG_REAL_WORLD,
+  FLAG_SYNTHETIC,
+  filterByFlags,
+  overallAccuracy,
+} from '@/lib/clipAccuracy'
 
 const PAGE_SIZE = 5
 const MINT_DEBOUNCE_MS = 300
 const CACHE_SAFETY_SECONDS = 10
 const SEEK_LOCK_EPSILON = 0.4
+
+const CLIP_FILTERS = [
+  { flag: FLAG_IN_OPERATING_ENVELOPE, label: 'Good scenario' },
+  { flag: FLAG_REAL_WORLD, label: 'Real world' },
+  { flag: FLAG_SYNTHETIC, label: 'Parking-lot / synthetic' },
+] as const
 
 type CachedMint = {
   areas: PlaybackSeriesFile | null
@@ -41,13 +54,6 @@ function seriesPoints(
     .map((point) => ({ ...point, value: point.value * scale }))
 }
 
-function labeledAccuracy(clips: PublicClipRow[]) {
-  const unlabeled = clips.filter((clip) => clip.label === '-').length
-  const labeled = clips.filter((clip) => clip.label !== '-')
-  const matches = labeled.filter((clip) => clip.classification === clip.label).length
-  return { labeled: labeled.length, matches, unlabeled }
-}
-
 export default function TryItOut() {
   const [clips, setClips] = useState<PublicClipRow[]>([])
   const [liveUrlMax, setLiveUrlMax] = useState(20)
@@ -56,6 +62,7 @@ export default function TryItOut() {
   const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [page, setPage] = useState(0)
+  const [activeFlags, setActiveFlags] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [detailed, setDetailed] = useState(true)
@@ -179,12 +186,13 @@ export default function TryItOut() {
     }
   }, [loadClips])
 
-  const pageCount = Math.max(1, Math.ceil(clips.length / PAGE_SIZE))
+  const visibleClips: PublicClipRow[] = filterByFlags(clips, activeFlags)
+  const accuracy = overallAccuracy(visibleClips)
+  const pageCount = Math.max(1, Math.ceil(visibleClips.length / PAGE_SIZE))
   const pageStart = page * PAGE_SIZE
-  const pageClips = clips.slice(pageStart, pageStart + PAGE_SIZE)
-  const rangeStart = clips.length === 0 ? 0 : pageStart + 1
+  const pageClips = visibleClips.slice(pageStart, pageStart + PAGE_SIZE)
+  const rangeStart = visibleClips.length === 0 ? 0 : pageStart + 1
   const rangeEnd = pageStart + pageClips.length
-  const accuracy = labeledAccuracy(clips)
   const t0 = areas?.t0_s ?? motion?.t0_s ?? 0
   const sampleEnd = Number(areas?.sample_end_s ?? motion?.sample_end_s ?? t0)
   const areaPoints = seriesPoints(areas, 'area', 100)
@@ -410,6 +418,15 @@ export default function TryItOut() {
     }, MINT_DEBOUNCE_MS)
   }
 
+  function toggleFlag(flag: string) {
+    setPage(0)
+    setActiveFlags((current) =>
+      current.includes(flag)
+        ? current.filter((item) => item !== flag)
+        : [...current, flag],
+    )
+  }
+
   return (
     <section className="scroll-mt-20 px-6 pb-6 pt-16" id="try-it-out">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -424,12 +441,36 @@ export default function TryItOut() {
           Live S3 links {liveUrls}/{liveUrlMax}
         </p>
         {clips.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {CLIP_FILTERS.map((filter) => {
+              const pressed = activeFlags.includes(filter.flag)
+              return (
+                <button
+                  aria-pressed={pressed}
+                  className={`rounded-md border px-3 py-1 text-sm ${
+                    pressed
+                      ? 'border-amber-400 bg-amber-400/10 text-amber-300'
+                      : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                  key={filter.flag}
+                  onClick={() => toggleFlag(filter.flag)}
+                  type="button"
+                >
+                  {filter.label}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
+        {clips.length > 0 ? (
           <p className="text-sm text-zinc-300">
-            {accuracy.labeled === 0
+            {visibleClips.length === 0
+              ? 'No clips match these filters.'
+              : accuracy.labeled === 0
               ? `No labeled clips yet. ${accuracy.unlabeled} unlabeled excluded.`
-              : `${accuracy.matches} of ${accuracy.labeled} labeled clips match (${Math.round(
-                  (100 * accuracy.matches) / accuracy.labeled,
-                )}%). ${accuracy.unlabeled} unlabeled excluded.`}
+              : `${accuracy.matches} of ${accuracy.labeled} labeled clips match (${
+                  accuracy.percent ?? 0
+                }%). ${accuracy.unlabeled} unlabeled excluded.`}
           </p>
         ) : null}
         {listError ? (
@@ -474,7 +515,7 @@ export default function TryItOut() {
               </tr>
             </thead>
             <tbody className="text-sm text-white">
-              {listLoading || clips.length === 0
+              {listLoading || visibleClips.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => (
                     <tr className="h-12 border-t border-zinc-800" key={`empty-${index}`}>
                       <td className="truncate px-4 text-zinc-400" colSpan={5}>
@@ -483,7 +524,9 @@ export default function TryItOut() {
                             ? 'Loading clips…'
                             : listError
                               ? 'No clips to show.'
-                              : 'No confirmed clips in the database yet.'
+                              : clips.length === 0
+                                ? 'No confirmed clips in the database yet.'
+                                : 'No clips match these filters.'
                           : '\u00a0'}
                       </td>
                     </tr>
@@ -554,11 +597,11 @@ export default function TryItOut() {
             Previous
           </button>
           <p>
-            {rangeStart}–{rangeEnd} of {clips.length}
+            {rangeStart}–{rangeEnd} of {visibleClips.length}
           </p>
           <button
             className="rounded-md border border-zinc-700 px-4 py-2 text-zinc-100 enabled:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={page >= pageCount - 1 || clips.length === 0}
+            disabled={page >= pageCount - 1 || visibleClips.length === 0}
             onClick={() => setPage((current) => current + 1)}
             type="button"
           >

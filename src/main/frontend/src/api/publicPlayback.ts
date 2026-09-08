@@ -8,6 +8,7 @@ export type PublicClipRow = {
   clipId: number
   dateTime: string
   drivingSessionId: number
+  flags: string[]
   id: string
   label: string
 }
@@ -24,6 +25,7 @@ type PublicClipListResponse = {
     clip_id: number
     dateTime: string
     driving_session_id: number
+    flags?: string[]
     id: string
     label: string
   }>
@@ -89,6 +91,7 @@ export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClip
       clipId: clip.clip_id,
       dateTime: clip.dateTime,
       drivingSessionId: clip.driving_session_id,
+      flags: Array.isArray(clip.flags) ? clip.flags : [],
       id: clip.id,
       label: clip.label,
     })),

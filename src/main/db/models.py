@@ -21,6 +21,14 @@ class ClassificationType(SQLModel, table=True):
     note: str
 
 
+class FlagDef(SQLModel, table=True):
+    __tablename__ = "flag_def"
+
+    id: int | None = Field(default=None, primary_key=True)
+    value: str = Field(unique=True)
+    note: str
+
+
 class ObjectLabel(SQLModel, table=True):
     """Detector / trigger class name (e.g. stop sign). Shared so the string is stored once."""
 
@@ -110,6 +118,17 @@ class Clip(SQLModel, table=True):
     num_frames: int
     start_time: datetime
     end_time: datetime
+
+
+class ClipFlag(SQLModel, table=True):
+    __tablename__ = "clip_flag"
+    __table_args__ = (
+        UniqueConstraint("clip_id", "flag_def_id", name="uq_clip_flag_clip_def"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    clip_id: int = Field(foreign_key="clip.id")
+    flag_def_id: int = Field(foreign_key="flag_def.id")
 
 
 class Classification(SQLModel, table=True):

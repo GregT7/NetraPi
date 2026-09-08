@@ -93,6 +93,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-8.11: The paths to the stored video clips within the S3 bucket shall be included in database.
 - M-8.12: The paths to stored video clips in the s3 bucket shall be used to retrieve video clips.
 - M-8.13: The stored clip path shall identify the video object inside the per-clip directory so that `areas.json`, `motion.json`, and `transitions.json` can be derived.
+- M-8.14: Optional review flags shall be stored as `flag_def` lookup rows and `clip_flag` instances keyed to `clip`.
 
 ## R-9 Web Frontend (Interactive Portfolio)
 ### R-9.1 Portfolio Presentation
@@ -108,6 +109,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-9.25: The Try-it-out section shall offer detailed analysis playback (default) and simple video-only playback, toggled by the visitor.
 - M-9.26: Detailed analysis playback shall synchronize a state diagram and area/motion graphs to clip playback time using native video controls without seeking.
 - M-9.27: The public clip list and mint shall include only clips whose `public_visible` flag is true.
+- M-9.28: The Try-it-out section shall allow filtering clips by optional review flags (ideal scenario, real-world, parking-lot).
 
 ### R-9.3 Visualization
 - M-9.30: The frontend shall include at least one visualization of collected event or evaluation data.
@@ -120,6 +122,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-9.50: The frontend shall present per-class and overall classification accuracy for run-through, rolling stop, and complete stop.
 - M-9.51: The interface shall visually communicate agreement and disagreement between model predictions and manual labels.
 - M-9.52: The analysis shall frame results as an evaluation of stop-sign event detection performance, not driving-behavior change.
+- M-9.53: The frontend shall present live overall and ideal-scenario classification accuracy with per-class percentages and clip counts.
 
 ## R-10 Deployment and Reliability
 ### R-10.1 Edge Runtime

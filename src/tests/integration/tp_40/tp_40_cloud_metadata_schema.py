@@ -31,6 +31,8 @@ REQUIRED_TABLES = (
     "classification",
     "auto_classification",
     "trip_segment",
+    "flag_def",
+    "clip_flag",
 )
 
 REQUIRED_COLUMNS = {

@@ -1,14 +1,34 @@
+import { useEffect, useState } from 'react'
+import { fetchPublicClips, type PublicClipRow } from '@/api/publicPlayback'
 import { LABEL_COLORS, LABEL_DISPLAY } from '../charts/clusterData'
 import { HARDWARE_NODE_CARDS } from '../diagrams/hardwareNodeCards'
 import MermaidDiagram from '../diagrams/MermaidDiagram'
 import { HARDWARE_CHART, SOFTWARE_CHART } from '../diagrams/mermaidCharts'
+import {
+  formatClassLine,
+  formatOverallLine,
+  idealClips,
+  overallAccuracy,
+  perClassAccuracy,
+  type ClassAccuracy,
+  type OverallAccuracy,
+} from '@/lib/clipAccuracy'
 
-const accuracy = [
-  { key: 'Unrelated', value: '96.2%' },
-  { key: 'Complete stop', value: '75.9%' },
-  { key: 'Run-through', value: '85.7%' },
-  { key: 'Rolling stop', value: '76.9%' },
+const looAccuracy = [
+  { key: 'Unrelated', value: '96.2%', count: 26 },
+  { key: 'Complete stop', value: '75.9%', count: 29 },
+  { key: 'Run-through', value: '85.7%', count: 21 },
+  { key: 'Rolling stop', value: '76.9%', count: 26 },
 ] as const
+
+const looOverall = { value: '83.3%', count: 102 }
+
+const LIVE_COLOR_KEY: Record<string, keyof typeof LABEL_COLORS> = {
+  'Complete Stop': 'Complete stop',
+  'Rolling Stop': 'Rolling stop',
+  'Run-through Stop': 'Run-through',
+  Unrelated: 'Unrelated',
+}
 
 function GifSlot({
   caption,
@@ -95,9 +115,7 @@ export default function Overview() {
               frontend, backend, local/cloud database, and cloud file storage.
               These systems work in tandem such that unsafe events are
               recorded, uploaded to the cloud, and are accessible via a public
-              website for anyone to view. With my mishaps being public, the
-              threat of embarrassment will provide plenty of motivation to
-              rebuild my driving discipline!
+              website for anyone to view.
             </p>
           </div>
           <ArchitectureFigures />
@@ -131,20 +149,27 @@ export default function Overview() {
           <div className="mx-auto max-w-5xl space-y-3">
             <h3 className="text-2xl font-medium text-amber-400">What It Can Do</h3>
             <p>
-              It classifies stops on the Pi, saves 10- to 20-second clips, and
-              beeps on unsafe stops. Metadata lives in SQLite on the device.
-              Uploads go through Render. Video lands in S3. Longer trip files
-              wait for Wi-Fi.
+              The goal of the NetraPi system is to help users improve driving
+              safety in a time-efficient and convenient manner. The system
+              automatically detects unsafe stops and uploads the footage to the
+              cloud. Within 5 seconds of the event occurring, a small speaker
+              will emit a noise to notify the driver. Real time feedback raises
+              the awareness of poor performance in real time, enabling quicker
+              correction of unsafe behavior. Lastly, anyone can visit the
+              website to view clips of my driving in the "Try It Out" section.
+              There is a "Detailed Analysis" section there that displays
+              several graphs that shed deeper insight into how the system is
+              actually working for those curious.
             </p>
           </div>
           <GifSlot
             alt="Stop labeled Complete Stop, Rolling Stop, or Run-through Stop after the approach"
-            caption="After an approach, the Pi samples motion for five seconds and names the stop: Complete Stop, Rolling Stop, or Run-through Stop. The banner on the clip is that final label."
+            caption="The system detects the car approaching a stop sign which triggers a 5 second period where motion data is sampled. This motion data is used to classify the stop into 3 types: Complete Stop, Rolling Stop, and Run-through Stop. The banner is only included in gifs and is not part of the normal flow."
             src="/gifs/classification.gif?v=1"
           />
           <GifSlot
             alt="Clip saved locally and uploaded to S3"
-            caption="The Pi saves the clip locally and uploads it to S3 when the phone hotspot is up."
+            caption="I turn on a phone hotspot, wave at the camera in a remote area, then go home, join regular Wi-Fi, and open the same clip from the cloud — showing it went from the Pi in the car to S3."
             src="/gifs/s3-persist.gif?v=1"
           />
         </div>
@@ -158,36 +183,184 @@ export default function Overview() {
 }
 
 function Results() {
+  const [clips, setClips] = useState<PublicClipRow[]>([])
+  const [liveReady, setLiveReady] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchPublicClips(controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        setClips(result.clips)
+        setLiveReady(true)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return
+        }
+        setClips([])
+        setLiveReady(true)
+      })
+    return () => controller.abort()
+  }, [])
+
+  const overall = overallAccuracy(clips)
+  const overallClasses = perClassAccuracy(clips)
+  const ideal = idealClips(clips)
+  const idealStats = overallAccuracy(ideal)
+  const idealClasses = perClassAccuracy(ideal)
+
+  const overallPhrase =
+    liveReady && overall.percent !== null
+      ? `${overall.percent}% (${overall.matches} of ${overall.labeled})`
+      : 'not yet available'
+  const idealPhrase =
+    liveReady && idealStats.percent !== null
+      ? `${idealStats.percent}% (${idealStats.matches} of ${idealStats.labeled})`
+      : 'not yet available'
+
   return (
-    <div className="scroll-mt-20 space-y-5" id="results">
-      <h3 className="text-2xl font-medium text-amber-400">Results</h3>
-      <p>
-        I scored the model with leave-one-out. I built a physical stop sign and
-        recorded clips in a quiet parking lot, and I used YouTube driving clips.
-        I labeled them by hand, then ran the program on each clip.
-      </p>
-      <p>
-        The set is about 100 unique clips, around 25 per class. I left out the
-        duplicate clips I made later (ids 108, 109, 110, and after).
-      </p>
-      <p className="text-zinc-400">
-        The percentages below come from the ap_050 run. That run still included
-        those extra ids, so a recount on unique clips only is still pending.
-        Overall accuracy on that run was 83.3%.
+    <div className="scroll-mt-20 space-y-8" id="results">
+      <div className="space-y-5">
+        <h3 className="text-2xl font-medium text-amber-400">Results</h3>
+        <p>
+          I scored the classification model using two different approaches. The
+          first used the leave-one-out (LOO) algorithm on a static set of 100
+          video clips — 25 per category, including a 25-clip control set.
+        </p>
+        <p>
+          Leave-one-out trains the model on almost the entire set, then holds
+          out one clip and asks the model to classify it. Because that clip
+          already has a known label, the prediction is scored as correct or
+          incorrect. Repeating this for every clip and combining the outcomes
+          gives a single overall accuracy. I mainly relied on that LOO metric
+          to gauge how well the model would perform. After I tried a second
+          scoring method, I found a flaw in that picture.
+        </p>
+        <p className="text-zinc-300">
+          {looOverall.value} ({looOverall.count} clips)
+        </p>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {looAccuracy.map((row) => (
+            <li
+              className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3"
+              key={row.key}
+            >
+              <span
+                className="mr-2 inline-block h-3 w-3 rounded-full"
+                style={{ backgroundColor: LABEL_COLORS[row.key] }}
+              />
+              {LABEL_DISPLAY[row.key]}: {row.value} ({row.count} clips)
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="space-y-5">
+        <p>
+          The second approach was to run the system in a real car. I drove for
+          a couple of hours, classified stop-sign approaches as they happened,
+          and uploaded the clips. Afterward I reviewed the footage and labeled
+          it by hand so each automated prediction had a ground truth.
+        </p>
+        <p>
+          On every labeled clip, overall accuracy is the share of predictions
+          that match my review: {overallPhrase}. That number is not very good.
+        </p>
+        <p>
+          The training set explains the gap. Most of those clips were
+          parking-lot runs past a mock stop sign about one-third the size of a
+          real one. I kept the passenger side very close to the sign, and on
+          complete stops I halted after only a short distance past it.
+        </p>
+        <p>
+          Real roads are different: larger signs, a longer gap from the sign to
+          the halt line, and usually more than one lane. In the middle or left
+          lane the model still expects a right-lane, close-up sign, so it
+          classifies poorly. The training data never included those conditions.
+        </p>
+        <p>
+          If you keep only the approaches that match training — right-most
+          lane, and a white stop line close to the sign — ideal accuracy is{' '}
+          {idealPhrase}.
+        </p>
+        <p>
+          Middle- and left-lane approaches, and long gaps to the halt line,
+          fail for a mechanical reason. The stop sign leaves the frame earlier,
+          so the system treats the approach as over and starts sampling motion
+          before there has been time to stop. In that window a complete stop is
+          effectively impossible.
+        </p>
+      </div>
+
+      <LiveAccuracyBlock
+        classes={overallClasses}
+        definition="Every labeled clip from the live evaluation. The model's prediction vs my review."
+        ready={liveReady}
+        stats={overall}
+        title="Overall accuracy"
+      />
+      <LiveAccuracyBlock
+        classes={idealClasses}
+        definition="The same comparison, but only clips in the right-most lane with the stop line close to the sign."
+        emptyLabel="No tagged ideal-scenario clips yet"
+        ready={liveReady}
+        stats={idealStats}
+        title="Ideal accuracy"
+      />
+    </div>
+  )
+}
+
+function LiveAccuracyBlock({
+  classes,
+  definition,
+  emptyLabel = 'No labeled clips yet',
+  ready,
+  stats,
+  title,
+}: {
+  classes: ClassAccuracy[]
+  definition: string
+  emptyLabel?: string
+  ready: boolean
+  stats: OverallAccuracy
+  title: string
+}) {
+  return (
+    <div className="space-y-3">
+      <h4 className="text-xl font-medium text-amber-400">{title}</h4>
+      <p className="text-zinc-400">{definition}</p>
+      <p className="text-zinc-200">
+        {!ready
+          ? 'Loading live accuracy…'
+          : stats.percent === null
+            ? emptyLabel
+            : formatOverallLine(stats)}
       </p>
       <ul className="grid gap-3 sm:grid-cols-2">
-        {accuracy.map((row) => (
-          <li
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3"
-            key={row.key}
-          >
-            <span
-              className="mr-2 inline-block h-3 w-3 rounded-full"
-              style={{ backgroundColor: LABEL_COLORS[row.key] }}
-            />
-            {LABEL_DISPLAY[row.key]}: {row.value}
-          </li>
-        ))}
+        {classes.map((row) => {
+          const colorKey = LIVE_COLOR_KEY[row.name]
+          return (
+            <li
+              className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3"
+              key={row.name}
+            >
+              {colorKey ? (
+                <span
+                  className="mr-2 inline-block h-3 w-3 rounded-full"
+                  style={{ backgroundColor: LABEL_COLORS[colorKey] }}
+                />
+              ) : null}
+              {formatClassLine(row)}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
