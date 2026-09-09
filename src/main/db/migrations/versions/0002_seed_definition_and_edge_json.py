@@ -652,13 +652,14 @@ def upgrade() -> None:
         [
             {
                 "master_config_id": master_id,
-                "enabled": False,
+                "enabled": True,
                 "segments_dir": "src/main/data/trips",
                 "segment_seconds": 300,
                 "ffmpeg_crf": 20,
                 "note": (
                     "Trip segments buffer frames in RAM, then encode once per segment "
-                    "with ffmpeg H.264 (requires ffmpeg on PATH)."
+                    "with ffmpeg H.264 (requires ffmpeg on PATH). logs_dir holds "
+                    "per-session trip.log + stats.csv (not snapshotted to cloud)."
                 ),
             }
         ],

@@ -77,7 +77,7 @@ def test_app_config_loads_production_directory():
     assert app_config.approach.min_peak_pct == 0.25
     assert app_config.motion.post_drop_window_s == 5.0
     assert app_config.knn.stage2_model_path.name == "knn_stage2.joblib"
-    assert app_config.recording_manager.record_safe_events is False
+    assert app_config.recording_manager.record_safe_events is True
     assert app_config.trip_recorder.segment_seconds == 300
     assert app_config.buzzer.gpio_pin == 18
     assert app_config.buzzer.duration_seconds == pytest.approx(0.3)

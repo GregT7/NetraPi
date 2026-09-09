@@ -667,7 +667,7 @@ def test_http_put_file_streams_and_logs(tmp_path: Path) -> None:
 
     from netrapi.cloud_ingest import PUT_TIMEOUT_S, _http_put_file
 
-    assert PUT_TIMEOUT_S == 1200.0
+    assert PUT_TIMEOUT_S == 600.0
 
     received: dict[str, object] = {}
 

@@ -79,7 +79,7 @@ python -m pip install opencv-python==4.8.1.78
 if errorlevel 1 goto pip_failed
 python -m pip install pillow==11.3.0
 if errorlevel 1 goto pip_failed
-python -m pip install scikit-learn joblib
+python -m pip install scikit-learn==1.6.1 joblib
 if errorlevel 1 goto pip_failed
 REM greenlet 3.2+ has no cp39 Windows wheel; SQLAlchemy would try to compile it.
 python -m pip install greenlet==3.1.1

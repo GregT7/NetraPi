@@ -29,7 +29,7 @@ python -m pip install "numpy==1.23.2"
 python -m pip install opencv-python==4.8.1.78
 python -m pip install pillow==11.3.0
 pip install --extra-index-url https://google-coral.github.io/py-repo/ "tflite-runtime==2.5.0.post1"
-python -m pip install scikit-learn joblib
+python -m pip install scikit-learn==1.6.1 joblib
 python -m pip install greenlet==3.1.1
 python -m pip install sqlmodel==0.0.34
 python -m pip install alembic==1.15.2

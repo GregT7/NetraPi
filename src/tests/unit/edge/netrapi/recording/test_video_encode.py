@@ -15,8 +15,9 @@ def _frame(value: int = 0) -> np.ndarray:
 def test_write_h264_mp4_pipes_frames_to_ffmpeg(tmp_path: Path) -> None:
     frames = [_frame(1), _frame(2)]
     output_path = tmp_path / "out" / "clip.mp4"
+    mock_stdin = MagicMock()
     mock_process = MagicMock()
-    mock_process.stdin = MagicMock()
+    mock_process.stdin = mock_stdin
     mock_process.returncode = 0
     mock_process.communicate.return_value = (b"", b"")
 
@@ -31,7 +32,7 @@ def test_write_h264_mp4_pipes_frames_to_ffmpeg(tmp_path: Path) -> None:
     assert "libx264" in cmd
     assert "yuv420p" in cmd
     assert str(output_path) in cmd
-    assert mock_process.stdin.write.call_count == 2
+    assert mock_stdin.write.call_count == 2
 
 
 def test_write_h264_mp4_requires_ffmpeg(tmp_path: Path) -> None:
