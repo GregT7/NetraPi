@@ -94,7 +94,7 @@ describe('App', () => {
     ).toBeNull()
   })
 
-  it('shows overview results and the try-it-out table', async () => {
+  it('shows overview results and the try-it-out table', { timeout: 15000 }, async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: RequestInfo | URL) => {

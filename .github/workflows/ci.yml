@@ -44,7 +44,7 @@ jobs:
           python -m pip install -r src/main/backend/requirements.txt
           python -m pip install "numpy<2" opencv-python==4.8.1.78 pillow==11.3.0 scikit-learn joblib
       - name: Run Python unit tests
-        run: pytest src/tests/unit
+        run: pytest src/tests/unit --import-mode=importlib
 
   deploy:
     needs: [frontend, python]
