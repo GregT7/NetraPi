@@ -3,6 +3,10 @@ export function apiUrl(path: string): string {
   return `${base}${path.startsWith('/') ? path : `/${path}`}`
 }
 
+function stripEmDash(value: string): string {
+  return value.replaceAll('—', '-')
+}
+
 export type PublicClipRow = {
   classification: string
   clipId: number
@@ -87,13 +91,13 @@ export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClip
   }
   return {
     clips: body.clips.map((clip) => ({
-      classification: clip.classification,
+      classification: stripEmDash(clip.classification),
       clipId: clip.clip_id,
       dateTime: clip.dateTime,
       drivingSessionId: clip.driving_session_id,
       flags: Array.isArray(clip.flags) ? clip.flags : [],
       id: clip.id,
-      label: clip.label,
+      label: stripEmDash(clip.label),
     })),
     liveUrlMax: body.live_url_max ?? 20,
     liveUrls: body.live_urls ?? 0,

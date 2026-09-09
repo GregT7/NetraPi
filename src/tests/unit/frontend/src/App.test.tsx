@@ -1,11 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '@/App'
 import { popupSide } from '@/components/diagrams/mermaidPopup'
+
+beforeEach(() => {
+  localStorage.clear()
+})
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  localStorage.clear()
 })
 
 describe('App', () => {
@@ -116,6 +121,24 @@ describe('App', () => {
                     id: 'clip-11',
                     label: 'Rolling Stop',
                   },
+                  {
+                    classification: 'Complete Stop',
+                    clip_id: 12,
+                    dateTime: '2026-08-16 08:00 PM',
+                    driving_session_id: 1,
+                    flags: ['real_world'],
+                    id: 'clip-12',
+                    label: 'Unrelated',
+                  },
+                  {
+                    classification: 'Rolling Stop',
+                    clip_id: 13,
+                    dateTime: '2026-08-16 09:00 PM',
+                    driving_session_id: 1,
+                    flags: ['synthetic'],
+                    id: 'clip-13',
+                    label: 'Rolling Stop',
+                  },
                 ],
                 live_url_max: 20,
                 live_urls: 0,
@@ -145,26 +168,34 @@ describe('App', () => {
     expect(screen.getByText(/Complete Stop: 75.9% \(29 clips\)/)).toBeTruthy()
     expect(screen.getByText(/Run-through Stop: 85.7% \(21 clips\)/)).toBeTruthy()
     expect(screen.getByText(/Rolling Stop: 76.9% \(26 clips\)/)).toBeTruthy()
-    expect(screen.getByText(/83.3% \(102 clips\)/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Leave-One-Out Accuracy' })).toBeTruthy()
+    expect(screen.getByText(/83.3% of 102 clips predicted correctly/)).toBeTruthy()
     expect(screen.getByText(/leave-one-out \(LOO\)/)).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Overall accuracy' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Field Accuracy' })).toBeTruthy()
     expect(
       screen.getByText(
-        /Every labeled clip from the live evaluation. The model's prediction vs my review./,
+        /Complete-stop, rolling-stop, and run-through clips from the live evaluation, excluding parking-lot \/ synthetic clips. The model's prediction vs my review./,
       ),
     ).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Ideal accuracy' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Calibrated Accuracy' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Limitations' })).toBeTruthy()
     expect(
       screen.getByText(
-        /only clips in the right-most lane with the stop line close to the sign/,
+        /only clips in the right-most lane with the stop line close to the sign are included. This is the accuracy after the limitations of the design are factored in./,
       ),
     ).toBeTruthy()
     expect(await screen.findByText('50% (1/2 clips predicted correctly)')).toBeTruthy()
     expect(screen.getByText('100% (1/1 clips predicted correctly)')).toBeTruthy()
+    expect(screen.getByText('1 false positive (unrelated detections)')).toBeTruthy()
+    expect(screen.getByText('0 false positives (unrelated detections)')).toBeTruthy()
+    expect(localStorage.getItem('netrapi.resultsAccuracy.v1')).toContain('"percent":50')
     expect(screen.getByRole('heading', { name: 'What It Is' })).toBeTruthy()
     expect(
       screen.getByText(/combination of "Netradyne" and "Pi"/),
     ).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Constraints' })).toBeTruthy()
+    expect(screen.getByText(/stay under \$1,000/)).toBeTruthy()
+    expect(screen.getByText(/2010 Mazda3/)).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Why I Made It' })).toBeTruthy()
     expect(
       screen.getByText(/Amazon affiliated DSP \(Delivery Service Partner\)/),
@@ -180,6 +211,57 @@ describe('App', () => {
     expect(screen.getByRole('columnheader', { name: 'Prediction' })).toBeTruthy()
     expect(await screen.findByText('clip-10')).toBeTruthy()
     expect(screen.getByText('clip-11')).toBeTruthy()
+    expect(screen.getByText('clip-12')).toBeTruthy()
+    expect(screen.queryByText('clip-13')).toBeNull()
+    expect(screen.getByRole('columnheader', { name: 'Scenario' })).toBeTruthy()
+    expect(screen.getByText('Calibrated')).toBeTruthy()
+    expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
+    expect(screen.getByText('Calibrated Accuracy: 100% (1/1 clip)')).toBeTruthy()
+    expect(screen.getByText('False Positives: 33% (1/3 clips)')).toBeTruthy()
+    expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
+  })
+
+  it('shows cached Field Accuracy when the clips API fails', async () => {
+    localStorage.setItem(
+      'netrapi.resultsAccuracy.v1',
+      JSON.stringify({
+        field: {
+          classes: [
+            { count: 4, matches: 3, name: 'Complete Stop', percent: 75 },
+            { count: 0, matches: 0, name: 'Rolling Stop', percent: null },
+            { count: 0, matches: 0, name: 'Run-through Stop', percent: null },
+          ],
+          falsePositives: 2,
+          labeled: 4,
+          matches: 3,
+          percent: 75,
+          unlabeled: 0,
+        },
+        ideal: {
+          classes: [
+            { count: 1, matches: 1, name: 'Complete Stop', percent: 100 },
+            { count: 0, matches: 0, name: 'Rolling Stop', percent: null },
+            { count: 0, matches: 0, name: 'Run-through Stop', percent: null },
+          ],
+          falsePositives: 0,
+          labeled: 1,
+          matches: 1,
+          percent: 100,
+          unlabeled: 0,
+        },
+      }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('offline'))),
+    )
+
+    render(<App />)
+    expect(
+      await screen.findByText(/Showing last saved Field and Calibrated Accuracy/),
+    ).toBeTruthy()
+    expect(screen.getByText('75% (3/4 clips predicted correctly)')).toBeTruthy()
+    expect(screen.getByText('2 false positives (unrelated detections)')).toBeTruthy()
   })
 
   it('shows how-it-works copy, state diagram, shark-fin chart, and rolling vs run-through plot', async () => {
@@ -188,8 +270,9 @@ describe('App', () => {
     expect(section).toBeTruthy()
     const how = within(section as HTMLElement)
     expect(how.getByRole('heading', { name: 'How It Works' })).toBeTruthy()
-    expect(how.getByText(/consistent, repeatable event/)).toBeTruthy()
-    expect(how.getByText(/easiest to see by thinking through an example/)).toBeTruthy()
+    expect(how.getByText(/live loop on the Pi/)).toBeTruthy()
+    expect(how.getByText(/approach is the event we look for/)).toBeTruthy()
+    expect(how.getByText(/easiest way to see the event is with a short example/)).toBeTruthy()
     expect(how.getByText(/Imagine this scenario/)).toBeTruthy()
     expect(how.getByText(/three-pronged fork in the road/)).toBeTruthy()
     expect(how.getByText(/The diagram below is that loop/)).toBeTruthy()
@@ -302,6 +385,59 @@ describe('App', () => {
     expect(
       screen.queryByText(/runs capture, Coral inference, and local SQLite/),
     ).toBeNull()
+    fireEvent.mouseOver(within(hardware as HTMLElement).getByText('Windshield Mount'))
+    expect(
+      screen.getByText(/3D-printed suction mount holds the camera/),
+    ).toBeTruthy()
+    expect(
+      screen
+        .getByRole('img', {
+          name: '3D-printed suction mount for the windshield camera',
+        })
+        .getAttribute('src'),
+    ).toBe('/gifs/cam-mount.gif?v=1')
+    fireEvent.mouseLeave(wrap as HTMLElement)
+    const hardwarePhotos = [
+      [
+        'Raspberry Pi 5',
+        'Raspberry Pi 5 in the in-car build',
+        '/gifs/pi.gif?v=1',
+      ],
+      ['Arducam USB', 'Arducam USB camera', '/images/arducam.avif?v=1'],
+      ['Coral USB TPU', 'Google Coral USB TPU', '/images/coral-tpu.avif?v=1'],
+      [
+        'Portable Battery',
+        '100W USB-C power bank with AC outlet',
+        '/images/battery.avif?v=1',
+      ],
+      [
+        'GPIO Buzzer',
+        'KY-006 passive piezo buzzer module',
+        '/images/buzzer.avif?v=1',
+      ],
+      [
+        'Phone',
+        'iPhone 11 used as the cellular hotspot',
+        '/images/iphone-11.avif?v=1',
+      ],
+      [
+        'Cellular Hotspot',
+        'Phone hotspot used to upload clips from the car',
+        '/gifs/hotspot.gif?v=1',
+      ],
+    ] as const
+    for (const [label, alt, src] of hardwarePhotos) {
+      fireEvent.mouseOver(within(hardware as HTMLElement).getByText(label))
+      const photo = screen.getByRole('img', { name: alt })
+      expect(photo.getAttribute('src')).toBe(src)
+      if (label === 'Phone') {
+        expect(photo.className).toContain('max-h-36')
+        expect(photo.className).not.toContain('w-full')
+      } else {
+        expect(photo.className).toContain('w-full')
+      }
+      fireEvent.mouseLeave(wrap as HTMLElement)
+    }
     expect(popupSide(100, 500)).toBe('right')
     expect(popupSide(800, 500)).toBe('left')
     const hotspot = within(hardware as HTMLElement).getByText('Cellular Hotspot')

@@ -11,7 +11,7 @@ Target ER for edge/cloud event metadata. Open constraints and review-time behavi
 - I want to play a clip in the frontend using a signed URL
 - I want to see the model's label next to my manual label and tell if they agree
 - I want overall and per-class accuracy after I finish review (including false positives and false negatives)
-- I want to tag clips with optional review flags (ideal operating envelope, real-world vs parking-lot) and score accuracy on those subsets
+- I want to tag clips with optional review flags (ideal operating envelope, real-world vs parking-lot) and score Field Accuracy on public real-world clips (synthetic clips are not public_visible)
 - I want stage-1 and stage-2 kNN accuracy, not just the final label
 - I want to find false negatives (missed events) and false positives from the type list
 - I want counts of events per driving session
@@ -22,13 +22,13 @@ Target ER for edge/cloud event metadata. Open constraints and review-time behavi
 
 Lookup rows that do not change per session. Alembic revision `0002` inserts `classification_type` once, plus the initial `edge-json` config snapshot. Flags say which FKs may point at the row (`auto_stage1` / `auto_stage2` on `auto_classification`, `manual` on a manual `classification`).
 
-Alembic `0006` inserts `flag_def` lookup rows. Optional review tags live in `clip_flag` (presence of a row means the flag applies; absence means not reviewed / not this property). `in_operating_envelope` is the composite “ideal scenario” tag (right-most lane, sign on the right, halt line close to the sign). `real_world` and `synthetic` are mutually exclusive; do not combine `in_operating_envelope` with `synthetic`.
+Alembic `0006` inserts `flag_def` lookup rows. Optional review tags live in `clip_flag` (presence of a row means the flag applies; absence means not reviewed / not this property). `in_operating_envelope` is the composite “ideal scenario” tag (right-most lane, sign on the right, halt line close to the sign). `real_world` and `synthetic` are mutually exclusive; do not combine `in_operating_envelope` with `synthetic`. Alembic `0007` sets `public_visible = false` on clips tagged `synthetic`. Alembic `0008` sets `public_visible = false` on every clip that is not tagged `real_world`.
 
 | value | Purpose |
 |---|---|
 | `in_operating_envelope` | Ideal scene: right-most lane, sign on the right, halt line close to the sign. Real-world only. |
 | `real_world` | Public-road clip with a real stop sign. |
-| `synthetic` | Parking-lot / homemade-sign training clip. |
+| `synthetic` | Parking-lot / homemade-sign training clip. Hidden from the public list (`public_visible` false). |
 
 | value | is_unsafe | auto_stage1 | auto_stage2 | manual | Purpose |
 |---|---|---|---|---|---|
@@ -76,7 +76,7 @@ Same flags on `trip_segment` for full-session files.
 - `stage1_classification_type_id` — always set: `complete-stop` or `rolling-or-run-through`
 - `stage2_classification_type_id` — set only when stage 1 is `rolling-or-run-through`: `rolling-stop` or `run-through`
 
-`classification_type` flags decide which FKs are allowed: stage 1 → `auto_stage1`, stage 2 → `auto_stage2`, manual review → `manual`. Date/type filters (M-9.20, not built) would use `manual = true`. Clip review tags (ideal scenario, real-world, parking-lot) are `flag_def` / `clip_flag`, not these booleans.
+`classification_type` flags decide which FKs are allowed: stage 1 → `auto_stage1`, stage 2 → `auto_stage2`, manual review → `manual`. Clip review tags (ideal scenario, real-world, parking-lot) are `flag_def` / `clip_flag`, not these booleans.
 
 ### Missed events
 

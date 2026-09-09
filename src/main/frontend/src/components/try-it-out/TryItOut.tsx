@@ -13,22 +13,18 @@ import PlaybackStateDiagram, {
 } from './PlaybackStateDiagram'
 import {
   FLAG_IN_OPERATING_ENVELOPE,
-  FLAG_REAL_WORLD,
-  FLAG_SYNTHETIC,
-  filterByFlags,
-  overallAccuracy,
+  clipHasFlag,
+  falsePositiveRate,
+  formatNamedAccuracy,
+  formatPendingLabels,
+  liveAccuracySnapshot,
+  realWorldClips,
 } from '@/lib/clipAccuracy'
 
 const PAGE_SIZE = 5
 const MINT_DEBOUNCE_MS = 300
 const CACHE_SAFETY_SECONDS = 10
 const SEEK_LOCK_EPSILON = 0.4
-
-const CLIP_FILTERS = [
-  { flag: FLAG_IN_OPERATING_ENVELOPE, label: 'Good scenario' },
-  { flag: FLAG_REAL_WORLD, label: 'Real world' },
-  { flag: FLAG_SYNTHETIC, label: 'Parking-lot / synthetic' },
-] as const
 
 type CachedMint = {
   areas: PlaybackSeriesFile | null
@@ -62,7 +58,6 @@ export default function TryItOut() {
   const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [page, setPage] = useState(0)
-  const [activeFlags, setActiveFlags] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [detailed, setDetailed] = useState(true)
@@ -186,8 +181,8 @@ export default function TryItOut() {
     }
   }, [loadClips])
 
-  const visibleClips: PublicClipRow[] = filterByFlags(clips, activeFlags)
-  const accuracy = overallAccuracy(visibleClips)
+  const visibleClips: PublicClipRow[] = realWorldClips(clips)
+  const liveAccuracy = liveAccuracySnapshot(visibleClips)
   const pageCount = Math.max(1, Math.ceil(visibleClips.length / PAGE_SIZE))
   const pageStart = page * PAGE_SIZE
   const pageClips = visibleClips.slice(pageStart, pageStart + PAGE_SIZE)
@@ -418,15 +413,6 @@ export default function TryItOut() {
     }, MINT_DEBOUNCE_MS)
   }
 
-  function toggleFlag(flag: string) {
-    setPage(0)
-    setActiveFlags((current) =>
-      current.includes(flag)
-        ? current.filter((item) => item !== flag)
-        : [...current, flag],
-    )
-  }
-
   return (
     <section className="scroll-mt-20 px-6 pb-6 pt-16" id="try-it-out">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -434,44 +420,39 @@ export default function TryItOut() {
           Try It Out
         </h2>
         <p className="text-zinc-300">
-          Confirmed clips from the cloud database. Click a row to play it from
-          the private S3 bucket. The browser never holds AWS or device keys.
+          Click a row to play a clip from a real drive. Parking-lot runs with
+          the mock stop sign are not in this list. Detailed Analysis is on by
+          default and shows the diagrams and graphs used to classify the stop;
+          uncheck it to watch the clip full size.
         </p>
         <p className="text-sm text-zinc-400">
           Live S3 links {liveUrls}/{liveUrlMax}
         </p>
         {clips.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {CLIP_FILTERS.map((filter) => {
-              const pressed = activeFlags.includes(filter.flag)
-              return (
-                <button
-                  aria-pressed={pressed}
-                  className={`rounded-md border px-3 py-1 text-sm ${
-                    pressed
-                      ? 'border-amber-400 bg-amber-400/10 text-amber-300'
-                      : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
-                  }`}
-                  key={filter.flag}
-                  onClick={() => toggleFlag(filter.flag)}
-                  type="button"
-                >
-                  {filter.label}
-                </button>
-              )
-            })}
+          <div className="space-y-1 text-sm text-zinc-300">
+            {visibleClips.length === 0 ? (
+              <p>No real-world clips in the public list yet.</p>
+            ) : (
+              <>
+                <p>
+                  {formatNamedAccuracy(
+                    'Calibrated Accuracy',
+                    liveAccuracy.ideal,
+                  )}
+                </p>
+                <p>{formatNamedAccuracy('Field Accuracy', liveAccuracy.field)}</p>
+                <p>
+                  {formatNamedAccuracy(
+                    'False Positives',
+                    falsePositiveRate(visibleClips),
+                  )}
+                </p>
+                <p>
+                  {formatPendingLabels(liveAccuracy.field.unlabeled)}
+                </p>
+              </>
+            )}
           </div>
-        ) : null}
-        {clips.length > 0 ? (
-          <p className="text-sm text-zinc-300">
-            {visibleClips.length === 0
-              ? 'No clips match these filters.'
-              : accuracy.labeled === 0
-              ? `No labeled clips yet. ${accuracy.unlabeled} unlabeled excluded.`
-              : `${accuracy.matches} of ${accuracy.labeled} labeled clips match (${
-                  accuracy.percent ?? 0
-                }%). ${accuracy.unlabeled} unlabeled excluded.`}
-          </p>
         ) : null}
         {listError ? (
           <div className="flex flex-wrap items-center gap-3 text-sm text-red-400">
@@ -489,11 +470,12 @@ export default function TryItOut() {
         <div className="overflow-x-auto rounded-lg border border-zinc-800">
           <table className="w-full table-fixed text-left">
             <colgroup>
-              <col className="w-[18%]" />
-              <col className="w-[12%]" />
-              <col className="w-[32%]" />
-              <col className="w-[19%]" />
-              <col className="w-[19%]" />
+              <col className="w-[16%]" />
+              <col className="w-[10%]" />
+              <col className="w-[26%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
             </colgroup>
             <thead className="bg-zinc-900 text-lg text-amber-400">
               <tr className="h-12">
@@ -512,13 +494,16 @@ export default function TryItOut() {
                 <th className="px-4 font-medium" scope="col">
                   Prediction
                 </th>
+                <th className="px-4 font-medium" scope="col">
+                  Scenario
+                </th>
               </tr>
             </thead>
             <tbody className="text-sm text-white">
               {listLoading || visibleClips.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => (
                     <tr className="h-12 border-t border-zinc-800" key={`empty-${index}`}>
-                      <td className="truncate px-4 text-zinc-400" colSpan={5}>
+                      <td className="truncate px-4 text-zinc-400" colSpan={6}>
                         {index === 0
                           ? listLoading
                             ? 'Loading clips…'
@@ -526,7 +511,7 @@ export default function TryItOut() {
                               ? 'No clips to show.'
                               : clips.length === 0
                                 ? 'No confirmed clips in the database yet.'
-                                : 'No clips match these filters.'
+                                : 'No real-world clips in the public list yet.'
                           : '\u00a0'}
                       </td>
                     </tr>
@@ -536,6 +521,7 @@ export default function TryItOut() {
                     if (!clip) {
                       return (
                         <tr className="h-12 border-t border-zinc-800" key={`pad-${index}`}>
+                          <td className="truncate px-4">&nbsp;</td>
                           <td className="truncate px-4">&nbsp;</td>
                           <td className="truncate px-4">&nbsp;</td>
                           <td className="truncate px-4">&nbsp;</td>
@@ -579,6 +565,11 @@ export default function TryItOut() {
                           }`}
                         >
                           {clip.classification}
+                        </td>
+                        <td className="truncate px-4">
+                          {clipHasFlag(clip, FLAG_IN_OPERATING_ENVELOPE)
+                            ? 'Calibrated'
+                            : ''}
                         </td>
                       </tr>
                     )

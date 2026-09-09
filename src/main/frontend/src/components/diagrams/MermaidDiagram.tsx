@@ -388,7 +388,7 @@ export default function MermaidDiagram({
               {hover.card.imageSrc ? (
                 <img
                   alt={hover.card.imageAlt ?? hover.card.title}
-                  className="mt-2 w-full rounded-md"
+                  className={`mt-2 rounded-md ${hover.card.imageClass ?? 'w-full'}`}
                   src={hover.card.imageSrc}
                 />
               ) : null}

@@ -36,6 +36,7 @@ Logs: `journalctl` live · `src/main/data/logs/trip_session_*/` (`trip.log`, `st
 
 - Clips upload online during the drive; **trips** need `--drain`.
 - Capture does not block on Render: cloud ingest runs on a background FIFO queue; session end flushes that queue before exit.
+- Do not `systemctl enable netrapi-edge` — capture is manual start/stop only.
 - `--drain … --delete-uploaded` drains first, then unlinks local MP4s already in S3 and removes empty clip/trip folders. Never deletes S3 objects.
 - TPU fail → exit. No Wi‑Fi / Render → OFFLINE capture still runs.
 - Flags: `--full-record` / `--no-full-record`, `--drain {clips,trips,both}`, `--delete-uploaded`, `--delete-all`

@@ -12,16 +12,15 @@ export default function HowItWorks() {
           How It Works
         </h2>
         <p>
-          The system constantly reads the camera to understand what is going
-          on. It looks for a consistent, repeatable event that always occurs,
-          regardless of the driver's ultimate decision: Complete Stop, Rolling
-          Stop, or Run-through Stop. If we can identify and consistently detect
-          this common event, then we will know when and what to record.
-          Capturing a mixed set of clips that does not concern the driver will
-          distract them and make it harder for them to improve. We want to
-          avoid that problem. The goal is to make the application as useful and
-          painless as possible. This common event is easiest to see by thinking
-          through an example.
+          This section walks through the live loop on the Pi. Every stop-sign
+          encounter shares one moment: the car approaches the sign, the sign
+          grows in the camera, then it disappears as the car passes it. That
+          approach is the event we look for. After it, the driver either comes
+          to a Complete Stop, a Rolling Stop, or a Run-through Stop. If the Pi
+          can find the approach reliably, it knows when to record and which
+          footage to keep. Unrelated clips would bury those encounters, so we
+          ignore footage that never shows this pattern. The easiest way to see
+          the event is with a short example.
         </p>
         <p>
           Imagine this scenario: someone driving a car turns onto a long street

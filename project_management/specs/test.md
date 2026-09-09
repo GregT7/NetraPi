@@ -1,7 +1,7 @@
 # NetraPi Test Plan (Updated for Full MVS Coverage)
 
 ## 1. Purpose
-Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, deployment, and the public portfolio clip list/playback (Sprint 9). Date/type filters (M-9.20), collection-config display (M-9.40), and Vercel CI remain deferred. Live Overall/Ideal accuracy is TP-71.
+Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, deployment, the public portfolio clip list/playback (Sprint 9), and GitHub Actions CI/CD (TP-72). Live Field/Calibrated Accuracy is TP-71.
 
 ## 2. How to Use This Plan
 This document is ordered by **sprint section** in this file (Sprint 1–5, then D–E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
@@ -19,7 +19,7 @@ Each test includes:
 - **Backend API**: deployed cloud API that authenticates the edge device, issues temporary S3 upload URLs (presigned PUT), persists metadata to Postgres, returns signed playback URLs for ingest, and mints short-lived public GET URLs for portfolio playback
 - **Database**: cloud-hosted PostgreSQL (via backend) storing structured metadata and S3 paths; local SQLite on the Pi for offline event metadata until an online upload completes
 - **Upload path**: when online, Pi authenticates to the backend → backend issues a short-lived S3 PUT URL and later writes Postgres metadata; Pi does not hold permanent AWS or Postgres credentials
-- **Frontend / UI**: public Try-it-out clip list, signed playback mint, review-flag filters, and live Overall/Ideal accuracy (Sprint 9). Date/type filters (M-9.20), collection-config display (M-9.40), and Vercel CI remain deferred
+- **Frontend / UI**: public Try-it-out clip list, signed playback mint, and live Field/Calibrated Accuracy (Sprint 9). GitHub Actions deploys the SPA to Vercel after unit/lint/build pass on `main` (TP-72)
 - **Ground-truth labeling**: manual review of collected footage to assign run-through, rolling stop, and complete stop categories for accuracy evaluation
 - **Event type**: one of **run-through**, **rolling stop**, or **complete stop** (model prediction or manual label)
 
@@ -1449,7 +1449,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 *Tests: TP-63 to TP-66; flags + live Results in TP-71*
 
-> **Focus:** Unauthenticated public clip list and short-lived signed GET mint for Try-it-out, plus review-flag filters. Design: [frontend_playback.md](../diagrams/frontend_playback.md). Unit: `src/tests/unit/backend/app/routes/test_public_clip.py`, `src/tests/unit/frontend/src/TryItOut.test.tsx`. Ingest signed GET remains TP-46. Live Overall/Ideal Results: TP-71.
+> **Focus:** Unauthenticated public clip list and short-lived signed GET mint for Try-it-out. Design: [frontend_playback.md](../diagrams/frontend_playback.md). Unit: `src/tests/unit/backend/app/routes/test_public_clip.py`, `src/tests/unit/frontend/src/TryItOut.test.tsx`. Ingest signed GET remains TP-46. Live Field/Calibrated Results: TP-71.
 
 ### TP-63: Public confirmed-clip list
 - **Description**: Verifies `GET /api/public/clips` returns confirmed, publicly visible S3 clips without an API key, newest event first, and leaves ingest routes keyed.
@@ -1508,7 +1508,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Unit coverage in `test_public_clip.py`.
 
 ### TP-66: Try it out browse and play
-- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows) and that selecting a row sets the video `src` to a minted GET URL.
+- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows), shows Field / False Positives (Unrelated over total clips) / Calibrated accuracy with clip counts, and that selecting a row sets the video `src` to a minted GET URL.
 - **Test level**: Unit
 - **Verification approach**: Test
 - **Reqs**: M-7.14, M-9.21, M-9.22, M-9.23, M-9.24, M-9.25, M-9.26, M-9.27, M-9.28
@@ -1516,16 +1516,16 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
 - **Steps**
   1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`). Unlabeled clips show `-` with the same table styling as labeled rows (no sky highlight). Session column shows `driving_session_id`.
-  2. Confirm labeled-vs-prediction accuracy uses only labeled rows and notes how many unlabeled were excluded.
-  3. Toggle review-flag filters (good scenario, real world, parking-lot); the table and match rate use the AND-filtered subset.
+  2. Confirm Field Accuracy, False Positives (Unrelated count / total clips), and Calibrated Accuracy with correct/total clip counts, plus a Clips Pending Labels count.
+  3. Confirm the table is real-world clips only (no filter chips) and the Scenario column tags `in_operating_envelope` as Calibrated.
   4. Click a clip row; video `src` becomes the minted GET URL.
   5. Confirm **Detailed Analysis** is checked by default (Style A: no native scrub bar; play overlay).
   6. Uncheck **Detailed Analysis**; native controls appear and the same video `src` is kept (no second mint).
 - **Pass criteria**
   - No dummy table rows.
   - Unlabeled clips (no manual classification) show `-` with no special highlight.
-  - Accuracy ignores unlabeled clips and reports the unlabeled count.
-  - Flag filters recompute the visible rows and match rate.
+  - Accuracy shows Field, False Positives (Unrelated / total clips), and Calibrated counts plus Clips Pending Labels.
+  - Table is real-world only; Scenario tags ideal-envelope clips; Field, False Positives, and Calibrated Accuracy include clip counts.
   - Session column is present.
   - Click sets video `src` to the minted GET.
   - Style A is the default; toggling to Style B does not remint.
@@ -1600,31 +1600,59 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Unit coverage in `test_public_clip.py`.
 
 ### TP-71: Clip flags and live Results accuracy
-- **Description**: Verifies `flag_def` / `clip_flag` exist, public clip rows include `flags`, Try-it-out can filter by those flags, and Overview Results shows live overall vs ideal-scenario accuracy with per-class clip counts (hardcoded LOO grid remains).
+- **Description**: Verifies `flag_def` / `clip_flag` exist, public clip rows include `flags`, Try-it-out lists real-world clips with Field/Calibrated Accuracy and an ideal-scenario tag, and Overview Results shows live Field vs Calibrated Accuracy with per-class clip counts (hardcoded LOO grid remains). Clips without `real_world` are not public_visible.
 - **Test level**: Unit
 - **Verification approach**: Test
-- **Reqs**: M-8.14, M-9.21, M-9.28, M-9.50, M-9.53
+- **Reqs**: M-8.14, M-9.21, M-9.27, M-9.28, M-9.50, M-9.53
 - **Prerequisites**
-  - Alembic 0006 applied.
+  - Alembic 0008 applied.
   - Public list returns `flags`.
 - **Steps**
   1. Confirm `flag_def` seed rows and `clip_flag` unique `(clip_id, flag_def_id)` (TP-40 inspects tables).
   2. Tag a clip; `GET /api/public/clips` includes those `flag_def.value`s.
-  3. In Try-it-out, enable Good scenario / Real world / Parking-lot filters and confirm AND filtering plus match-rate update (`TryItOut.test.tsx`).
-  4. In Results, confirm hardcoded LOO percents with counts and live Overall / Ideal blocks (`App.test.tsx`).
+  3. Confirm clips without `real_world` (including `synthetic` and untagged) are `public_visible = false` after 0008 (`test_migrations.py`).
+  4. In Try-it-out, confirm no filter chips; synthetic rows are omitted; Scenario shows Calibrated for `in_operating_envelope`; Field and Calibrated Accuracy lines include correct/total clip counts (`TryItOut.test.tsx`).
+  5. In Results, confirm hardcoded LOO percents with counts and live Field / Calibrated blocks; Field Accuracy ignores synthetic (`App.test.tsx`, `clipAccuracy.test.ts`).
 - **Pass criteria**
   - Untagged clips return `flags: []`.
-  - Ideal accuracy uses `in_operating_envelope` and excludes `synthetic`.
-  - Unit coverage in `test_public_clip.py`, `TryItOut.test.tsx`, `App.test.tsx`.
+  - Field Accuracy excludes `synthetic`. Calibrated Accuracy uses `in_operating_envelope` and excludes `synthetic`.
+  - Unit coverage in `test_public_clip.py`, `test_migrations.py`, `TryItOut.test.tsx`, `App.test.tsx`.
+
+---
+
+# Sprint 11 — GitHub Actions CI/CD
+
+*Tests: TP-72*
+
+> **Focus:** Lint, unit tests, and build on every PR/push; deploy Render + Vercel on `main` only when those jobs pass; treat the pipeline as failed unless post-deploy health curls succeed. Workflow: `.github/workflows/ci.yml`. Skip Pi integration, Coral, Compose, and `src/tests/integration`.
+
+### TP-72: GitHub Actions lint, unit tests, and gated deploy
+- **Description**: Verifies GitHub Actions runs frontend oxlint / vitest / build and `pytest src/tests/unit` on repository updates, deploys backend and frontend only after those jobs pass on `main`, and fails the workflow unless post-deploy health checks succeed.
+- **Test level**: Integration
+- **Verification approach**: Test
+- **Reqs**: M-10.20, M-10.21, M-10.22, M-10.23
+- **Prerequisites**
+  - `.github/workflows/ci.yml` exists.
+  - GitHub Actions secrets: `RENDER_DEPLOY_HOOK_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+  - Render and Vercel Git auto-deploy are off.
+- **Steps**
+  1. Open a pull request (or push a branch) and confirm the `frontend` and `python` jobs run.
+  2. Merge to `main` with both jobs green; confirm the `deploy` job runs.
+  3. Confirm `GET https://netrapi.onrender.com/health` returns 200 with `status: ok`.
+  4. Confirm `GET https://netrapi.onrender.com/api/public/clips` returns 200.
+  5. Confirm `GET https://netrapi.vercel.app/` returns 200.
+- **Pass criteria**
+  - CI jobs run on repository updates (lint + unit tests + frontend build).
+  - Deploy on `main` happens only after those jobs pass.
+  - A failed health curl fails the workflow.
+  - Evidence: GitHub Actions run screenshot (green `frontend`, `python`, and `deploy` on `main`).
 
 ---
 
 ## 8. Coverage Notes
-This plan currently covers through **Sprint 10** (clip telemetry sidecars + detailed Try-it-out playback) plus clip review flags and live Overall/Ideal accuracy (TP-71). Sprint 9 frontend is **partial** (Try-it-out list/play/flag-filter unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
-- remaining frontend / portfolio UI tests (date/type filters M-9.20; collection-config display M-9.40)
-- full CI/CD matrix beyond backend deploy health
+This plan currently covers through **Sprint 11** (GitHub Actions CI/CD, TP-72) plus Sprint 10 clip telemetry sidecars, clip review flags, and live Field/Calibrated Accuracy (TP-71). Sprint 9 frontend is **partial** (Try-it-out list/play unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
+- remaining frontend / portfolio UI tests
 - 10-hour collection and model-evaluation publication tests
-- dedicated edge managed-service (systemd) verification for M-10.10
 - dedicated offline capture/detection verification for M-5.10
 
 Covered now:
@@ -1637,7 +1665,8 @@ Covered now:
 - Sprint 7 harnesses under `src/tests/integration/tp_50`–`tp_56` against https://netrapi.onrender.com
 - Sprint 7 ad-hoc: mocked pipeline (AT-7.1), camera + SPACE + stubbed events (AT-7.2), in-car live three-maneuver cloud E2E (AT-7.3)
 - Sprint 8: boot health, `/ready`, keep-alive→offline, `--drain clips|trips|both` + `--delete-uploaded`, `health_config` snapshot (`src/tests/integration/tp_57`–`tp_62`)
-- Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP, review-flag filters, live Overall/Ideal Results (`test_public_clip.py`, `TryItOut.test.tsx`, `App.test.tsx`)
+- Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP, real-world Try-it-out list with Field/Calibrated Accuracy, live Field/Calibrated Results (`test_public_clip.py`, `TryItOut.test.tsx`, `App.test.tsx`)
 - Sprint 10: per-clip S3 directory (`clip.mp4` + `areas.json` + `motion.json` + `transitions.json`), public mint inlines sidecar JSON, Try-it-out detailed/simple toggle (`test_playback_json.py`, `test_s3_upload.py`, `TryItOut.test.tsx`)
+- Sprint 11: GitHub Actions lint + unit tests + frontend build on every PR/push; Render hook + Vercel CLI deploy on `main` only after those jobs pass; pipeline health curls (`/health`, `/api/public/clips`, Vercel homepage)
 
-**TP range:** TP-01 through TP-71. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).
+**TP range:** TP-01 through TP-72. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

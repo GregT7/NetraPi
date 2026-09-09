@@ -33,7 +33,7 @@ function clipRow(
     clip_id: clipId,
     dateTime: extras?.dateTime ?? '2026-08-16 06:00 PM',
     driving_session_id: extras?.driving_session_id ?? 1,
-    flags: extras?.flags ?? [],
+    flags: extras?.flags ?? ['real_world'],
     id: `clip-${clipId}`,
     label: extras?.label ?? 'Complete Stop',
   }
@@ -79,9 +79,10 @@ describe('TryItOut', () => {
     render(<TryItOut />)
     expect(await screen.findByText('clip-10')).toBeTruthy()
     expect(screen.getByText('Live S3 links 1/20')).toBeTruthy()
-    expect(
-      screen.getByText('0 of 1 labeled clips match (0%). 0 unlabeled excluded.'),
-    ).toBeTruthy()
+    expect(screen.getByText('Calibrated Accuracy: n/a (0/0 clips)')).toBeTruthy()
+    expect(screen.getByText('Field Accuracy: 0% (0/1 clip)')).toBeTruthy()
+    expect(screen.getByText('False Positives: 0% (0/1 clip)')).toBeTruthy()
+    expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Session' })).toBeTruthy()
     expect(screen.getByText('1')).toBeTruthy()
     vi.useFakeTimers()
@@ -212,6 +213,10 @@ describe('TryItOut', () => {
                 label: 'Rolling Stop',
               }),
               clipRow(12, { classification: 'Rolling Stop', label: '-' }),
+              clipRow(13, {
+                classification: 'Unrelated',
+                label: 'Unrelated',
+              }),
             ],
             live_url_max: 20,
             live_urls: 0,
@@ -223,12 +228,12 @@ describe('TryItOut', () => {
 
     render(<TryItOut />)
     expect(await screen.findByText('clip-10')).toBeTruthy()
-    expect(
-      screen.getByText('1 of 2 labeled clips match (50%). 1 unlabeled excluded.'),
-    ).toBeTruthy()
+    expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
+    expect(screen.getByText('False Positives: 25% (1/4 clips)')).toBeTruthy()
+    expect(screen.getByText('Clips Pending Labels: 1')).toBeTruthy()
   })
 
-  it('filters the table and match rate by clip flags', async () => {
+  it('shows real-world clips, Field and Calibrated Accuracy, and a Calibrated tag', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
@@ -262,26 +267,15 @@ describe('TryItOut', () => {
     render(<TryItOut />)
     expect(await screen.findByText('clip-10')).toBeTruthy()
     expect(screen.getByText('clip-11')).toBeTruthy()
-    expect(screen.getByText('clip-12')).toBeTruthy()
-    expect(
-      screen.getByText('2 of 3 labeled clips match (67%). 0 unlabeled excluded.'),
-    ).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Good scenario' }))
-    expect(screen.getByText('clip-10')).toBeTruthy()
-    expect(screen.queryByText('clip-11')).toBeNull()
     expect(screen.queryByText('clip-12')).toBeNull()
-    expect(
-      screen.getByText('1 of 1 labeled clips match (100%). 0 unlabeled excluded.'),
-    ).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Good scenario' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Parking-lot / synthetic' }))
-    expect(screen.getByText('clip-12')).toBeTruthy()
-    expect(screen.queryByText('clip-10')).toBeNull()
-    expect(
-      screen.getByText('1 of 1 labeled clips match (100%). 0 unlabeled excluded.'),
-    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Good scenario' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Real world' })).toBeNull()
+    expect(screen.getByRole('columnheader', { name: 'Scenario' })).toBeTruthy()
+    expect(screen.getByText('Calibrated')).toBeTruthy()
+    expect(screen.getByText('Calibrated Accuracy: 100% (1/1 clip)')).toBeTruthy()
+    expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
+    expect(screen.getByText('False Positives: 0% (0/2 clips)')).toBeTruthy()
+    expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
   })
 
   it('refetches the live S3 count after the mint TTL', async () => {

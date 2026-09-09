@@ -79,7 +79,7 @@ Although the original career-driven incentive for this project changed after gai
 ### 3.8 Deployment & Reliability (Required)
 - Deploy backend API to **Render** using Docker
 - Host frontend on **Vercel** as a static application
-- Run edge software as a **systemd** service on the Raspberry Pi
+- Run edge software as a **systemd** service on the Raspberry Pi (manual start/stop; not enabled on boot)
 
 
 ### 3.9 CI/CD (Minimal)
@@ -93,7 +93,7 @@ Although the original career-driven incentive for this project changed after gai
 ---
 
 ## Minimal Tech Stack (Deployed)
-- **Edge:** Raspberry Pi 5 running a Python service with TensorFlow Lite (`tflite-runtime`) and `pycoral` accelerated by a Google Coral USB TPU for real-time inference; OpenCV for continuous video capture and pre/post-event clip extraction; SQLite for local event metadata; and `systemd` for reliable boot-time startup and recovery. Cloud uploads are direct and one-at-a-time when connectivity is available (no offline upload queue).
+- **Edge:** Raspberry Pi 5 running a Python service with TensorFlow Lite (`tflite-runtime`) and `pycoral` accelerated by a Google Coral USB TPU for real-time inference; OpenCV for continuous video capture and pre/post-event clip extraction; SQLite for local event metadata; and `systemd` for manual start/stop of the capture process (not enabled on boot). Cloud uploads are direct and one-at-a-time when connectivity is available (no offline upload queue).
 - **Cloud (Supabase + AWS):** Supabase PostgreSQL for structured event metadata and analytics, paired with AWS S3 for scalable, private video clip storage, keeping large media assets decoupled from relational data and served securely via time-limited signed URLs.
 - **Backend:** FastAPI service containerized with Docker and deployed on Render, responsible for ingesting authenticated edge device uploads, enforcing device-level API key authentication, generating signed URLs for secure clip playback from AWS S3, and exposing read-only analytics endpoints. SQLLite will be used to store the data locally.
 - **Frontend:** React web application styled with Tailwind CSS and deployed on Vercel, using Recharts for analytics visualizations (event frequency, session distributions), with support for secure clip playback and a public demo mode.

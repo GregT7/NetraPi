@@ -101,32 +101,30 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-9.11: The interface shall include a concise project overview describing system goals, architecture, and constraints.
 
 ### R-9.2 Interactivity
-- M-9.20: The frontend shall allow filtering of events by date range and event type (run-through, rolling stop, complete stop).
 - M-9.21: The frontend shall display model classification accuracy metrics by comparing detected labels against manual ground-truth categories.
 - M-9.22: The frontend shall support video playback via signed URLs.
 - M-9.23: The frontend shall display event metadata and timestamps.
 - M-9.24: The frontend shall allow users to browse and select clips from the collected footage.
 - M-9.25: The Try-it-out section shall offer detailed analysis playback (default) and simple video-only playback, toggled by the visitor.
 - M-9.26: Detailed analysis playback shall synchronize a state diagram and area/motion graphs to clip playback time using native video controls without seeking.
-- M-9.27: The public clip list and mint shall include only clips whose `public_visible` flag is true.
-- M-9.28: The Try-it-out section shall allow filtering clips by optional review flags (ideal scenario, real-world, parking-lot).
+- M-9.27: The public clip list and mint shall include only clips whose `public_visible` flag is true. Clips that are not tagged `real_world` shall not be public_visible.
+- M-9.28: The Try-it-out table shall mark clips tagged `in_operating_envelope` as Calibrated and shall show live Field Accuracy, False Positives (Unrelated-labeled count over total clips), and Calibrated Accuracy with correct/total clip counts.
 
 ### R-9.3 Visualization
 - M-9.30: The frontend shall include at least one visualization of collected event or evaluation data.
 
 ### R-9.4 Transparency
-- M-9.40: The frontend shall display configuration parameters used during data collection.
 - M-9.41: The frontend shall provide access to source code and technical documentation.
 
 ### R-9.5 Model Evaluation
 - M-9.50: The frontend shall present per-class and overall classification accuracy for run-through, rolling stop, and complete stop.
 - M-9.51: The interface shall visually communicate agreement and disagreement between model predictions and manual labels.
 - M-9.52: The analysis shall frame results as an evaluation of stop-sign event detection performance, not driving-behavior change.
-- M-9.53: The frontend shall present live overall and ideal-scenario classification accuracy with per-class percentages and clip counts.
+- M-9.53: The frontend shall present live Field Accuracy (excluding synthetic clips) and Calibrated Accuracy with per-class percentages and clip counts.
 
 ## R-10 Deployment and Reliability
 ### R-10.1 Edge Runtime
-- M-10.10: The edge software shall run as a managed service on the Raspberry Pi.
+- M-10.10: The edge software shall be startable and stoppable as a systemd service on the Raspberry Pi. The service shall not start automatically on boot.
 
 ### R-10.2 CI/CD
 - M-10.20: Automated CI pipelines shall execute on repository updates, including linting and test suites.

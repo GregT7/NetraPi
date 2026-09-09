@@ -2,14 +2,13 @@ export const FLAG_IN_OPERATING_ENVELOPE = 'in_operating_envelope'
 export const FLAG_REAL_WORLD = 'real_world'
 export const FLAG_SYNTHETIC = 'synthetic'
 
-export const ACCURACY_CLASSES = [
+export const STOP_CLASSES = [
   'Complete Stop',
   'Rolling Stop',
   'Run-through Stop',
-  'Unrelated',
 ] as const
 
-export type AccuracyClass = (typeof ACCURACY_CLASSES)[number]
+export type AccuracyClass = (typeof STOP_CLASSES)[number]
 
 export type ClipForAccuracy = {
   classification: string
@@ -31,6 +30,22 @@ export type ClassAccuracy = {
   percent: number | null
 }
 
+export type LiveAccuracySnapshot = {
+  field: LiveAccuracyBlock
+  ideal: LiveAccuracyBlock
+}
+
+export type LiveAccuracyBlock = {
+  classes: ClassAccuracy[]
+  falsePositives: number
+  labeled: number
+  matches: number
+  percent: number | null
+  unlabeled: number
+}
+
+const UNRELATED_LABEL = 'Unrelated'
+
 export function clipHasFlag(clip: ClipForAccuracy, flag: string): boolean {
   return (clip.flags ?? []).includes(flag)
 }
@@ -43,6 +58,14 @@ export function filterByFlags<T extends ClipForAccuracy>(
     return clips
   }
   return clips.filter((clip) => flags.every((flag) => clipHasFlag(clip, flag)))
+}
+
+export function fieldClips<T extends ClipForAccuracy>(clips: T[]): T[] {
+  return clips.filter((clip) => !clipHasFlag(clip, FLAG_SYNTHETIC))
+}
+
+export function realWorldClips<T extends ClipForAccuracy>(clips: T[]): T[] {
+  return clips.filter((clip) => clipHasFlag(clip, FLAG_REAL_WORLD))
 }
 
 export function idealClips<T extends ClipForAccuracy>(clips: T[]): T[] {
@@ -70,9 +93,47 @@ export function overallAccuracy(clips: ClipForAccuracy[]): OverallAccuracy {
   }
 }
 
-export function perClassAccuracy(clips: ClipForAccuracy[]): ClassAccuracy[] {
+export function stopAccuracy(clips: ClipForAccuracy[]): OverallAccuracy {
+  const stopClips = clips.filter((clip) =>
+    STOP_CLASSES.includes(clip.label as AccuracyClass),
+  )
+  const matches = stopClips.filter(
+    (clip) => clip.classification === clip.label,
+  ).length
+  const unlabeled = clips.filter((clip) => clip.label === '-').length
+  return {
+    labeled: stopClips.length,
+    matches,
+    unlabeled,
+    percent:
+      stopClips.length === 0
+        ? null
+        : Math.round((100 * matches) / stopClips.length),
+  }
+}
+
+export function falsePositiveCount(clips: ClipForAccuracy[]): number {
+  return clips.filter((clip) => clip.label === UNRELATED_LABEL).length
+}
+
+export function falsePositiveRate(clips: ClipForAccuracy[]): {
+  labeled: number
+  matches: number
+  percent: number | null
+} {
+  const total = clips.length
+  const falsePositives = falsePositiveCount(clips)
+  return {
+    labeled: total,
+    matches: falsePositives,
+    percent:
+      total === 0 ? null : Math.round((100 * falsePositives) / total),
+  }
+}
+
+export function perStopAccuracy(clips: ClipForAccuracy[]): ClassAccuracy[] {
   const labeled = clips.filter((clip) => clip.label !== '-')
-  return ACCURACY_CLASSES.map((name) => {
+  return STOP_CLASSES.map((name) => {
     const inClass = labeled.filter((clip) => clip.label === name)
     const matches = inClass.filter(
       (clip) => clip.classification === clip.label,
@@ -89,16 +150,61 @@ export function perClassAccuracy(clips: ClipForAccuracy[]): ClassAccuracy[] {
   })
 }
 
-export function formatOverallLine(stats: OverallAccuracy): string {
+export function liveAccuracyBlock(clips: ClipForAccuracy[]): LiveAccuracyBlock {
+  const stats = stopAccuracy(clips)
+  return {
+    classes: perStopAccuracy(clips),
+    falsePositives: falsePositiveCount(clips),
+    labeled: stats.labeled,
+    matches: stats.matches,
+    percent: stats.percent,
+    unlabeled: stats.unlabeled,
+  }
+}
+
+export function liveAccuracySnapshot(
+  clips: ClipForAccuracy[],
+): LiveAccuracySnapshot {
+  return {
+    field: liveAccuracyBlock(fieldClips(clips)),
+    ideal: liveAccuracyBlock(idealClips(clips)),
+  }
+}
+
+export function formatOverallLine(stats: {
+  labeled: number
+  matches: number
+  percent: number | null
+}): string {
   if (stats.percent === null || stats.labeled === 0) {
-    return 'No labeled clips yet'
+    return 'No labeled stop-type clips yet'
   }
   return `${stats.percent}% (${stats.matches}/${stats.labeled} clips predicted correctly)`
 }
 
 export function formatClassLine(row: ClassAccuracy): string {
   if (row.percent === null) {
-    return `${row.name} (${row.count} clips): —`
+    return `${row.name} (${row.count} clips): n/a`
   }
   return `${row.name} (${row.count} clips): ${row.percent}%`
+}
+
+export function formatFalsePositives(count: number): string {
+  const noun = count === 1 ? 'false positive' : 'false positives'
+  return `${count} ${noun} (unrelated detections)`
+}
+
+export function formatPendingLabels(count: number): string {
+  return `Clips Pending Labels: ${count}`
+}
+
+export function formatNamedAccuracy(
+  name: string,
+  block: { labeled: number; matches: number; percent: number | null },
+): string {
+  const noun = block.labeled === 1 ? 'clip' : 'clips'
+  if (block.percent === null) {
+    return `${name}: n/a (${block.matches}/${block.labeled} ${noun})`
+  }
+  return `${name}: ${block.percent}% (${block.matches}/${block.labeled} ${noun})`
 }

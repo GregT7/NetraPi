@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { fetchPublicClips, type PublicClipRow } from '@/api/publicPlayback'
+import { fetchPublicClips } from '@/api/publicPlayback'
 import { LABEL_COLORS, LABEL_DISPLAY } from '../charts/clusterData'
 import { HARDWARE_NODE_CARDS } from '../diagrams/hardwareNodeCards'
 import MermaidDiagram from '../diagrams/MermaidDiagram'
 import { HARDWARE_CHART, SOFTWARE_CHART } from '../diagrams/mermaidCharts'
 import {
   formatClassLine,
+  formatFalsePositives,
   formatOverallLine,
-  idealClips,
-  overallAccuracy,
-  perClassAccuracy,
-  type ClassAccuracy,
-  type OverallAccuracy,
+  liveAccuracySnapshot,
+  type LiveAccuracyBlock as AccuracyBlock,
 } from '@/lib/clipAccuracy'
+import {
+  accuracySnapshotsEqual,
+  readAccuracyCache,
+  writeAccuracyCache,
+} from '@/lib/accuracyCache'
 
 const looAccuracy = [
   { key: 'Unrelated', value: '96.2%', count: 26 },
@@ -118,6 +121,15 @@ export default function Overview() {
               website for anyone to view.
             </p>
           </div>
+          <div className="mx-auto max-w-5xl space-y-3">
+            <h3 className="text-2xl font-medium text-amber-400">Constraints</h3>
+            <p>
+              The build had to stay under $1,000, fit a 2010 Mazda3, and remain
+              legal and safe on public roads. The Pi runs on a portable
+              battery (no 12V tap). The Pi, TPU, and battery use reversible
+              mounts so the car can go back to stock.
+            </p>
+          </div>
           <ArchitectureFigures />
           <GifSlot
             alt="NetraPi hardware mounted in the car"
@@ -169,7 +181,7 @@ export default function Overview() {
           />
           <GifSlot
             alt="Clip saved locally and uploaded to S3"
-            caption="I turn on a phone hotspot, wave at the camera in a remote area, then go home, join regular Wi-Fi, and open the same clip from the cloud — showing it went from the Pi in the car to S3."
+            caption="I turn on a phone hotspot, wave at the camera in a remote area, then go home, join regular Wi-Fi, and open the same clip from the cloud, showing it went from the Pi in the car to S3."
             src="/gifs/s3-persist.gif?v=1"
           />
         </div>
@@ -183,7 +195,10 @@ export default function Overview() {
 }
 
 function Results() {
-  const [clips, setClips] = useState<PublicClipRow[]>([])
+  const [snapshot, setSnapshot] = useState<ReturnType<
+    typeof liveAccuracySnapshot
+  > | null>(() => readAccuracyCache())
+  const [fromCache, setFromCache] = useState(() => readAccuracyCache() != null)
   const [liveReady, setLiveReady] = useState(false)
 
   useEffect(() => {
@@ -193,7 +208,13 @@ function Results() {
         if (controller.signal.aborted) {
           return
         }
-        setClips(result.clips)
+        const next = liveAccuracySnapshot(result.clips)
+        const cached = readAccuracyCache()
+        if (!cached || !accuracySnapshotsEqual(cached, next)) {
+          writeAccuracyCache(next)
+        }
+        setSnapshot(next)
+        setFromCache(false)
         setLiveReady(true)
       })
       .catch((error: unknown) => {
@@ -203,25 +224,23 @@ function Results() {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return
         }
-        setClips([])
+        const cached = readAccuracyCache()
+        setSnapshot(cached)
+        setFromCache(cached != null)
         setLiveReady(true)
       })
     return () => controller.abort()
   }, [])
 
-  const overall = overallAccuracy(clips)
-  const overallClasses = perClassAccuracy(clips)
-  const ideal = idealClips(clips)
-  const idealStats = overallAccuracy(ideal)
-  const idealClasses = perClassAccuracy(ideal)
-
-  const overallPhrase =
-    liveReady && overall.percent !== null
-      ? `${overall.percent}% (${overall.matches} of ${overall.labeled})`
+  const field = snapshot?.field
+  const ideal = snapshot?.ideal
+  const fieldPhrase =
+    field?.percent != null
+      ? `${field.percent}% (${field.matches} of ${field.labeled})`
       : 'not yet available'
   const idealPhrase =
-    liveReady && idealStats.percent !== null
-      ? `${idealStats.percent}% (${idealStats.matches} of ${idealStats.labeled})`
+    ideal?.percent != null
+      ? `${ideal.percent}% (${ideal.matches} of ${ideal.labeled})`
       : 'not yet available'
 
   return (
@@ -229,21 +248,19 @@ function Results() {
       <div className="space-y-5">
         <h3 className="text-2xl font-medium text-amber-400">Results</h3>
         <p>
-          I scored the classification model using two different approaches. The
-          first used the leave-one-out (LOO) algorithm on a static set of 100
-          video clips — 25 per category, including a 25-clip control set.
+          I scored the classification model two ways: leave-one-out (LOO) on a
+          static clip set, and field testing in a real car. The LOO set had 100
+          video clips, 25 per category, including a 25-clip control. Each pass
+          trains on almost the entire set, holds out one clip, scores that
+          prediction against the known label, and repeats until every clip has
+          been held out. I treated that single LOO number as the model's
+          accuracy until field testing showed it was too optimistic.
         </p>
-        <p>
-          Leave-one-out trains the model on almost the entire set, then holds
-          out one clip and asks the model to classify it. Because that clip
-          already has a known label, the prediction is scored as correct or
-          incorrect. Repeating this for every clip and combining the outcomes
-          gives a single overall accuracy. I mainly relied on that LOO metric
-          to gauge how well the model would perform. After I tried a second
-          scoring method, I found a flaw in that picture.
-        </p>
-        <p className="text-zinc-300">
-          {looOverall.value} ({looOverall.count} clips)
+        <h4 className="text-xl font-medium text-amber-400">
+          Leave-One-Out Accuracy
+        </h4>
+        <p className="text-zinc-200">
+          {looOverall.value} of {looOverall.count} clips predicted correctly
         </p>
         <ul className="grid gap-3 sm:grid-cols-2">
           {looAccuracy.map((row) => (
@@ -259,77 +276,84 @@ function Results() {
             </li>
           ))}
         </ul>
-      </div>
-
-      <div className="space-y-5">
         <p>
-          The second approach was to run the system in a real car. I drove for
-          a couple of hours, classified stop-sign approaches as they happened,
-          and uploaded the clips. Afterward I reviewed the footage and labeled
-          it by hand so each automated prediction had a ground truth.
+          For field testing I drove a real car for a couple of hours, let the
+          Pi classify stop-sign approaches, uploaded the clips, and labeled
+          them by hand. Field Accuracy is the match rate on those complete,
+          rolling, and run-through clips. Parking-lot recordings are tagged
+          synthetic and left out, so the number reflects real roads rather
+          than the mock-sign setup. Field Accuracy is currently {fieldPhrase}.
+          That score is not very good, especially relative to the LOO's accuracy rating.
+          
+          After some investigation, it was found that there is a misalignment with
+          the training dataset and how things actually present in real life.
+          Most of the training clips were recorded in a parking lot, using a
+          mock stop sign smaller than those on real roads. The passenger side
+          of the car passed very close to the sign, and the car came to a full
+          stop immediately after. The sign leaves the
+          frame only a moment before the car stops. Motion sampling starts
+          the instant the sign disappears, so the motion features look busier
+          than a real complete stop. On the road the signs are larger, the
+          stop line is farther away, and extra lanes are common, so that
+          close-up timing almost never happens.
         </p>
         <p>
-          On every labeled clip, overall accuracy is the share of predictions
-          that match my review: {overallPhrase}. That number is not very good.
-        </p>
-        <p>
-          The training set explains the gap. Most of those clips were
-          parking-lot runs past a mock stop sign about one-third the size of a
-          real one. I kept the passenger side very close to the sign, and on
-          complete stops I halted after only a short distance past it.
-        </p>
-        <p>
-          Real roads are different: larger signs, a longer gap from the sign to
-          the halt line, and usually more than one lane. In the middle or left
-          lane the model still expects a right-lane, close-up sign, so it
-          classifies poorly. The training data never included those conditions.
-        </p>
-        <p>
-          If you keep only the approaches that match training — right-most
-          lane, and a white stop line close to the sign — ideal accuracy is{' '}
-          {idealPhrase}.
-        </p>
-        <p>
-          Middle- and left-lane approaches, and long gaps to the halt line,
-          fail for a mechanical reason. The stop sign leaves the frame earlier,
-          so the system treats the approach as over and starts sampling motion
-          before there has been time to stop. In that window a complete stop is
-          effectively impossible.
+          Calibrated Accuracy uses the same labeled clips as Field Accuracy,
+          but only the right-most-lane approaches where the white stop line
+          sits close to the sign. That subset is currently {idealPhrase}. It
+          is the score after the design's operating limits are factored in,
+          not a claim about every lane on the road.
         </p>
       </div>
 
+      {fromCache && liveReady ? (
+        <p className="text-sm text-zinc-400">
+          Showing last saved Field and Calibrated Accuracy (could not reach the
+          API).
+        </p>
+      ) : null}
+
       <LiveAccuracyBlock
-        classes={overallClasses}
-        definition="Every labeled clip from the live evaluation. The model's prediction vs my review."
-        ready={liveReady}
-        stats={overall}
-        title="Overall accuracy"
+        block={field}
+        definition="Complete-stop, rolling-stop, and run-through clips from the live evaluation, excluding parking-lot / synthetic clips. The model's prediction vs my review."
+        ready={liveReady || snapshot != null}
+        title="Field Accuracy"
       />
       <LiveAccuracyBlock
-        classes={idealClasses}
-        definition="The same comparison, but only clips in the right-most lane with the stop line close to the sign."
-        emptyLabel="No tagged ideal-scenario clips yet"
-        ready={liveReady}
-        stats={idealStats}
-        title="Ideal accuracy"
+        block={ideal}
+        definition="The same comparison as Field Accuracy, but only clips in the right-most lane with the stop line close to the sign are included. This is the accuracy after the limitations of the design are factored in."
+        emptyLabel="No tagged calibrated clips yet"
+        ready={liveReady || snapshot != null}
+        title="Calibrated Accuracy"
       />
+
+      <div className="space-y-3">
+        <h4 className="text-xl font-medium text-amber-400">Limitations</h4>
+        <p>
+          LOO overstates how the model behaves on real roads because the
+          training set was mostly parking-lot geometry. Field Accuracy is the
+          live score on public labeled stop-type clips that are not tagged
+          synthetic (unrelated detections are counted separately as false
+          positives). Calibrated Accuracy is a small subset. Live numbers come from
+          the public clip list and are saved in the browser so they still
+          appear if the API is down.
+        </p>
+      </div>
     </div>
   )
 }
 
 function LiveAccuracyBlock({
-  classes,
+  block,
   definition,
-  emptyLabel = 'No labeled clips yet',
+  emptyLabel = 'No labeled stop-type clips yet',
   ready,
-  stats,
   title,
 }: {
-  classes: ClassAccuracy[]
+  block: AccuracyBlock | undefined
   definition: string
   emptyLabel?: string
   ready: boolean
-  stats: OverallAccuracy
   title: string
 }) {
   return (
@@ -338,13 +362,18 @@ function LiveAccuracyBlock({
       <p className="text-zinc-400">{definition}</p>
       <p className="text-zinc-200">
         {!ready
-          ? 'Loading live accuracy…'
-          : stats.percent === null
+          ? 'Loading live Accuracy...'
+          : !block || block.percent === null
             ? emptyLabel
-            : formatOverallLine(stats)}
+            : formatOverallLine(block)}
       </p>
+      {block ? (
+        <p className="text-sm text-zinc-400">
+          {formatFalsePositives(block.falsePositives)}
+        </p>
+      ) : null}
       <ul className="grid gap-3 sm:grid-cols-2">
-        {classes.map((row) => {
+        {(block?.classes ?? []).map((row) => {
           const colorKey = LIVE_COLOR_KEY[row.name]
           return (
             <li

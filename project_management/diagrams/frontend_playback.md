@@ -122,14 +122,13 @@ Implemented:
 - `GET /api/public/clips` — confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings)
 - CORS for `http://localhost:5173` and `http://127.0.0.1:5173` (add the Vercel origin via `CORS_ORIGINS` on Render)
 - Try it out click-to-play (`VITE_API_URL` on Vercel; Vite proxies `/api` to local FastAPI)
-- Try it out review-flag filters (Good scenario / Real world / Parking-lot; AND if more than one is on)
-- Overview Results live Overall vs Ideal accuracy from the same public clip list
+- Try it out lists real-world clips only (no visitor filter chips); Scenario column tags `in_operating_envelope` as Calibrated; Field, False Positives (Unrelated / total clips), and Calibrated Accuracy with correct/total clip counts
+- Overview Results live Field vs Calibrated Accuracy from the same public clip list (clips without `real_world` are not public_visible)
 - Public mint inlines `areas`/`motion`/`transitions` JSON (one live slot for the MP4). Try it out detailed analysis is the default; simple video-only remains available. Detailed playback uses native HTML5 controls with seeking disabled.
 
 Not in this pass:
 
 - JWT / Google login
-- Date-range / event-type filters (M-9.20)
 
 ---
 

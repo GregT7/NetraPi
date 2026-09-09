@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/main/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/main/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install unit-test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          python -m pip install -r src/main/backend/requirements.txt
+          python -m pip install "numpy<2" opencv-python==4.8.1.78 pillow==11.3.0 scikit-learn joblib
+      - name: Run Python unit tests
+        run: pytest src/tests/unit
+
+  deploy:
+    needs: [frontend, python]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Render deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      - name: Wait for Render health
+        run: |
+          set -euo pipefail
+          sleep 60
+          for i in $(seq 1 48); do
+            if curl -fsS https://netrapi.onrender.com/health -o /tmp/netrapi-health.json; then
+              if python3 -c "import json; assert json.load(open('/tmp/netrapi-health.json'))['status'] == 'ok'"; then
+                echo "Render /health ok"
+                exit 0
+              fi
+            fi
+            echo "Render not ready yet (attempt ${i}/48)"
+            sleep 15
+          done
+          echo "Render /health did not become ok"
+          exit 1
+
+      - name: Check public clips
+        run: curl -fsS --retry 8 --retry-delay 10 --retry-all-errors -o /dev/null -w "%{http_code}\n" https://netrapi.onrender.com/api/public/clips | grep -qx 200
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy frontend to Vercel
+        working-directory: src/main/frontend
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Check Vercel homepage
+        run: curl -fsS --retry 8 --retry-delay 10 --retry-all-errors -o /dev/null -w "%{http_code}\n" https://netrapi.vercel.app/ | grep -qx 200
