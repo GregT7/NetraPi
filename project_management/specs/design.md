@@ -38,48 +38,54 @@ flowchart LR
 ```
 
 ## Software Architecture Diagram
-_Description:_ Edge Pi, backend on Render, cloud, and the Vercel frontend sit in one horizontal row. Each block stacks its tools vertically. Persistence holds SQLAlchemy, SQLModel, and Alembic and links the Pi to the cloud. Unlabeled lines between those blocks.
+_Description:_ GitHub Actions CI/CD sits above the runtime row and links to Render and Vercel. Edge Pi, persistence, backend, cloud, and frontend sit in one horizontal row under that. Each runtime block stacks its tools vertically. Persistence holds SQLAlchemy, SQLModel, and Alembic and links the Pi to the cloud. Other lines are unlabeled.
 
 ```mermaid
-flowchart LR
-  subgraph edge [Edge Pi]
-    direction TB
-    Capture[OpenCV]
-    Detect[TFLite Coral]
-    LocalDb[SQLite]
+flowchart TB
+  subgraph cicd [CI/CD]
+    GHA[GitHub Actions]
   end
-  subgraph schema [Persistence]
-    direction TB
-    Sqla[SQLAlchemy]
-    Sqlm[SQLModel]
-    Alembic[Alembic]
+  subgraph stack[" "]
+    direction LR
+    subgraph edge [Edge Pi]
+      direction TB
+      Capture[OpenCV]
+      Detect[TFLite Coral]
+      LocalDb[SQLite]
+    end
+    subgraph schema [Persistence]
+      direction TB
+      Sqla[SQLAlchemy]
+      Sqlm[SQLModel]
+      Alembic[Alembic]
+    end
+    subgraph backend [Backend]
+      direction TB
+      Render[Render]
+      Api[FastAPI]
+      Dock[Docker]
+    end
+    subgraph cloud [Cloud]
+      direction TB
+      S3[S3]
+      Supabase[Supabase]
+    end
+    subgraph frontend [Frontend]
+      direction TB
+      Vercel[Vercel]
+      Spa[React]
+      Ts[TypeScript]
+      Tw[Tailwind]
+    end
   end
-  subgraph backend [Backend]
-    direction TB
-    Render[Render]
-    Api[FastAPI]
-    Uvicorn[Uvicorn]
-    Dock[Docker]
-  end
-  subgraph cloud [Cloud]
-    direction TB
-    S3[S3]
-    Supabase[Supabase]
-  end
-  subgraph frontend [Frontend]
-    direction TB
-    Vercel[Vercel]
-    Spa[React]
-    Ts[TypeScript]
-    Vite[Vite]
-    Tw[Tailwind]
-    Shad[Shadcn]
-  end
+  GHA --- Render
+  GHA --- Vercel
   edge --- backend
   backend --- cloud
   frontend --- backend
   schema --- edge
   schema --- cloud
+  style stack fill:none,stroke:none
 ```
 
 ## Physical Installation Layout

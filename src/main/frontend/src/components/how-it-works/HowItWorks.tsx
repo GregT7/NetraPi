@@ -12,32 +12,20 @@ export default function HowItWorks() {
           How It Works
         </h2>
         <p>
-          This section walks through the live loop on the Pi. Every stop-sign
-          encounter shares one moment: the car approaches the sign, the sign
-          grows in the camera, then it disappears as the car passes it. That
-          approach is the event we look for. After it, the driver either comes
-          to a Complete Stop, a Rolling Stop, or a Run-through Stop. If the Pi
-          can find the approach reliably, it knows when to record and which
-          footage to keep. Unrelated clips would bury those encounters, so we
-          ignore footage that never shows this pattern. The easiest way to see
-          the event is with a short example.
+          This section walks through the live loop on the Pi. Picture turning
+          onto a long street with a stop sign at the end. As you drive closer,
+          the sign grows in the camera, peaks, then drops out of frame when you
+          pass it. That approach is the event NetraPi looks for. At that moment
+          the driver has three choices: a Complete Stop, a Rolling Stop, or a
+          Run-through Stop. If the Pi can spot the approach reliably, it knows
+          when to record and which footage to keep; clips that never show this
+          pattern are ignored.
         </p>
         <p>
-          Imagine this scenario: someone driving a car turns onto a long street
-          where, at the end, there is a stop sign before an intersection. They
-          continue driving toward the sign. As the distance decreases, the size
-          of the stop sign increases from the camera's perspective. Eventually
-          the size hits a peak and then disappears once the car passes it. At
-          this moment, there is a three-pronged fork in the road. The driver
-          can follow the law and stop, slow down a little but keep driving
-          anyway, or drive past the sign without stopping. The three branching
-          outcomes all share the approach of the stop sign. This is the event
-          we need the Pi to look for. The diagram below is that loop: stay in
-          monitoring until an Approach Stop Sign is detected, sample the car's
-          motion for 5 seconds, sort the stop into Complete Stop, Rolling Stop,
-          or Run-through Stop, then return to monitoring. Before we dive into
-          how the Pi finds that approach, we need to discuss some additional
-          processing details.
+          The diagram below is that loop: stay in monitoring until an Approach
+          Stop Sign is detected, sample the car's motion for five seconds,
+          classify the stop, then return to monitoring. Here's how the Pi
+          finds the approach.
         </p>
         <figure>
           <MermaidDiagram chart={EVENT_STATE_CHART} />
@@ -58,17 +46,13 @@ export default function HowItWorks() {
         </p>
         <AreaMotionChart />
         <p>
-          The Pi can algorithmically locate this pattern by constantly
-          searching for exponential growth in area over a short time frame,
-          followed by a steep drop to an empty reading. The point where the
-          area calculation transitions from a global or local maximum to an
-          empty reading is called the "peak." Locating the peak is at the
-          heart of this recipe; that is when we officially have found the
-          approach pattern. Many false peaks show up while driving, though.
-          Each candidate has a series of strict criteria applied to it, which
-          filters out most of them until a single valid peak remains. Finding
-          the approach pattern is not the end of the story. We still need to
-          sort the driver's decision into the 3 bins shown in the diagram.
+          The Pi finds that pattern by watching for a short burst of
+          exponential growth in bounding-box area, then a steep drop to an
+          empty reading. The moment area falls from a local or global maximum
+          to empty is the "peak" — that is the official approach. Many false
+          peaks show up while driving, so each candidate has to pass a strict
+          filter until one valid peak remains. After that, the stop still has
+          to be sorted into the three bins in the diagram.
         </p>
         <figure>
           <img
@@ -83,23 +67,16 @@ export default function HowItWorks() {
           </figcaption>
         </figure>
         <p>
-          At the moment of the peak, we know the driver must make a decision,
-          so we start paying closer attention. Evaluating the motion of the car
-          is the key, which is where the Farneback Optical Flow Algorithm comes
-          in. The algorithm approximates motion by measuring the rate of change
-          in pixel intensity. If pixel intensity changes at a higher rate,
-          whatever is in the image is likely moving faster in real life, and
-          slower deltas mean slower motion. The three decisions have distinct
-          motion profiles: Complete Stop has lower motion scores overall,
-          Rolling Stop has a little more motion, and Run-through Stop has the
-          most (this is simplified for explanation). If we sample the car's
-          motion after an approach is detected, we can compare the live data
-          with previous examples to see which category the event most closely
-          aligns with. The comparisons are driven by k-nearest neighbors
-          (k-NN), which is a good fit for this scenario. That k-NN is
-          multi-stage and uses five features in total. Other features help
-          earlier in the pipeline; the second stage uses just two of those
-          values, shown in the plot below.
+          At the peak, the driver has to decide, so the Pi starts scoring
+          motion with Farneback optical flow: how fast pixel intensity changes
+          is a stand-in for how fast the car is moving. Complete stops look
+          calm, rolling stops have more motion, and run-throughs have the most
+          (simplified, but useful). After the approach, those live motion
+          features are compared to past examples with k-nearest neighbors
+          (k-NN). The full pipeline uses five features across stages; the
+          scatterplot below shows the two values used in the later stage —
+          minimum motion and total sign area — for rolling vs run-through
+          stops.
         </p>
         <ClusterScatter
           points={CLUSTER_POINTS}
@@ -108,12 +85,9 @@ export default function HowItWorks() {
           yLabel="Total Sign Area (%)"
         />
         <p>
-          Finally, the event has been identified. Now we need to wrap things
-          up and record the footage. The Pi records the clip and saves it to
-          the cloud through the cellular hotspot my phone is hosting. The
-          footage is then available on the hosted frontend for anyone curious
-          about my driving. After that, it returns to monitoring and waits for
-          the next approach.
+          Once the stop is classified, the Pi saves the clip and uploads it
+          over a phone hotspot so it shows up in Try It Out. Then it returns
+          to monitoring and waits for the next approach.
         </p>
       </div>
     </section>

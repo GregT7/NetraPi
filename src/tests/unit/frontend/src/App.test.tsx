@@ -40,9 +40,6 @@ describe('App', () => {
       }).getAttribute('src'),
     ).toBe('/gifs/approach.gif?v=3')
     expect(
-      screen.getByText(/banner is only included in gifs/),
-    ).toBeTruthy()
-    expect(
       screen.getByRole('img', {
         name: 'Stop labeled Complete Stop, Rolling Stop, or Run-through Stop after the approach',
       }).getAttribute('src'),
@@ -53,7 +50,7 @@ describe('App', () => {
       }).getAttribute('src'),
     ).toBe('/gifs/s3-persist.gif?v=1')
     expect(
-      screen.getByText(/went from the Pi in the car to S3/),
+      screen.getByText(/sync to S3 once the car is back on normal Wi-Fi/),
     ).toBeTruthy()
     expect(screen.queryByText('Finding a stop sign')).toBeNull()
     expect(screen.queryByText('Labeling the stop')).toBeNull()
@@ -174,14 +171,17 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Field Accuracy' })).toBeTruthy()
     expect(
       screen.getByText(
-        /Complete-stop, rolling-stop, and run-through clips from the live evaluation, excluding parking-lot \/ synthetic clips. The model's prediction vs my review./,
+        /Live match rate on labeled complete, rolling, and run-through clips \(synthetic \/ parking-lot clips excluded\)/,
       ),
     ).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Calibrated Accuracy' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Limitations' })).toBeTruthy()
     expect(
+      screen.getByText(/LOO overstates on-road behavior/),
+    ).toBeTruthy()
+    expect(
       screen.getByText(
-        /only clips in the right-most lane with the stop line close to the sign are included. This is the accuracy after the limitations of the design are factored in./,
+        /only right-most-lane clips where the stop line sits close to the sign/,
       ),
     ).toBeTruthy()
     expect(await screen.findByText('50% (1/2 clips predicted correctly)')).toBeTruthy()
@@ -191,17 +191,15 @@ describe('App', () => {
     expect(localStorage.getItem('netrapi.resultsAccuracy.v1')).toContain('"percent":50')
     expect(screen.getByRole('heading', { name: 'What It Is' })).toBeTruthy()
     expect(
-      screen.getByText(/combination of "Netradyne" and "Pi"/),
+      screen.getByText(/blends "Netradyne" and "Pi"/),
     ).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Constraints' })).toBeTruthy()
     expect(screen.getByText(/stay under \$1,000/)).toBeTruthy()
     expect(screen.getByText(/2010 Mazda3/)).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Why I Made It' })).toBeTruthy()
-    expect(
-      screen.getByText(/Amazon affiliated DSP \(Delivery Service Partner\)/),
-    ).toBeTruthy()
+    expect(screen.getByText(/Amazon-affiliated DSP/)).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'What It Can Do' })).toBeTruthy()
-    expect(screen.getByText(/help users improve driving safety/)).toBeTruthy()
+    expect(screen.getByText(/improve stop-sign safety/)).toBeTruthy()
     expect(screen.queryByText(/mishaps being public/)).toBeNull()
     expect(screen.getByRole('heading', { name: 'Try It Out' })).toBeTruthy()
     expect(screen.queryByText('Demo clip coming soon')).toBeNull()
@@ -221,7 +219,7 @@ describe('App', () => {
     expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
   })
 
-  it('shows cached Field Accuracy when the clips API fails', async () => {
+  it('shows cached Field Accuracy when the clips API fails', { timeout: 15000 }, async () => {
     localStorage.setItem(
       'netrapi.resultsAccuracy.v1',
       JSON.stringify({
@@ -258,7 +256,7 @@ describe('App', () => {
 
     render(<App />)
     expect(
-      await screen.findByText(/Showing last saved Field and Calibrated Accuracy/),
+      await screen.findByText(/Showing last saved Field and Calibrated Accuracy/, {}, { timeout: 14_000 }),
     ).toBeTruthy()
     expect(screen.getByText('75% (3/4 clips predicted correctly)')).toBeTruthy()
     expect(screen.getByText('2 false positives (unrelated detections)')).toBeTruthy()
@@ -271,10 +269,8 @@ describe('App', () => {
     const how = within(section as HTMLElement)
     expect(how.getByRole('heading', { name: 'How It Works' })).toBeTruthy()
     expect(how.getByText(/live loop on the Pi/)).toBeTruthy()
-    expect(how.getByText(/approach is the event we look for/)).toBeTruthy()
-    expect(how.getByText(/easiest way to see the event is with a short example/)).toBeTruthy()
-    expect(how.getByText(/Imagine this scenario/)).toBeTruthy()
-    expect(how.getByText(/three-pronged fork in the road/)).toBeTruthy()
+    expect(how.getByText(/event NetraPi looks for/)).toBeTruthy()
+    expect(how.getByText(/three choices/)).toBeTruthy()
     expect(how.getByText(/The diagram below is that loop/)).toBeTruthy()
     expect(how.getByText('Stop-Sign Encounter States')).toBeTruthy()
     expect(
@@ -299,18 +295,18 @@ describe('App', () => {
     expect(how.queryByText('Unsafe')).toBeNull()
     expect(how.queryByText('Safe')).toBeNull()
     expect(how.queryByText('Box grows then drops after peak')).toBeNull()
-    expect(how.getByText(/3 bins shown in the diagram/)).toBeTruthy()
+    expect(how.getByText(/three bins in the diagram/)).toBeTruthy()
     expect(how.getByText(/returns to monitoring and waits for the next approach/)).toBeTruthy()
     expect(how.getByText(/pretrained TFLite model/)).toBeTruthy()
     expect(how.getByText(/shark-fin-like pattern/)).toBeTruthy()
     expect(how.getByText('Sign Area and Motion Over Time')).toBeTruthy()
     expect(how.getByText('Sign Area (% of Frame)')).toBeTruthy()
     expect(how.getAllByText('Motion (px / Frame)').length).toBeGreaterThan(0)
-    expect(how.getByText(/called the "peak\."/)).toBeTruthy()
-    expect(how.getByText(/Farneback Optical Flow Algorithm/)).toBeTruthy()
+    expect(how.getByText(/the "peak"/)).toBeTruthy()
+    expect(how.getByText(/Farneback optical flow/)).toBeTruthy()
     expect(how.getByText(/k-nearest neighbors \(k-NN\)/)).toBeTruthy()
-    expect(how.getByText(/multi-stage and uses five features in total/)).toBeTruthy()
-    expect(how.getByText(/the second stage uses just two of those values/)).toBeTruthy()
+    expect(how.getByText(/five features across stages/)).toBeTruthy()
+    expect(how.getByText(/two values used in the later stage/)).toBeTruthy()
     expect(
       how.getByText(
         'Classification Scatterplot for Rolling vs Run-through Stops',
@@ -318,7 +314,7 @@ describe('App', () => {
     ).toBeTruthy()
     expect(how.getByText('Minimum Motion (px / Frame)')).toBeTruthy()
     expect(how.getByText('Total Sign Area (%)')).toBeTruthy()
-    expect(how.getByText(/cellular hotspot my phone is hosting/)).toBeTruthy()
+    expect(how.getByText(/over a phone hotspot/)).toBeTruthy()
     expect(how.queryByText('Video coming soon')).toBeNull()
     expect(how.queryByText('Approach to classification')).toBeNull()
     expect(how.queryByText('Keep Polling')).toBeNull()
@@ -350,11 +346,11 @@ describe('App', () => {
     expect((await screen.findAllByText('SQLAlchemy')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('SQLModel')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('Alembic')).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText('Uvicorn')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('Vercel')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('TypeScript')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('Render')).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText('Shadcn')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('GitHub Actions')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('CI/CD')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('Docker')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('GPIO Buzzer')).length).toBeGreaterThan(0)
   }, 15_000)

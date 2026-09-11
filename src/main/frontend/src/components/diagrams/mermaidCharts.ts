@@ -29,45 +29,52 @@ export const HARDWARE_CHART = `flowchart LR
   style hub fill:none,stroke:none
   style extras fill:none,stroke:none`
 
-export const SOFTWARE_CHART = `flowchart LR
-  subgraph edge [Edge Pi]
-    direction TB
-    Capture@{ icon: "logos:opencv", form: "rounded", label: "OpenCV" }
-    Detect@{ icon: "logos:tensorflow", form: "rounded", label: "TFLite Coral" }
-    LocalDb@{ icon: "logos:sqlite", form: "rounded", label: "SQLite" }
+export const SOFTWARE_CHART = `%%{init: {"flowchart": {"nodeSpacing": 18, "padding": 8, "rankSpacing": 32}}}%%
+flowchart TB
+  subgraph cicd [CI/CD]
+    GHA@{ icon: "logos:github-actions", form: "rounded", label: "GitHub Actions" }
   end
-  subgraph schema [Persistence]
-    direction TB
-    Sqla@{ icon: "logos:sqlalchemy", form: "rounded", label: "SQLAlchemy" }
-    Sqlm@{ icon: "logos:sqlmodel", form: "rounded", label: "SQLModel" }
-    Alembic@{ icon: "logos:python", form: "rounded", label: "Alembic" }
+  subgraph stack[" "]
+    direction LR
+    subgraph edge [Edge Pi]
+      direction TB
+      Capture@{ icon: "logos:opencv", form: "rounded", label: "OpenCV" }
+      Detect@{ icon: "logos:tensorflow", form: "rounded", label: "TFLite Coral" }
+      LocalDb@{ icon: "logos:sqlite", form: "rounded", label: "SQLite" }
+    end
+    subgraph schema [Persistence]
+      direction TB
+      Sqla@{ icon: "logos:sqlalchemy", form: "rounded", label: "SQLAlchemy" }
+      Sqlm@{ icon: "logos:sqlmodel", form: "rounded", label: "SQLModel" }
+      Alembic@{ icon: "logos:python", form: "rounded", label: "Alembic" }
+    end
+    subgraph backend [Backend]
+      direction TB
+      Render@{ icon: "logos:render", form: "rounded", label: "Render" }
+      Api@{ icon: "logos:fastapi", form: "rounded", label: "FastAPI" }
+      Dock@{ icon: "logos:docker-icon", form: "rounded", label: "Docker" }
+    end
+    subgraph cloud [Cloud]
+      direction TB
+      S3@{ icon: "logos:aws-s3", form: "rounded", label: "S3" }
+      Supabase@{ icon: "logos:supabase-icon", form: "rounded", label: "Supabase" }
+    end
+    subgraph frontend [Frontend]
+      direction TB
+      Vercel@{ icon: "logos:vercel", form: "rounded", label: "Vercel" }
+      Spa@{ icon: "logos:react", form: "rounded", label: "React" }
+      Ts@{ icon: "logos:typescript", form: "rounded", label: "TypeScript" }
+      Tw@{ icon: "logos:tailwindcss", form: "rounded", label: "Tailwind" }
+    end
   end
-  subgraph backend [Backend]
-    direction TB
-    Render@{ icon: "logos:render", form: "rounded", label: "Render" }
-    Api@{ icon: "logos:fastapi", form: "rounded", label: "FastAPI" }
-    Uvicorn@{ icon: "logos:uvicorn", form: "rounded", label: "Uvicorn" }
-    Dock@{ icon: "logos:docker-icon", form: "rounded", label: "Docker" }
-  end
-  subgraph cloud [Cloud]
-    direction TB
-    S3@{ icon: "logos:aws-s3", form: "rounded", label: "S3" }
-    Supabase@{ icon: "logos:supabase-icon", form: "rounded", label: "Supabase" }
-  end
-  subgraph frontend [Frontend]
-    direction TB
-    Vercel@{ icon: "logos:vercel", form: "rounded", label: "Vercel" }
-    Spa@{ icon: "logos:react", form: "rounded", label: "React" }
-    Ts@{ icon: "logos:typescript", form: "rounded", label: "TypeScript" }
-    Vite@{ icon: "logos:vitejs", form: "rounded", label: "Vite" }
-    Tw@{ icon: "logos:tailwindcss", form: "rounded", label: "Tailwind" }
-    Shad@{ icon: "logos:shadcn", form: "rounded", label: "Shadcn" }
-  end
+  GHA --- Render
+  GHA --- Vercel
   edge --- backend
   backend --- cloud
   frontend --- backend
   schema --- edge
-  schema --- cloud`
+  schema --- cloud
+  style stack fill:none,stroke:none`
 
 export const EVENT_STATE_CHART = `stateDiagram-v2
   [*] --> Monitoring

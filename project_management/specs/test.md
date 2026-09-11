@@ -1,7 +1,7 @@
 # NetraPi Test Plan (Updated for Full MVS Coverage)
 
 ## 1. Purpose
-Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, deployment, the public portfolio clip list/playback (Sprint 9), and GitHub Actions CI/CD (TP-72). Live Field/Calibrated Accuracy is TP-71.
+Verify that NetraPi satisfies the MVS through staged, repeatable tests across the edge device, local persistence, cloud storage, backend API, deployment, the public portfolio clip list/playback (Sprint 9), GitHub Actions CI/CD (TP-72), systemd manual start/stop (TP-73), and the 10-hour fixed-config collection with labels (TP-74). Live Field/Calibrated Accuracy is TP-71.
 
 ## 2. How to Use This Plan
 This document is ordered by **sprint section** in this file (Sprint 1–5, then D–E). Earlier tests should be executable before later layers exist. A separate `sprint.md` schedule file was removed; sprint goals live in these section headers until reintroduced.
@@ -1649,11 +1649,57 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 
 ---
 
+# Sprint 12 — systemd runtime and 10-hour collection
+
+*Tests: TP-73 to TP-74*
+
+> **Focus:** Close the remaining MVS gaps that units and CI cannot prove: the edge process as a **manual** systemd service (not enabled on boot), then a **field** 10-hour collection with frozen config, trip+clip upload, and ground-truth labels. No new `src/tests/integration` harnesses. Drain mechanics stay TP-61. Frontend overview / GitHub / accuracy stay on Vitest (TP-66 / TP-71). Offline boot stays TP-58.
+
+### TP-73: systemd manual start and stop
+- **Description**: Verifies the edge capture process starts and stops as `netrapi-edge.service` on the Raspberry Pi and does not start automatically on boot.
+- **Test level**: System
+- **Verification approach**: Demonstration
+- **Reqs**: M-10.10
+- **Prerequisites**
+  - Unit file `src/main/edge/netrapi-edge.service` installed (`sudo cp` to `/etc/systemd/system/` and `daemon-reload` if not already).
+  - Do **not** `systemctl enable netrapi-edge`.
+- **Steps**
+  1. `sudo systemctl start netrapi-edge`.
+  2. Confirm the service is active (`systemctl status` / `journalctl -u netrapi-edge`) and the capture process is running.
+  3. `sudo systemctl stop netrapi-edge`.
+  4. Confirm the service is inactive and capture has stopped.
+  5. `systemctl is-enabled netrapi-edge` — must not report `enabled`.
+- **Pass criteria**
+  - Start and stop by hand succeed.
+  - The unit is not enabled on boot (no capture after a reboot until `systemctl start`).
+  - Evidence: unit file path `src/main/edge/netrapi-edge.service` plus Pi status / journal screenshots.
+
+### TP-74: 10-hour fixed-config collection and labels
+- **Description**: Verifies at least 10 hours of driving footage after the edge system is operational, with a frozen ML model and config, full-session trips and event clips uploaded to S3, and manual ground-truth labels used for accuracy evaluation.
+- **Test level**: Acceptance
+- **Verification approach**: Inspection + Demonstration
+- **Reqs**: M-4.10, M-4.11, M-4.12, M-4.21, M-4.30, M-4.31
+- **Prerequisites**
+  - Edge operational (systemd or equivalent start; TP-73 may be used).
+  - Trip recording enabled; drain implemented (TP-61).
+  - Do not change detector, kNN joblibs, or `src/main/edge/config` JSON for the collection window.
+- **Steps**
+  1. Record driving until `driving_session` / trip-segment duration sums to **≥10 hours**.
+  2. Confirm config and models were not changed during that window (same fingerprint / files).
+  3. Run `--drain both` (or `clips` then `trips`) per TP-61 so full-session MP4s and event clips are in S3.
+  4. Confirm event clips and metadata belong to those same sessions (alongside trips).
+  5. Manually assign ground-truth categories (run-through, rolling stop, complete stop, unrelated as needed).
+  6. Confirm Field / Calibrated Accuracy on the site is computed from that labeled set (TP-71).
+- **Pass criteria**
+  - ≥10 hours of footage with a fixed model and configuration.
+  - Full-session trips in private S3; event clips retained with that footage.
+  - Manual labels exist and support the evaluation metrics on the frontend.
+  - Evidence: session/trip duration totals, S3 keys, and labeled public clips — not a pytest harness.
+
+---
+
 ## 8. Coverage Notes
-This plan currently covers through **Sprint 11** (GitHub Actions CI/CD, TP-72) plus Sprint 10 clip telemetry sidecars, clip review flags, and live Field/Calibrated Accuracy (TP-71). Sprint 9 frontend is **partial** (Try-it-out list/play unit tests; hover cards are unit-only, not a TP). Deferred for later test generation:
-- remaining frontend / portfolio UI tests
-- 10-hour collection and model-evaluation publication tests
-- dedicated offline capture/detection verification for M-5.10
+This plan currently covers through **Sprint 12** (systemd TP-73; 10-hour collection and labels TP-74). Sprint 9 frontend TPs are the public list/play/accuracy units (hover cards stay unit-only, not a TP). M-5.10 is TP-58 (plus `test_boot_health.py`); there is no second offline-drive TP.
 
 Covered now:
 - constraints and edge bring-up (earlier sprints)
@@ -1668,5 +1714,6 @@ Covered now:
 - Sprint 9: public clip list + 2-minute mint, 20 live URLs, 10/min/IP, real-world Try-it-out list with Field/Calibrated Accuracy, live Field/Calibrated Results (`test_public_clip.py`, `TryItOut.test.tsx`, `App.test.tsx`)
 - Sprint 10: per-clip S3 directory (`clip.mp4` + `areas.json` + `motion.json` + `transitions.json`), public mint inlines sidecar JSON, Try-it-out detailed/simple toggle (`test_playback_json.py`, `test_s3_upload.py`, `TryItOut.test.tsx`)
 - Sprint 11: GitHub Actions lint + unit tests + frontend build on every PR/push; Render hook + Vercel CLI deploy on `main` only after those jobs pass; pipeline health curls (`/health`, `/api/public/clips`, Vercel homepage)
+- Sprint 12: systemd manual start/stop not on boot (TP-73); ≥10 hours fixed-config driving, `--drain both`, labels for Field/Calibrated Accuracy (TP-74)
 
-**TP range:** TP-01 through TP-72. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).
+**TP range:** TP-01 through TP-74. **Ad-hoc:** AT-7.1, AT-7.2, AT-7.3 (Sprint 7).

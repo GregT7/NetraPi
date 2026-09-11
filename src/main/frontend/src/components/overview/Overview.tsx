@@ -77,7 +77,7 @@ function ArchitectureFigures() {
         </figcaption>
       </figure>
       <figure className="mx-auto max-w-6xl">
-        <div className="text-2xl">
+        <div className="text-xl [&_svg]:w-full">
           <MermaidDiagram chart={SOFTWARE_CHART} />
         </div>
         <figcaption className="mt-2 text-center text-zinc-400">
@@ -100,25 +100,18 @@ export default function Overview() {
           <div className="mx-auto max-w-5xl space-y-3">
             <h3 className="text-2xl font-medium text-amber-400">What It Is</h3>
             <p>
-              NetraPi is a smart dashcam I built using a Raspberry Pi, Coral
-              USB TPU, and some other pieces of hardware. The name is a
-              combination of "Netradyne" and "Pi". The "Pi" comes from the
-              typical naming scheme used with RaspberryPi affiliated products
-              and projects. Netradyne on the other hand, refers to a company
-              whose main product is an AI powered camera that autonomously
-              detects unsafe driving events. Amazon forces delivery drivers to
-              be monitored by this camera so that safety can be enforced at
-              scale.
+              NetraPi is a smart dashcam I built with a Raspberry Pi, a Coral
+              USB TPU, and a few other pieces of hardware. The name blends
+              "Netradyne" and "Pi": Netradyne makes AI cameras that flag
+              unsafe driving (Amazon delivery vans use them), and "Pi"
+              follows the usual Raspberry Pi project naming style.
             </p>
             <p>
-              NetraPi mimics a small subset of the Netradyne cameras
-              functionality. Specifically, it analyzes dash cam footage to
-              detect unsafe behavior when passing a stop sign in real time. The
-              system is comprised of several subsystems: the edge device,
-              frontend, backend, local/cloud database, and cloud file storage.
-              These systems work in tandem such that unsafe events are
-              recorded, uploaded to the cloud, and are accessible via a public
-              website for anyone to view.
+              It mimics a small slice of a Netradyne camera's job: analyzing
+              dashcam footage in real time to catch unsafe stop-sign behavior.
+              An edge device, frontend, backend, database, and cloud storage
+              work together so those events get recorded, uploaded, and shown
+              on this public site.
             </p>
           </div>
           <div className="mx-auto max-w-5xl space-y-3">
@@ -141,19 +134,13 @@ export default function Overview() {
         <div className="mx-auto max-w-5xl space-y-3">
           <h3 className="text-2xl font-medium text-amber-400">Why I Made It</h3>
           <p>
-            I wanted to create a machine-learning based project that also
-            employed a variety of different technologies to improve my resume.
-            The idea was inspired by my time working as a delivery driver for
-            an Amazon affiliated DSP (Delivery Service Partner). The job
-            responsibilities entailed safe driving which is strictly enforced
-            through AI powered cameras mounted inside the cabin. The cameras
-            keep drivers honest and while it's a pain to deal with, they do
-            improve the driving competency of employees that stick around. I
-            learned to appreciate my new found discipline while actively
-            working but found myself losing some skills once the season was
-            over. Recognizing the technical depth behind the cameras, I thought
-            it would be a good idea to replicate the system for my career and
-            driving competency.
+            I wanted a machine-learning project that also stretched across
+            hardware, cloud, and a real product surface. The idea came from
+            driving for an Amazon-affiliated DSP, where cabin AI cameras
+            enforce safe stops. The cameras are annoying, but they do sharpen
+            habits if you stick around. After the season ended, some of that
+            discipline faded, and rebuilding a smaller version of the system
+            felt like a way to keep the skills and grow as an engineer.
           </p>
         </div>
 
@@ -161,27 +148,22 @@ export default function Overview() {
           <div className="mx-auto max-w-5xl space-y-3">
             <h3 className="text-2xl font-medium text-amber-400">What It Can Do</h3>
             <p>
-              The goal of the NetraPi system is to help users improve driving
-              safety in a time-efficient and convenient manner. The system
+              NetraPi helps improve stop-sign safety without extra busywork. It
               automatically detects unsafe stops and uploads the footage to the
-              cloud. Within 5 seconds of the event occurring, a small speaker
-              will emit a noise to notify the driver. Real time feedback raises
-              the awareness of poor performance in real time, enabling quicker
-              correction of unsafe behavior. Lastly, anyone can visit the
-              website to view clips of my driving in the "Try It Out" section.
-              There is a "Detailed Analysis" section there that displays
-              several graphs that shed deeper insight into how the system is
-              actually working for those curious.
+              cloud. Within five seconds of an event, a small speaker alerts the
+              driver so the behavior can be corrected immediately. Anyone can
+              visit this site to watch clips in Try It Out; Detailed Analysis
+              shows the graphs behind each classification.
             </p>
           </div>
           <GifSlot
             alt="Stop labeled Complete Stop, Rolling Stop, or Run-through Stop after the approach"
-            caption="The system detects the car approaching a stop sign which triggers a 5 second period where motion data is sampled. This motion data is used to classify the stop into 3 types: Complete Stop, Rolling Stop, and Run-through Stop. The banner is only included in gifs and is not part of the normal flow."
+            caption="When the car approaches a stop sign, NetraPi samples motion for five seconds and classifies the stop as Complete Stop, Rolling Stop, or Run-through Stop."
             src="/gifs/classification.gif?v=1"
           />
           <GifSlot
             alt="Clip saved locally and uploaded to S3"
-            caption="I turn on a phone hotspot, wave at the camera in a remote area, then go home, join regular Wi-Fi, and open the same clip from the cloud, showing it went from the Pi in the car to S3."
+            caption="Clips save on the Pi over a phone hotspot, then sync to S3 once the car is back on normal Wi-Fi."
             src="/gifs/s3-persist.gif?v=1"
           />
         </div>
@@ -279,30 +261,18 @@ function Results() {
         <p>
           For field testing I drove a real car for a couple of hours, let the
           Pi classify stop-sign approaches, uploaded the clips, and labeled
-          them by hand. Field Accuracy is the match rate on those complete,
-          rolling, and run-through clips. Parking-lot recordings are tagged
-          synthetic and left out, so the number reflects real roads rather
-          than the mock-sign setup. Field Accuracy is currently {fieldPhrase}.
-          That score is not very good, especially relative to the LOO's accuracy rating.
-          
-          After some investigation, it was found that there is a misalignment with
-          the training dataset and how things actually present in real life.
-          Most of the training clips were recorded in a parking lot, using a
-          mock stop sign smaller than those on real roads. The passenger side
-          of the car passed very close to the sign, and the car came to a full
-          stop immediately after. The sign leaves the
-          frame only a moment before the car stops. Motion sampling starts
-          the instant the sign disappears, so the motion features look busier
-          than a real complete stop. On the road the signs are larger, the
-          stop line is farther away, and extra lanes are common, so that
-          close-up timing almost never happens.
+          them by hand. Field Accuracy is currently {fieldPhrase} — well below
+          the LOO number. The gap mostly comes from training geometry: most
+          training clips used a small mock sign in a parking lot, with the car
+          passing very close and stopping right after the sign left the frame.
+          On real roads the signs are larger, the stop line is farther away,
+          and extra lanes are common, so that close-up timing almost never
+          happens.
         </p>
         <p>
-          Calibrated Accuracy uses the same labeled clips as Field Accuracy,
-          but only the right-most-lane approaches where the white stop line
-          sits close to the sign. That subset is currently {idealPhrase}. It
-          is the score after the design's operating limits are factored in,
-          not a claim about every lane on the road.
+          Calibrated Accuracy on the same labeled set, limited to right-most
+          lane approaches with the stop line close to the sign, is currently{" "}
+          {idealPhrase}.
         </p>
       </div>
 
@@ -315,13 +285,13 @@ function Results() {
 
       <LiveAccuracyBlock
         block={field}
-        definition="Complete-stop, rolling-stop, and run-through clips from the live evaluation, excluding parking-lot / synthetic clips. The model's prediction vs my review."
+        definition="Live match rate on labeled complete, rolling, and run-through clips (synthetic / parking-lot clips excluded)."
         ready={liveReady || snapshot != null}
         title="Field Accuracy"
       />
       <LiveAccuracyBlock
         block={ideal}
-        definition="The same comparison as Field Accuracy, but only clips in the right-most lane with the stop line close to the sign are included. This is the accuracy after the limitations of the design are factored in."
+        definition="Same as Field Accuracy, but only right-most-lane clips where the stop line sits close to the sign."
         emptyLabel="No tagged calibrated clips yet"
         ready={liveReady || snapshot != null}
         title="Calibrated Accuracy"
@@ -330,13 +300,12 @@ function Results() {
       <div className="space-y-3">
         <h4 className="text-xl font-medium text-amber-400">Limitations</h4>
         <p>
-          LOO overstates how the model behaves on real roads because the
-          training set was mostly parking-lot geometry. Field Accuracy is the
-          live score on public labeled stop-type clips that are not tagged
-          synthetic (unrelated detections are counted separately as false
-          positives). Calibrated Accuracy is a small subset. Live numbers come from
-          the public clip list and are saved in the browser so they still
-          appear if the API is down.
+          LOO overstates on-road behavior because training was mostly
+          parking-lot geometry. Field Accuracy is the honest live number;
+          Calibrated Accuracy is a smaller operating-envelope subset. Unrelated
+          detections are tracked separately as false positives. Live figures
+          come from the public clip list and are cached in the browser if the
+          API is down.
         </p>
       </div>
     </div>

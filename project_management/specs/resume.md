@@ -1,43 +1,40 @@
 # Resume Support Document - NetraPi
 
 ## What This Document Is
-This document tracks the resume-ready accomplishments of the NetraPi project and helps confirm that each claim is backed by implemented, tested, and demonstrated work. It is the bridge between the project proposal (`pop.md`) and the final concise resume bullets.
+This document tracks the resume-ready accomplishments of the NetraPi project and confirms that each claim is backed by implemented, tested, and demonstrated work. It is the bridge between the project proposal (`pop.md`) and the concise bullets in Section 3.
 
-This file will be used to:
-- map proposed outcomes to concrete implementation evidence,
-- maintain ongoing/new accomplishment bullets as work evolves,
-- and produce a final concise set of polished resume points.
+**Still open vs MVS:** TP-74 (10+ hours of driving with a frozen config, trip+clip drain to S3, and labels for evaluation). Do not put that claim in Section 3 until TP-74 passes.
 
 ## Section 1: Initial Resume Bullets to Fulfill (Derived from `pop.md`)
-These are the initial target bullets derived from the project overview proposal and stack definitions.
+These are the original target bullets from the proposal and stack definitions. They are not a claim that every line is done.
 
 - Built an end-to-end stop-sign event detection system that runs from Raspberry Pi 5 at the edge to cloud services for storage and dashboard reporting.
 - Used Python, TensorFlow Lite (`tflite-runtime`), and Google Coral USB TPU to classify stop-sign encounters (run-through, rolling stop, complete stop) in real time on-device.
 - Built the video pipeline with OpenCV and SQLite for local event metadata, then uploaded clips one at a time when online via a FastAPI backend (presigned S3 PUT + Postgres metadata; no offline upload queue).
 - Added a synchronous edge boot health check (Coral TPU, Wi-Fi/internet, Render wake, authenticated `/ready`) that selects online or offline capture, keeps Render awake while online, and later drains leftover clips/trips on Wi-Fi (with optional local delete after a successful drain).
-- Collected 10+ hours of driving footage after system bring-up with fixed model settings, manual ground-truth labeling, and model accuracy evaluation.
+- Collected 10+ hours of driving footage after system bring-up with fixed model settings, manual ground-truth labeling, and model accuracy evaluation. **(TP-74 — not passed yet)**
 - Deployed a Dockerized FastAPI backend on Render for API key authentication, presigned upload URL issuance, metadata ingestion to Postgres, and analytics/video endpoints.
 - Stored videos in private AWS S3 buckets with signed URL access, and stored event metadata in Supabase PostgreSQL with linked S3 object paths.
 - Public demo playback lets visitors browse and play real collected event clips through short-lived signed GET URLs (2-minute TTL), capped at 20 concurrent signatures and rate-limited per client IP, so they can engage with actual footage while unbounded public GETs are less likely to produce a large AWS S3 bill.
-- Try-it-out detailed playback (default) will replay the stop-sign state machine next to area/motion graphs synchronized to the clip, using JSON sidecars (`areas.json`, `motion.json`, `transitions.json`) stored beside each video in S3.
+- Try-it-out detailed playback (default) replays the stop-sign state machine next to area/motion graphs synchronized to the clip, using JSON sidecars (`areas.json`, `motion.json`, `transitions.json`) stored beside each video in S3.
 - Deployed a React + Tailwind dashboard on Vercel with event browsing, clip selection, accuracy metrics, and at least one evaluation visualization.
 - Set up GitHub Actions for lint, test, build, and deployment checks, and ran the edge app as a `systemd` service that is started and stopped manually (not on boot).
 
-## Section 2: Ongoing / New Bullet Points
-This section captures work completed or in progress beyond Section 1 targets.
+## Section 2: Completed work (evidence-backed)
+Work that is implemented and demonstrated. Hardware, sprints through CI/CD, and public playback are in; the 10-hour collection campaign is not.
 
-- Designed the full in-car hardware stack (Raspberry Pi 5, Coral USB TPU, USB camera, portable battery) and manually installed it in a 2010 Mazda3 with routed wiring and reversible mounting.
-- Iterated 3D-printed windshield camera mount prototypes and installed the final mount with screws and adhesive for stable, road-legal forward-facing video.
-- Produced hardware and software architecture diagrams plus Mermaid UML/flow documentation for the recording, inference, and event-clip pipeline (`event_clip_pipeline.md`).
-- Got Coral TPU inference working on Raspberry Pi by resolving TensorFlow Lite dependency and runtime issues (`tflite-runtime` instead of PyCoral).
-- Switched from PiCam to a USB camera so capture libraries stay compatible with the edge inference stack.
-- Validated live on-device object detection and inference timing with dedicated edge test scripts (TPU smoke tests, live USB inference, realtime detection loop).
-- Prototyped rolling-buffer event-clip extraction and multi-hour in-car recording endurance with OpenCV-based test scripts and recorded pass evidence.
-- Added real-time audible feedback with a GPIO buzzer that triggers when an unsafe stop-sign event is detected.
-- Defined requirements and acceptance tests in `mvs.md` and `test.md` (sprint sections through E), including narrowing scope to stop-sign events and model-accuracy evaluation.
-- Served real collected event clips in the public portfolio through short-lived signed GET URLs (2-minute TTL), capped at 20 concurrent signatures and rate-limited per client IP, so visitors can engage with actual footage while unbounded public GETs are less likely to produce a large AWS S3 bill.
+- Designed the in-car hardware stack (Raspberry Pi 5, Coral USB TPU, USB camera, portable battery) and installed it in a 2010 Mazda3 with reversible mounts and portable-battery power only.
+- Iterated 3D-printed windshield camera mount prototypes and installed a road-legal forward-facing mount.
+- Ran Coral TPU inference on the Pi with `tflite-runtime` (not PyCoral) and switched from PiCam to USB camera for library compatibility.
+- Built continuous capture with a rolling buffer, stop-sign classification (complete / rolling / run-through), GPIO buzzer feedback, SQLite event metadata, and trip-segment recording.
+- Added synchronous boot health (TPU smoke, Wi-Fi/internet, Render `/health`, authenticated `/ready`), one-way online/offline capture, keep-alive, and `--drain clips|trips|both` with optional `--delete-uploaded`.
+- Deployed FastAPI on Render (Docker, API key ingest, presigned S3 PUT/GET, Alembic to Supabase). Objects stay in a private S3 bucket; the Pi holds no AWS or Postgres credentials.
+- Shipped the public SPA on Vercel (`netrapi.vercel.app`): real-world clip list, 2-minute signed playback, mint caps, detailed vs simple playback, sidecar JSON, Field vs Calibrated Accuracy vs manual labels.
+- GitHub Actions runs oxlint, Vitest, pytest unit tests, and a frontend build on every update; `main` deploys Render then Vercel only when those jobs pass, with `/health`, public clips, and homepage curls as the gate (TP-72).
+- Defined requirements and tests in `mvs.md` / `test.md` (TP-01–74). systemd start/stop without enable-on-boot is TP-73.
 
 ## Section 3: Final Concise Resume Points
-This section contains the polished final set intended for direct resume use, written to be concise and high signal.
+Use these on a resume. Do not add the 10-hour collection line until TP-74 passes.
 
-- to be determined...
+- Built a real-time stop-sign behavior classifier on Raspberry Pi 5 + Coral USB TPU (OpenCV, TFLite, SQLite) that labels complete, rolling, and run-through stops on-device.
+- Shipped FastAPI + Docker on Render, private S3 + Supabase Postgres, and a React/TypeScript/Tailwind SPA on Vercel, with GitHub Actions CI/CD gating deploys
