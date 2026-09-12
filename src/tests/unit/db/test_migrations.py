@@ -9,6 +9,7 @@ from sqlmodel import select
 import db.database as database
 from db.database import get_session, init_engine
 from db.models import (
+    BuzzerConfig,
     ClassificationType,
     Clip,
     ClipFlag,
@@ -49,6 +50,9 @@ def test_upgrade_head_seeds_master_config_and_types(sqlite_url: str) -> None:
         health = session.exec(
             select(HealthConfig).where(HealthConfig.master_config_id == master.id)
         ).one()
+        buzzer = session.exec(
+            select(BuzzerConfig).where(BuzzerConfig.master_config_id == master.id)
+        ).one()
     assert "complete-stop" in values
     assert "rolling-stop" in values
     assert "run-through" in values
@@ -60,6 +64,7 @@ def test_upgrade_head_seeds_master_config_and_types(sqlite_url: str) -> None:
     }
     assert health.render_wait_s == 90
     assert health.wlan_interface == "wlan0"
+    assert buzzer.play_on_safe is True
 
 
 def test_upgrade_hides_non_real_world_clips(sqlite_url: str) -> None:
