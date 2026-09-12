@@ -650,29 +650,28 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - **`COMPLETE_STOP`** produces a clip **only** when `record_safe_events = true`; otherwise no clip.
   - Each saved clip is a playable MP4 with pre/post footage; buffers clear and `clip_active` is false after write.
 
-### TP-27: Audible feedback on unsafe stop-sign event
-- **Description**: Verifies the real edge pipeline emits audible feedback when a stubbed rolling-stop or run-through `DrivingEvent` is evaluated, within timing constraints (camera and EventManager mocked; real `Buzzer` only).
+### TP-27: Audible feedback on classified stop-sign event
+- **Description**: Verifies the real edge pipeline emits coded audible feedback when a stubbed complete-stop, rolling-stop, or run-through `DrivingEvent` is evaluated, within timing constraints (camera and EventManager mocked; real `Buzzer` only).
 - **Test level**: System
 - **Verification approach**: Demonstration + Test
 - **Reqs**: M-3.30, M-3.31
 - **Prerequisites**
   - TP-15 passed (buzzer tones validated on GPIO)
-  - Buzzer wired (BCM **18**); `buzzer.json` with `play_on.unsafe=true`
+  - Buzzer wired (BCM **18**); `buzzer.json` with `play_on.unsafe=true` and `play_on.safe=true`
   - Coral USB TPU plugged in — `build_pipeline` loads the edgetpu `.tflite` via `Detector.load()` even though EventManager is stubbed (`needs_detection=False`; no live inference)
   - No USB camera required (harness mocks the camera)
   - Test entry point: `src/tests/integration/tp_27/tp_27_stubbed_event_buzzer_integration.py`
 - **Steps**
   1. On the Pi (Coral attached), run `python src/tests/integration/tp_27/tp_27_stubbed_event_buzzer_integration.py` (builds real pipeline + real `Buzzer`; mocks camera; stubs `EventManager`).
-  2. Confirm an audible beep for stubbed **`ROLLING_STOP`**; note evaluate→beep latency printed by the harness.
-  3. Confirm an audible beep for stubbed **`RUN_THROUGH`**; note latency.
-  4. Confirm **no** beep for stubbed **`COMPLETE_STOP`** (default `play_on.safe=false`).
+  2. Confirm **two** audible pulses for stubbed **`ROLLING_STOP`**; note evaluate→beep latency printed by the harness.
+  3. Confirm **three** audible pulses for stubbed **`RUN_THROUGH`**; note latency.
+  4. Confirm **one** audible pulse for stubbed **`COMPLETE_STOP`** (`play_on.safe=true`).
 - **Pass criteria**
-  - Audible feedback is produced for **`ROLLING_STOP`** and **`RUN_THROUGH`**.
-  - Each unsafe beep occurs within **10 seconds** of the stubbed `evaluate`.
-  - No beep for **`COMPLETE_STOP`** under default `play_on`.
+  - Audible feedback is produced for **`COMPLETE_STOP`** (1), **`ROLLING_STOP`** (2), and **`RUN_THROUGH`** (3).
+  - Each classification beep sequence starts within **10 seconds** of the stubbed `evaluate`.
 
 ### TP-28: In-car E2E classify + beep + clip (edge pipeline)
-- **Description**: End-to-end in-vehicle soak on the **fully integrated edge pipeline** (not the AT-3.4 bench, not stubbed events): one complete stop, one rolling stop, and one run-through at stop signs. Confirms classification labels match operator intent, the buzzer fires for unsafe events only, and evidence clips are saved for unsafe events.
+- **Description**: End-to-end in-vehicle soak on the **fully integrated edge pipeline** (not the AT-3.4 bench, not stubbed events): one complete stop, one rolling stop, and one run-through at stop signs. Confirms classification labels match operator intent, the buzzer uses coded pulses (1/2/3) for each class, and evidence clips are saved for unsafe events.
 - **Test level**: System
 - **Verification approach**: Demonstration + Test
 - **Reqs**: M-3.13, M-3.20, M-3.30, M-3.31, M-4.12, M-4.20
@@ -686,12 +685,12 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   1. Mount and power the system in the vehicle; clips land under `clips_dir/tp_28/`.
   2. On the Pi, run `python src/tests/integration/tp_28/tp_28_e2e_classify_beep_clip_integration.py` (real Detector + EventManager + Buzzer + Recorder; no stubs / no CLI flags).
   3. For each of three fixed phases, focus the preview window and press **SPACE** to arm, then perform **complete stop**, **rolling stop**, and **run-through** in that order. Classifications before SPACE are ignored (no beep/clip).
-  4. Confirm console classification matches the intended maneuver; listen for beep on unsafe phases.
+  4. Confirm console classification matches the intended maneuver; listen for coded beeps (1 complete / 2 rolling / 3 run-through).
   5. Inspect saved clips under `clips_dir/tp_28/` after unsafe encounters.
 - **Pass criteria**
   - All three encounters complete without crash or camera/TPU stall.
   - Classification labels match operator intent for complete stop, rolling stop, and run-through.
-  - Buzzer activates for **rolling stop** and **run-through** within **10 seconds** of each unsafe event; **no** beep for the complete stop (`play_on.safe=false`).
+  - Buzzer activates within **10 seconds** of each classification: **1** pulse for complete stop, **2** for rolling stop, **3** for run-through (`play_on.safe=true`).
   - An evidence clip is saved for each unsafe event (rolling stop and run-through); no clip for the complete stop (`record_safe_events=false`).
   - Evidence: harness console log (classify / latency / clip paths), clips directory listing (or clip files).
 
@@ -1305,11 +1304,11 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Steps**
   1. On the Pi (parked / driveway is fine), run `python src/tests/integration/at_7_2/at_7_2_camera_stubbed_events_deployed_cloud.py`.
   2. Click preview for focus. For each phase, press **SPACE**; the stub fires complete stop, then rolling stop, then run-through.
-  3. Confirm beep + clip for unsafe phases only; complete stop has neither (metadata still persists).
+  3. Confirm coded beeps on all three phases (1/2/3) and clip + upload for unsafe phases only; complete stop has no clip (metadata still persists).
   4. Confirm three SQLite event rows (complete-stop + two unsafe); unsafe clips have `s3_stored` true.
 - **Pass criteria**
   - Preview runs; SPACE arms each phase; stub injects the intended event type.
-  - Beep + clip for rolling stop and run-through only (`play_on.safe=false`, `record_safe_events=false`).
+  - Coded beeps for all three phases (1 complete / 2 rolling / 3 run-through); clip for rolling stop and run-through only (`record_safe_events=false`).
   - Complete stop has **no** clip; event metadata **is** persisted (local + cloud JSON, no S3).
   - Rolling-stop and run-through rows exist in harness SQLite with `s3_stored` true and `s3_key` set.
 
@@ -1328,11 +1327,11 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   1. Mount and power the system; clips land under `clips_dir/at_7_3/`. Local SQLite is the Pi file (`src/main/db/netrapi.db`).
   2. On the Pi, run `python src/tests/integration/at_7_3/at_7_3_incar_e2e_deployed_cloud.py`.
   3. For each phase, focus preview and press **SPACE**, then perform **complete stop**, **rolling stop**, and **run-through** in that order. Classifications before SPACE are ignored.
-  4. Confirm console labels, beep on unsafe only, clips for unsafe only.
+  4. Confirm console labels, coded beeps (1/2/3), clips for unsafe only.
   5. Confirm three SQLite event rows; unsafe clips have `s3_stored` true. Inspect Postgres + S3 with the README `python -c` commands; check Render logs.
 - **Pass criteria**
   - All three encounters complete without crash.
-  - Classification matches operator intent; beep + clip for rolling stop and run-through only (`play_on.safe=false`, `record_safe_events=false`).
+  - Classification matches operator intent; coded beeps for all three phases (1/2/3); clip for rolling stop and run-through only (`record_safe_events=false`).
   - Complete stop has **no** clip; event metadata **is** persisted (local + cloud JSON, no S3).
   - Rolling-stop and run-through rows exist in Pi SQLite and Postgres with matching `s3_key`; S3 objects exist; Render logs show ingest POSTs for those events.
 
@@ -1508,7 +1507,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Unit coverage in `test_public_clip.py`.
 
 ### TP-66: Try it out browse and play
-- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows), shows Field / False Positives (Unrelated over total clips) / Calibrated accuracy with clip counts, and that selecting a row sets the video `src` to a minted GET URL.
+- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows), shows Field / False Positives (Unrelated over total clips) / Errors (error-tagged over listed real-world clips) / Calibrated accuracy with clip counts, Total Trip Time from confirmed trip segments, and that selecting a row sets the video `src` to a minted GET URL.
 - **Test level**: Unit
 - **Verification approach**: Test
 - **Reqs**: M-7.14, M-9.21, M-9.22, M-9.23, M-9.24, M-9.25, M-9.26, M-9.27, M-9.28
@@ -1516,7 +1515,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
 - **Steps**
   1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`). Unlabeled clips show `-` with the same table styling as labeled rows (no sky highlight). Session column shows `driving_session_id`.
-  2. Confirm Field Accuracy, False Positives (Unrelated count / total clips), and Calibrated Accuracy with correct/total clip counts, plus a Clips Pending Labels count.
+  2. Confirm Field Accuracy, False Positives (Unrelated count / total clips), Errors (error-tagged count / listed clips), Calibrated Accuracy with correct/total clip counts, Total Trip Time in hours, plus a Clips Pending Labels count.
   3. Confirm the table is real-world clips only (no filter chips) and the Scenario column tags `in_operating_envelope` as Calibrated.
   4. Click a clip row; video `src` becomes the minted GET URL.
   5. Confirm **Detailed Analysis** is checked by default (Style A: no native scrub bar; play overlay).
@@ -1524,8 +1523,8 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Pass criteria**
   - No dummy table rows.
   - Unlabeled clips (no manual classification) show `-` with no special highlight.
-  - Accuracy shows Field, False Positives (Unrelated / total clips), and Calibrated counts plus Clips Pending Labels.
-  - Table is real-world only; Scenario tags ideal-envelope clips; Field, False Positives, and Calibrated Accuracy include clip counts.
+  - Accuracy shows Field, False Positives (Unrelated / total clips), Errors (error-tagged / listed clips), Calibrated counts, Total Trip Time, plus Clips Pending Labels.
+  - Table is real-world only; Scenario tags ideal-envelope clips; Field, False Positives, Errors, and Calibrated Accuracy include clip counts.
   - Session column is present.
   - Click sets video `src` to the minted GET.
   - Style A is the default; toggling to Style B does not remint.
@@ -1600,22 +1599,22 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Unit coverage in `test_public_clip.py`.
 
 ### TP-71: Clip flags and live Results accuracy
-- **Description**: Verifies `flag_def` / `clip_flag` exist, public clip rows include `flags`, Try-it-out lists real-world clips with Field/Calibrated Accuracy and an ideal-scenario tag, and Overview Results shows live Field vs Calibrated Accuracy with per-class clip counts (hardcoded LOO grid remains). Clips without `real_world` are not public_visible.
+- **Description**: Verifies `flag_def` / `clip_flag` exist, public clip rows include `flags`, Try-it-out lists real-world clips with Field/Calibrated Accuracy and an ideal-scenario tag, and Overview Results shows live Field vs Calibrated Accuracy with per-class clip counts (hardcoded LOO grid remains). Clips without `real_world` are not public_visible. Clips tagged `error` stay listed with Label Error and are excluded from accuracy.
 - **Test level**: Unit
 - **Verification approach**: Test
 - **Reqs**: M-8.14, M-9.21, M-9.27, M-9.28, M-9.50, M-9.53
 - **Prerequisites**
-  - Alembic 0008 applied.
+  - Alembic 0009 applied.
   - Public list returns `flags`.
 - **Steps**
-  1. Confirm `flag_def` seed rows and `clip_flag` unique `(clip_id, flag_def_id)` (TP-40 inspects tables).
+  1. Confirm `flag_def` seed rows (`in_operating_envelope`, `real_world`, `synthetic`, `error`) and `clip_flag` unique `(clip_id, flag_def_id)` (TP-40 inspects tables).
   2. Tag a clip; `GET /api/public/clips` includes those `flag_def.value`s.
-  3. Confirm clips without `real_world` (including `synthetic` and untagged) are `public_visible = false` after 0008 (`test_migrations.py`).
-  4. In Try-it-out, confirm no filter chips; synthetic rows are omitted; Scenario shows Calibrated for `in_operating_envelope`; Field and Calibrated Accuracy lines include correct/total clip counts (`TryItOut.test.tsx`).
-  5. In Results, confirm hardcoded LOO percents with counts and live Field / Calibrated blocks; Field Accuracy ignores synthetic (`App.test.tsx`, `clipAccuracy.test.ts`).
+  3. Confirm clips without `real_world` (including `synthetic` and untagged) are `public_visible = false` after 0008, and error-tagged real-world clips stay `public_visible` after 0009 (`test_migrations.py`).
+  4. In Try-it-out, confirm no filter chips; synthetic rows are omitted; error rows show Label Error; Scenario shows Calibrated for `in_operating_envelope`; Field, Calibrated, False Positives, Errors, and Total Trip Time lines include counts (`TryItOut.test.tsx`).
+  5. In Results, confirm hardcoded LOO percents with counts and live Field / Calibrated blocks; Field Accuracy ignores synthetic and error (`App.test.tsx`, `clipAccuracy.test.ts`).
 - **Pass criteria**
   - Untagged clips return `flags: []`.
-  - Field Accuracy excludes `synthetic`. Calibrated Accuracy uses `in_operating_envelope` and excludes `synthetic`.
+  - Field Accuracy excludes `synthetic` and `error`. Calibrated Accuracy uses `in_operating_envelope` and excludes `synthetic` and `error`. Error-tagged real-world clips remain in the table with Label Error. Errors is error-tagged count over listed real-world clips.
   - Unit coverage in `test_public_clip.py`, `test_migrations.py`, `TryItOut.test.tsx`, `App.test.tsx`.
 
 ---

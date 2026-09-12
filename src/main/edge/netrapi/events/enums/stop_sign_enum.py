@@ -15,6 +15,15 @@ class StopSignEnum(Enum):
         member.model_label = model_label
         return member
 
+    @property
+    def beep_count(self) -> int:
+        """Audible pulses after classify: complete=1, rolling=2, run-through=3."""
+        if self is StopSignEnum.RUN_THROUGH:
+            return 3
+        if self is StopSignEnum.ROLLING_STOP:
+            return 2
+        return 1
+
     @classmethod
     def from_model_label(cls, label: str) -> StopSignEnum:
         for member in cls:

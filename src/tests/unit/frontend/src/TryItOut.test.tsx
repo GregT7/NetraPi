@@ -82,6 +82,8 @@ describe('TryItOut', () => {
     expect(screen.getByText('Calibrated Accuracy: n/a (0/0 clips)')).toBeTruthy()
     expect(screen.getByText('Field Accuracy: 0% (0/1 clip)')).toBeTruthy()
     expect(screen.getByText('False Positives: 0% (0/1 clip)')).toBeTruthy()
+    expect(screen.getByText('Errors: 0% (0/1 clip)')).toBeTruthy()
+    expect(screen.getByText('Total Trip Time: 0 hours')).toBeTruthy()
     expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: 'Session' })).toBeTruthy()
     expect(screen.getByText('1')).toBeTruthy()
@@ -230,6 +232,8 @@ describe('TryItOut', () => {
     expect(await screen.findByText('clip-10')).toBeTruthy()
     expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
     expect(screen.getByText('False Positives: 25% (1/4 clips)')).toBeTruthy()
+    expect(screen.getByText('Errors: 0% (0/4 clips)')).toBeTruthy()
+    expect(screen.getByText('Total Trip Time: 0 hours')).toBeTruthy()
     expect(screen.getByText('Clips Pending Labels: 1')).toBeTruthy()
   })
 
@@ -255,9 +259,15 @@ describe('TryItOut', () => {
                 flags: ['synthetic'],
                 label: 'Rolling Stop',
               }),
+              clipRow(13, {
+                classification: 'Complete Stop',
+                flags: ['real_world', 'error'],
+                label: 'Complete Stop',
+              }),
             ],
             live_url_max: 20,
             live_urls: 0,
+            trip_seconds: 37800,
           })
         }
         return jsonResponse({ expires_in: 120, url: 'https://s3.example/clip.mp4' })
@@ -268,6 +278,8 @@ describe('TryItOut', () => {
     expect(await screen.findByText('clip-10')).toBeTruthy()
     expect(screen.getByText('clip-11')).toBeTruthy()
     expect(screen.queryByText('clip-12')).toBeNull()
+    expect(screen.getByText('clip-13')).toBeTruthy()
+    expect(screen.getByText('Error')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Good scenario' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Real world' })).toBeNull()
     expect(screen.getByRole('columnheader', { name: 'Scenario' })).toBeTruthy()
@@ -275,6 +287,11 @@ describe('TryItOut', () => {
     expect(screen.getByText('Calibrated Accuracy: 100% (1/1 clip)')).toBeTruthy()
     expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
     expect(screen.getByText('False Positives: 0% (0/2 clips)')).toBeTruthy()
+    expect(screen.getByText('Errors: 33% (1/3 clips)')).toBeTruthy()
+    expect(screen.getByText('Total Trip Time: 10.5 hours')).toBeTruthy()
+    expect(localStorage.getItem('netrapi.resultsAccuracy.v1')).toContain(
+      '"tripSeconds":37800',
+    )
     expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
   })
 

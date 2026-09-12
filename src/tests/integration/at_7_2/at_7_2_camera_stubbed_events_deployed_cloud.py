@@ -12,7 +12,7 @@ Usage (from repo root, Pi — camera + Coral + buzzer on BCM 18):
 
 1. Click the preview window for focus.
 2. When prompted, press SPACE to arm; the stub fires that phase's event.
-3. Confirm beep/clip for unsafe phases only, then local s3_stored flags.
+3. Confirm 1 beep on complete stop (no clip); 2 beeps + clip + upload for rolling; 3 beeps + clip + upload for run-through.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
         label="1/3 Complete stop (stubbed)",
         event_type_name="COMPLETE_STOP",
-        expect_beep=False,
+        expect_beep=True,
         expect_clip=False,
     ),
     Scenario(
@@ -200,7 +200,7 @@ def _apply_test_config(
             buzzer,
             duration_seconds=BEEP_DURATION_SECONDS,
             volume=BEEP_VOLUME_PERCENT,
-            play_on=replace(buzzer.play_on, unsafe=True, safe=False),
+            play_on=replace(buzzer.play_on, unsafe=True, safe=True),
         ),
         recording_manager=replace(
             recording,

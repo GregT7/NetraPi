@@ -162,7 +162,11 @@ def test_sync_session_and_event_then_clip_put(tmp_path: Path) -> None:
         session_id = driving.id
 
     CloudIngest(json_request=json_request, put_file=put_file).sync_session(session_id)
-    CloudIngest(json_request=json_request, put_file=put_file).sync_event(event_id)
+    done: list[int] = []
+    ingest = CloudIngest(json_request=json_request, put_file=put_file)
+    ingest.set_on_upload_done(lambda: done.append(1))
+    ingest.sync_event(event_id)
+    assert done == [1]
 
     paths = [item[1] for item in calls]
     assert "/api/netrapi/master-config" in paths
@@ -312,10 +316,14 @@ def test_sync_event_metadata_only_skips_s3(tmp_path: Path) -> None:
         session.commit()
         event_id = event.id
 
-    CloudIngest(json_request=json_request, put_file=put_file).sync_event(event_id)
+    done: list[int] = []
+    ingest = CloudIngest(json_request=json_request, put_file=put_file)
+    ingest.set_on_upload_done(lambda: done.append(1))
+    ingest.sync_event(event_id)
     paths = [item[1] for item in calls]
     assert "/api/netrapi/driving-event" in paths
     assert "/api/netrapi/s3-upload-url" not in paths
+    assert done == []
     event_body = next(
         item[2] for item in calls if item[1] == "/api/netrapi/driving-event"
     )

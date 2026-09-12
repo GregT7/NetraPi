@@ -119,11 +119,11 @@ Use CORS anyway. Do not treat it as authentication. The limits in [§3](#3-three
 Implemented:
 
 - `POST /api/public/clip-download-url` — 2-minute GET, 20 live slots, 10 mints/minute/IP
-- `GET /api/public/clips` — confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings)
+- `GET /api/public/clips` — confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings) plus `trip_seconds` (sum of confirmed S3 trip_segment durations)
 - CORS for `http://localhost:5173` and `http://127.0.0.1:5173` (add the Vercel origin via `CORS_ORIGINS` on Render)
 - Try it out click-to-play (`VITE_API_URL` on Vercel; Vite proxies `/api` to local FastAPI)
-- Try it out lists real-world clips only (no visitor filter chips); Scenario column tags `in_operating_envelope` as Calibrated; Field, False Positives (Unrelated / total clips), and Calibrated Accuracy with correct/total clip counts
-- Overview Results live Field vs Calibrated Accuracy from the same public clip list (clips without `real_world` are not public_visible)
+- Try it out lists real-world clips only (no visitor filter chips); Scenario column tags `in_operating_envelope` as Calibrated; Field, False Positives (Unrelated / total clips), Errors (error-tagged / listed clips), Calibrated Accuracy with correct/total clip counts, and Total Trip Time (hours, cached in localStorage with Field/Calibrated and refreshed when the public list fetch succeeds and the snapshot changed)
+- Overview Results live Field vs Calibrated Accuracy from the same public clip list (clips without `real_world` are not public_visible; `error` clips stay listed with Label Error and are excluded from accuracy)
 - Public mint inlines `areas`/`motion`/`transitions` JSON (one live slot for the MP4). Try it out detailed analysis is the default; simple video-only remains available. Detailed playback uses native HTML5 controls with seeking disabled.
 
 Not in this pass:

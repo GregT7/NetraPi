@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 import urllib.error
 import urllib.request
@@ -42,6 +43,8 @@ PUT_PROGRESS_EVERY_S = 15.0
 CLIP_CONTENT_TYPE = "video/mp4"
 JSON_CONTENT_TYPE = "application/json"
 UPLOAD_DONE_SEPARATOR = "-" * 72
+
+logger = logging.getLogger(__name__)
 
 
 def _iso(value: datetime) -> str:
@@ -220,9 +223,13 @@ class CloudIngest:
         # put_bytes kept as a deprecated alias for put_file (tests / call sites).
         self._put_file = put_file or put_bytes
         self._on_log = on_log
+        self._on_upload_done: Callable[[], None] | None = None
 
     def set_log(self, on_log: Callable[[str], None] | None) -> None:
         self._on_log = on_log
+
+    def set_on_upload_done(self, callback: Callable[[], None] | None) -> None:
+        self._on_upload_done = callback
 
     def _emit(self, message: str) -> None:
         if self._on_log is not None:
@@ -232,6 +239,13 @@ class CloudIngest:
 
     def _emit_upload_separator(self) -> None:
         self._emit(UPLOAD_DONE_SEPARATOR)
+        callback = self._on_upload_done
+        if callback is None:
+            return
+        try:
+            callback()
+        except Exception:
+            logger.exception("upload-done callback failed")
 
     def _put_path(
         self, url: str, path: Path, content_type: str, *, quiet: bool = False

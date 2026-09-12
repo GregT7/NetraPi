@@ -12,7 +12,11 @@ export function readAccuracyCache(): LiveAccuracySnapshot | null {
     if (!parsed?.field || !parsed?.ideal) {
       return null
     }
-    return parsed
+    return {
+      ...parsed,
+      tripSeconds:
+        typeof parsed.tripSeconds === 'number' ? parsed.tripSeconds : 0,
+    }
   } catch {
     return null
   }
@@ -23,6 +27,13 @@ export function writeAccuracyCache(snapshot: LiveAccuracySnapshot): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
   } catch {
     return
+  }
+}
+
+export function persistAccuracyCache(snapshot: LiveAccuracySnapshot): void {
+  const cached = readAccuracyCache()
+  if (!cached || !accuracySnapshotsEqual(cached, snapshot)) {
+    writeAccuracyCache(snapshot)
   }
 }
 

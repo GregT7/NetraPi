@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   accuracySnapshotsEqual,
+  persistAccuracyCache,
   readAccuracyCache,
   writeAccuracyCache,
 } from '@/lib/accuracyCache'
@@ -31,6 +32,7 @@ const snapshot: LiveAccuracySnapshot = {
     percent: 100,
     unlabeled: 0,
   },
+  tripSeconds: 0,
 }
 
 afterEach(() => {
@@ -47,7 +49,19 @@ describe('accuracyCache', () => {
       field: { ...snapshot.field, percent: 40, matches: 0 },
     }
     expect(accuracySnapshotsEqual(snapshot, updated)).toBe(false)
-    writeAccuracyCache(updated)
+    persistAccuracyCache(snapshot)
+    expect(readAccuracyCache()).toEqual(snapshot)
+    persistAccuracyCache(snapshot)
+    persistAccuracyCache(updated)
     expect(readAccuracyCache()?.field.percent).toBe(40)
+    expect(readAccuracyCache()?.tripSeconds).toBe(0)
+    const withTrip = { ...updated, tripSeconds: 37800 }
+    persistAccuracyCache(withTrip)
+    expect(readAccuracyCache()?.tripSeconds).toBe(37800)
+    localStorage.setItem(
+      'netrapi.resultsAccuracy.v1',
+      JSON.stringify({ field: snapshot.field, ideal: snapshot.ideal }),
+    )
+    expect(readAccuracyCache()?.tripSeconds).toBe(0)
   })
 })

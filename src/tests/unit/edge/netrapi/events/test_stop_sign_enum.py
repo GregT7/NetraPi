@@ -19,6 +19,12 @@ def test_stop_sign_enum_model_labels():
     assert StopSignEnum.from_model_label("rolling-stop") is StopSignEnum.ROLLING_STOP
 
 
+def test_stop_sign_enum_beep_counts():
+    assert StopSignEnum.COMPLETE_STOP.beep_count == 1
+    assert StopSignEnum.ROLLING_STOP.beep_count == 2
+    assert StopSignEnum.RUN_THROUGH.beep_count == 3
+
+
 def test_stage_label_values():
     assert Stage1Label.COMPLETE_STOP.value == "complete-stop"
     assert Stage1Label.ROLLING_OR_RUN_THROUGH.value == "rolling-or-run-through"

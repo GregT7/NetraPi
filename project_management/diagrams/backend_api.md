@@ -37,7 +37,7 @@ Do **not** design or implement these until frontend work starts:
 
 - One edge device.
 - Ingest routes under `/api/netrapi/*` require header `X-API-Key` (M-7.10, TP-42). `GET /health` stays open (TP-35 uvicorn, TP-37 Compose, Render). Swagger `/docs` `/redoc` `/openapi.json` are local/Compose only; off on Render (decision 59).
-- Same SQLModel tables locally (SQLite) and in cloud (Supabase Postgres). Alembic `0001`–`0008`: `0002` seeds `classification_type` / `object_label` / initial `master_config`; `0005` adds `clip.public_visible`; `0006` seeds `flag_def` and creates `clip_flag`; `0007` sets `public_visible` false on synthetic-tagged clips; `0008` hides clips without `real_world`. `POST /master-config` find-or-creates additional snapshots when live edge JSON differs (decision 56). `classification_type` / `object_label` / `flag_def` are still not ingest APIs.
+- Same SQLModel tables locally (SQLite) and in cloud (Supabase Postgres). Alembic `0001`–`0009`: `0002` seeds `classification_type` / `object_label` / initial `master_config`; `0005` adds `clip.public_visible`; `0006` seeds `flag_def` and creates `clip_flag`; `0007` sets `public_visible` false on synthetic-tagged clips; `0008` hides clips without `real_world`; `0009` seeds `error`. `POST /master-config` find-or-creates additional snapshots when live edge JSON differs (decision 56). `classification_type` / `object_label` / `flag_def` are still not ingest APIs.
 - Paths are **singular** when the call creates or acts on one record.
 - Build order matches Sprint 5/6 in [test.md](../specs/test.md): TP-34 `driving-session` → TP-35 `/health` → TP-36 `driving-event` (SQLite) → Compose (TP-37) → API key (TP-42) → `s3-upload-url` (TP-43) → Pi PUT to S3 → `confirm-s3-upload` (TP-47) → local E2E via `CloudIngest` (TP-49). `trip-segment` JSON prime matches TP-34/36 but has no dedicated TP yet.
 - FastAPI never receives video. Render only handles JSON + URL signing.
@@ -425,7 +425,7 @@ What each ingest call is allowed to write. Full column lists: [schema_design.md]
 | ----- | ----------------- | ----------------- | -------------- | --------------- | ----------------- | ------------------- | ----- |
 | `master_config` + config children | find-or-create by fingerprint | 400 if id missing | no | no | no | no | Seed id 1 reused when live JSON matches |
 | `classification_type`, `object_label` | `object_label` get-or-create by value | no | no | no | no | no | `classification_type` stays Alembic-only |
-| `flag_def`, `clip_flag` | no | no | no | no | no | no | Alembic `0006` seed; tag `clip_flag` in SQL. `0007`/`0008` hide non-`real_world`. Public `GET /clips` reads `flags` |
+| `flag_def`, `clip_flag` | no | no | no | no | no | no | Alembic `0006`/`0009` seed; tag `clip_flag` in SQL. `0007`/`0008` hide non-`real_world`. Public `GET /clips` reads `flags`; Try-it-out shows Label Error for `error` |
 | `knn_feature` | yes (per snapshot) | no | no | no | no | no | Scoped to the session’s `knn_config` |
 | `driving_session` | no | yes | no | no | no | no | |
 | `operational_exception` | no | no | no | no | no | no | `POST /operational-exception` |

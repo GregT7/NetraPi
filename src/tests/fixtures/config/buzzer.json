@@ -5,6 +5,6 @@
   "duration_seconds": 0.3,
   "play_on": {
     "unsafe": true,
-    "safe": false
+    "safe": true
   }
 }

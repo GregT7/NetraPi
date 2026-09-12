@@ -10,6 +10,7 @@ from config.types import BuzzerConfig
 from netrapi.events.driving_event import DrivingEvent
 
 logger = logging.getLogger(__name__)
+_PULSE_GAP_SECONDS = 0.12
 
 
 class Buzzer:
@@ -58,17 +59,34 @@ class Buzzer:
             self._gpio = None
             self._pwm = None
 
-    def beep(self, event: DrivingEvent) -> bool:
-        """Start a non-blocking tone when policy allows. Returns True if a tone was started."""
-        if not self._available or not self._config.enabled:
+    def pulse(self, count: int = 1) -> bool:
+        """Start ``count`` non-blocking tones. Returns True if a sequence was started."""
+        if count < 1:
             return False
+        return self._start_pulses(count)
+
+    def beep(self, event: DrivingEvent) -> bool:
+        """Start a coded non-blocking tone when policy allows.
+
+        Complete stop: 1 pulse, rolling: 2, run-through: 3.
+        Returns True if a tone sequence was started.
+        """
         if event.is_unsafe:
             if not self._config.play_on.unsafe:
                 return False
         elif not self._config.play_on.safe:
             return False
+        return self._start_pulses(event.type.beep_count)
 
-        thread = threading.Thread(target=self._beep_worker, name="buzzer-beep", daemon=True)
+    def _start_pulses(self, count: int) -> bool:
+        if not self._available or not self._config.enabled:
+            return False
+        thread = threading.Thread(
+            target=self._beep_worker,
+            args=(count,),
+            name="buzzer-beep",
+            daemon=True,
+        )
         thread.start()
         return True
 
@@ -100,28 +118,38 @@ class Buzzer:
 
             self._available = False
 
-    def _beep_worker(self) -> None:
-        with self._lock:
-            if not self._available or self._pwm is None or self._stop_beep.is_set():
-                return
-            try:
-                self._pwm.ChangeFrequency(self._config.pitch)
-                self._pwm.ChangeDutyCycle(self._config.volume)
-            except Exception:
-                logger.exception("Buzzer failed to start tone")
-                return
-
-        # Sleep outside the lock so close() can silence promptly.
-        deadline = time.monotonic() + self._config.duration_seconds
+    def _sleep_until(self, deadline: float) -> None:
         while time.monotonic() < deadline:
             if self._stop_beep.is_set():
-                break
+                return
             time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
 
-        with self._lock:
-            if self._pwm is None:
+    def _beep_worker(self, count: int) -> None:
+        gap_s = min(_PULSE_GAP_SECONDS, self._config.duration_seconds)
+        for index in range(count):
+            if self._stop_beep.is_set():
                 return
-            try:
-                self._pwm.ChangeDutyCycle(0)
-            except Exception:
-                logger.exception("Buzzer failed to end tone")
+            with self._lock:
+                if not self._available or self._pwm is None or self._stop_beep.is_set():
+                    return
+                try:
+                    self._pwm.ChangeFrequency(self._config.pitch)
+                    self._pwm.ChangeDutyCycle(self._config.volume)
+                except Exception:
+                    logger.exception("Buzzer failed to start tone")
+                    return
+
+            # Sleep outside the lock so close() can silence promptly.
+            self._sleep_until(time.monotonic() + self._config.duration_seconds)
+
+            with self._lock:
+                if self._pwm is None:
+                    return
+                try:
+                    self._pwm.ChangeDutyCycle(0)
+                except Exception:
+                    logger.exception("Buzzer failed to end tone")
+                    return
+
+            if index + 1 < count and not self._stop_beep.is_set():
+                self._sleep_until(time.monotonic() + gap_s)

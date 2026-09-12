@@ -52,7 +52,7 @@ SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
         label="1/3 Complete stop",
         event_type_name="COMPLETE_STOP",
-        expect_beep=False,
+        expect_beep=True,
         expect_clip=False,
     ),
     Scenario(
@@ -146,7 +146,7 @@ def _apply_test_config(
             buzzer,
             duration_seconds=BEEP_DURATION_SECONDS,
             volume=BEEP_VOLUME_PERCENT,
-            play_on=replace(buzzer.play_on, unsafe=True, safe=False),
+            play_on=replace(buzzer.play_on, unsafe=True, safe=True),
         ),
         recording_manager=replace(
             recording,

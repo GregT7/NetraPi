@@ -17,9 +17,9 @@ python src/tests/integration/at_7_2/at_7_2_camera_stubbed_events_deployed_cloud.
 ```
 
 1. Click the preview window (focus).
-2. **SPACE** → stub fires **complete stop** (no beep, no clip; metadata persists).
-3. **SPACE** → stub fires **rolling stop** (beep + clip + upload).
-4. **SPACE** → stub fires **run-through** (beep + clip + upload).
+2. **SPACE** → stub fires **complete stop** (1 beep, no clip; metadata persists).
+3. **SPACE** → stub fires **rolling stop** (2 beeps + clip + upload).
+4. **SPACE** → stub fires **run-through** (3 beeps + clip + upload).
 
 Nothing is injected before SPACE. Clips: `clips_dir/at_7_2/`.
 Isolated SQLite: `src/tests/integration/at_7_2/netrapi.db` (recreated each run).
@@ -119,7 +119,7 @@ https://dashboard.render.com → `netrapi` → Logs:
 ### Local clips / buzzer
 
 - `clips_dir/at_7_2/` has **two** new MP4s (rolling + run-through).
-- Hear beep on the two unsafe phases only.
+- Hear coded beeps on all three phases (1 complete / 2 rolling / 3 run-through), plus one more after clip upload finishes.
 
 ## Progression
 

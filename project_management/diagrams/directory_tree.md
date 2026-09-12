@@ -51,7 +51,7 @@ src/main/
 │   └── migrations/                    ✅  one Alembic tree; dialect from engine URL
 │       ├── env.py                     ✅  SQLModel metadata; loads edge/.env or process DATABASE_URL
 │       ├── script.py.mako             ✅
-│       └── versions/                  ✅  0001 schema; 0002 classification_type / edge-json; 0003 trip file_size_bytes; 0004 health_config; 0005 clip.public_visible; 0006 flag_def / clip_flag; 0007 hide synthetic clips; 0008 hide clips without real_world
+│       └── versions/                  ✅  0001 schema; 0002 classification_type / edge-json; 0003 trip file_size_bytes; 0004 health_config; 0005 clip.public_visible; 0006 flag_def / clip_flag; 0007 hide synthetic clips; 0008 hide clips without real_world; 0009 error flag_def
 │
 ├── edge/                              ✅  Raspberry Pi — capture, detect, clip
 │   ├── README.md                      ✅  how to run capture, boot health, online/offline, drain
@@ -332,7 +332,7 @@ src/tests/
 │   │   ├── test_writes.py             ✅  ↔ db/writes.py
 │   │   ├── test_config_snapshot.py    ✅  ↔ db/config_snapshot.py (fingerprint reuse + new snapshot)
 │   │   ├── test_models.py             ✅  ↔ db/models.py
-│   │   └── test_migrations.py         ✅  Alembic upgrade head + seed; 0008 hides non-real_world
+│   │   └── test_migrations.py         ✅  Alembic upgrade head + seed; 0008 hides non-real_world; 0009 seeds error
 │   │
 │   ├── backend/
 │   │   ├── conftest.py                ✅  sys.path + in-memory DATABASE_URL

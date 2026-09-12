@@ -171,7 +171,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Field Accuracy' })).toBeTruthy()
     expect(
       screen.getByText(
-        /Live match rate on labeled complete, rolling, and run-through clips \(synthetic \/ parking-lot clips excluded\)/,
+        /Live match rate on labeled complete, rolling, and run-through clips \(synthetic \/ parking-lot and error clips excluded\)/,
       ),
     ).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Calibrated Accuracy' })).toBeTruthy()
@@ -216,6 +216,8 @@ describe('App', () => {
     expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
     expect(screen.getByText('Calibrated Accuracy: 100% (1/1 clip)')).toBeTruthy()
     expect(screen.getByText('False Positives: 33% (1/3 clips)')).toBeTruthy()
+    expect(screen.getByText('Errors: 0% (0/3 clips)')).toBeTruthy()
+    expect(screen.getByText('Total Trip Time: 0 hours')).toBeTruthy()
     expect(screen.getByText('Clips Pending Labels: 0')).toBeTruthy()
   })
 

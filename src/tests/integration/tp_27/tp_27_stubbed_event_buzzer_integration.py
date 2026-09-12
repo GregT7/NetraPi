@@ -3,9 +3,9 @@ TP-27: Audible feedback on unsafe stop-sign events (integration).
 
 Builds the real edge pipeline (including the real ``Buzzer``), mocks the camera,
 and injects mock ``DrivingEvent`` values via a stub ``EventManager``. Confirms
-``buzzer.beep`` runs for ``ROLLING_STOP`` / ``RUN_THROUGH`` within 10 s of
-evaluate, and does not run for ``COMPLETE_STOP`` under default
-``play_on.safe=false``.
+``buzzer.beep`` runs for ``COMPLETE_STOP`` (1 pulse), ``ROLLING_STOP`` (2),
+and ``RUN_THROUGH`` (3) within 10 s of evaluate when ``play_on`` allows the
+event class.
 
 Does **not** require a USB camera or real stop-sign classification.
 Coral USB TPU **is** required at build time: ``build_pipeline`` always calls
@@ -57,19 +57,19 @@ class Scenario:
 
 SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
-        label="ROLLING_STOP (expect beep)",
+        label="ROLLING_STOP (expect 2 beeps)",
         event_type_name="ROLLING_STOP",
         expect_beep=True,
     ),
     Scenario(
-        label="RUN_THROUGH (expect beep)",
+        label="RUN_THROUGH (expect 3 beeps)",
         event_type_name="RUN_THROUGH",
         expect_beep=True,
     ),
     Scenario(
-        label="COMPLETE_STOP (expect no beep)",
+        label="COMPLETE_STOP (expect 1 beep)",
         event_type_name="COMPLETE_STOP",
-        expect_beep=False,
+        expect_beep=True,
     ),
 )
 
@@ -158,7 +158,7 @@ def _apply_test_config(app_config, *, repo_root: Path, resolve_runtime_paths: Ca
         buzzer=replace(
             buzzer,
             duration_seconds=BEEP_DURATION_SECONDS,
-            play_on=replace(buzzer.play_on, unsafe=True, safe=False),
+            play_on=replace(buzzer.play_on, unsafe=True, safe=True),
         ),
         recording_manager=replace(
             app_config.recording_manager,
@@ -179,7 +179,7 @@ def _confirm_heard(scenario: Scenario, *, assume_heard: bool) -> None:
     if assume_heard:
         print("  hear confirmation: skipped (--assume-heard)")
         return
-    answer = input("  Did you hear the beep? [y/N]: ").strip().lower()
+    answer = input("  Did you hear the beep(s)? [y/N]: ").strip().lower()
     if answer not in ("y", "yes"):
         raise RuntimeError(f"{scenario.label}: operator did not confirm audible feedback")
 

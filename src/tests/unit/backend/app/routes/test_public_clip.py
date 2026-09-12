@@ -218,7 +218,7 @@ def test_public_list_empty_without_confirmed_clip(ingest_client: TestClient) -> 
     _prime_clip(ingest_client)
     response = ingest_client.get("/api/public/clips")
     assert response.status_code == 200
-    assert response.json() == {"clips": [], "live_urls": 0, "live_url_max": 20}
+    assert response.json() == {"clips": [], "trip_seconds": 0, "live_urls": 0, "live_url_max": 20}
 
 
 def test_public_list_returns_confirmed_clip(ingest_client: TestClient) -> None:
@@ -239,7 +239,48 @@ def test_public_list_returns_confirmed_clip(ingest_client: TestClient) -> None:
         ],
         "live_urls": 0,
         "live_url_max": 20,
+        "trip_seconds": 0,
     }
+
+
+def test_public_list_sums_confirmed_trip_seconds(ingest_client: TestClient) -> None:
+    session = ingest_client.post(
+        "/api/netrapi/driving-session", json=_SESSION, headers=_HEADERS
+    )
+    assert session.status_code == 200
+    primed = ingest_client.post(
+        "/api/netrapi/trip-segment",
+        json={
+            "id": 3,
+            "driving_session_id": 1,
+            "local_path": "/tmp/seg.mp4",
+            "init_local_stored": True,
+            "start_time": "2026-08-16T18:00:00Z",
+            "end_time": "2026-08-16T18:05:00Z",
+            "order_number": 3,
+        },
+        headers=_HEADERS,
+    )
+    assert primed.status_code == 200
+    listed = ingest_client.get("/api/public/clips")
+    assert listed.status_code == 200
+    assert listed.json()["trip_seconds"] == 0
+    with patch(
+        "app.routes.s3_upload.head_object",
+        return_value={"ContentLength": 4096},
+    ):
+        confirmed = ingest_client.post(
+            "/api/netrapi/confirm-s3-upload",
+            json={
+                "trip_segment_id": 3,
+                "object_key": "Aug-2026/driving_session_id_1/trips/trip-3.mp4",
+            },
+            headers=_HEADERS,
+        )
+    assert confirmed.status_code == 200
+    response = ingest_client.get("/api/public/clips")
+    assert response.status_code == 200
+    assert response.json()["trip_seconds"] == 300
 
 
 def test_public_list_orders_newest_event_first(ingest_client: TestClient) -> None:

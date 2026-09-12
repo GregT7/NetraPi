@@ -60,7 +60,7 @@ def test_app_config_loads_fixture_directory():
     assert app_config.trip_recorder.segment_seconds == 300
     assert app_config.buzzer.gpio_pin == 18
     assert app_config.buzzer.play_on.unsafe is True
-    assert app_config.buzzer.play_on.safe is False
+    assert app_config.buzzer.play_on.safe is True
     assert app_config.buzzer.enabled is True
     assert app_config.health.render_wait_s == 90
     assert app_config.health.wlan_interface == "wlan0"
@@ -81,6 +81,7 @@ def test_app_config_loads_production_directory():
     assert app_config.trip_recorder.segment_seconds == 300
     assert app_config.buzzer.gpio_pin == 18
     assert app_config.buzzer.duration_seconds == pytest.approx(0.3)
+    assert app_config.buzzer.play_on.safe is True
 
 
 def test_app_config_missing_directory(tmp_path):

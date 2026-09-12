@@ -12,9 +12,9 @@ python src/tests/integration/tp_28/tp_28_e2e_classify_beep_clip_integration.py
 ```
 
 1. Click the preview window (focus).
-2. **SPACE** to arm phase 1 → perform a **complete stop**.
-3. **SPACE** → **rolling stop** (expect beep + clip).
-4. **SPACE** → **run-through** (expect beep + clip).
+2. **SPACE** to arm phase 1 → perform a **complete stop** (1 beep, no clip).
+3. **SPACE** → **rolling stop** (2 beeps + clip).
+4. **SPACE** → **run-through** (expect 3 beeps + clip).
 
 Classifications before SPACE are ignored (no beep/clip).
 
@@ -22,9 +22,9 @@ Classifications before SPACE are ignored (no beep/clip).
 
 | Phase | Maneuver | Beep | Clip |
 |-------|----------|------|------|
-| 1/3 | `COMPLETE_STOP` | no | no |
-| 2/3 | `ROLLING_STOP` | yes ≤ 10 s | MP4 under `clips_dir/tp_28/` |
-| 3/3 | `RUN_THROUGH` | yes ≤ 10 s | MP4 under `clips_dir/tp_28/` |
+| 1/3 | `COMPLETE_STOP` | 1 pulse | no |
+| 2/3 | `ROLLING_STOP` | 2 pulses ≤ 10 s | MP4 under `clips_dir/tp_28/` |
+| 3/3 | `RUN_THROUGH` | 3 pulses ≤ 10 s | MP4 under `clips_dir/tp_28/` |
 
 ## Evidence
 

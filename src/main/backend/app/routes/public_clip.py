@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timezone
+
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlmodel import SQLModel, select
 
@@ -23,7 +25,15 @@ from app.s3 import (
     presign_get,
 )
 from db.database import get_session
-from db.models import Classification, ClassificationType, Clip, ClipFlag, Event, FlagDef
+from db.models import (
+    Classification,
+    ClassificationType,
+    Clip,
+    ClipFlag,
+    Event,
+    FlagDef,
+    TripSegment,
+)
 
 router = APIRouter(prefix="/api/public")
 
@@ -114,6 +124,26 @@ def _live_url_status() -> dict[str, int]:
     }
 
 
+def _total_trip_seconds(session) -> int:
+    total = 0.0
+    rows = session.exec(
+        select(TripSegment)
+        .where(TripSegment.s3_stored.is_(True))
+        .where(TripSegment.s3_key.is_not(None))
+    ).all()
+    for row in rows:
+        start = row.start_time
+        end = row.end_time
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        delta = (end - start).total_seconds()
+        if delta > 0:
+            total += delta
+    return int(round(total))
+
+
 def _sidecar_json(object_key: str, name: str) -> dict | None:
     sidecar_key = clip_sidecar_key(object_key, name)
     if sidecar_key is None:
@@ -160,7 +190,11 @@ def list_public_clips():
                     "flags": flags_by_clip.get(clip.id, []),
                 }
             )
-        return {"clips": body, **_live_url_status()}
+        return {
+            "clips": body,
+            "trip_seconds": _total_trip_seconds(session),
+            **_live_url_status(),
+        }
 
 
 @router.post("/clip-download-url")

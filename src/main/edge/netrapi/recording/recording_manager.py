@@ -78,6 +78,10 @@ class RecordingManager:
             trip_recorder.set_on_segment_saved(self._persist_saved_segment)
         if local_store is not None and hasattr(trip_recorder, "set_on_segment_opened"):
             trip_recorder.set_on_segment_opened(self._prime_open_segment)
+        if cloud_ingest is not None:
+            setter = getattr(type(cloud_ingest), "set_on_upload_done", None)
+            if callable(setter):
+                setter(cloud_ingest, self._beep_saved)
 
     def _emit(self, message: str) -> None:
         if self._trip_log is not None:
@@ -257,6 +261,7 @@ class RecordingManager:
                 classifications = self._detector.classify(record.raw)
                 self.pre_buffer.latest().patch_classifications(classifications)
             if self._event_manager.observe(self.pre_buffer):
+                self._buzzer.pulse(1)
                 latched = self._event_manager.last_latched_approach
                 if latched is not None:
                     self._emit(
@@ -469,6 +474,9 @@ class RecordingManager:
             self._emit(f"[exception] persist failed: {exc}")
             return
         self._try_ingest("sync_operational_exception", exception_id)
+
+    def _beep_saved(self) -> None:
+        self._buzzer.pulse(1)
 
     def _try_ingest(self, method_name: str, *args) -> None:
         if self._ingest_worker is None:

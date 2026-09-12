@@ -184,7 +184,7 @@ Solid = lap control flow. Dashed = preview or buffer store / **`display_frames`*
 
 **Why no Mermaid subgraphs in this diagram:** Mermaid routes cross-subgraph links to the **cluster border**, so a reader cannot see which step resumes inside **RecordingManager**. Component identity is shown in the **node label** (`RecordingManager · …`, `Detector · …`, etc.) and color instead — every arrow is node → node. Use [§4.1](#41-component-view) for the boxed component picture.
 
-Idle orchestration (once per idle lap): **`pre_buffer.push`** → **if `needs_detection` (current state is `'Watching'`)** → **Detector.classify(raw)** → **`patch_classifications`** → **EventManager.observe(pre_buffer)** → **if `ready_to_evaluate`** → **EventManager.evaluate()** → **`Buzzer.beep(event)`** (non-blocking; gated by **`buzzer.json`** **`play_on`**) → clip gate **`event.is_unsafe or record_safe_events`** → set **`clip_active = true`** / **`begin_clip()`** or continue loop. While **CollectPostDrop**, skip the detector (motion-only observe). **Detector** and **EventManager** do not run while **`clip_active`**.
+Idle orchestration (once per idle lap): **`pre_buffer.push`** → **if `needs_detection` (current state is `'Watching'`)** → **Detector.classify(raw)** → **`patch_classifications`** → **EventManager.observe(pre_buffer)** → **if approach latched** → **`Buzzer.pulse(1)`** → **if `ready_to_evaluate`** → **EventManager.evaluate()** → **`Buzzer.beep(event)`** (non-blocking coded pulses: complete=1, rolling=2, run-through=3; gated by **`buzzer.json`** **`play_on`**) → clip gate **`event.is_unsafe or record_safe_events`** → set **`clip_active = true`** / **`begin_clip()`** or continue loop. While **CollectPostDrop**, skip the detector (motion-only observe). **Detector** and **EventManager** do not run while **`clip_active`**. After a clip/trip S3 upload finishes, **CloudIngest** prints the upload-done separator and **`Buzzer.pulse(1)`** again.
 
 **EventManager output:** **Safe** (`COMPLETE_STOP`) or **Unsafe** subtypes **Rolling** (`ROLLING_STOP`) / **Run-through** (`RUN_THROUGH`) — see [event_detection.md](event_detection.md). **`observe`** collects every idle lap; **`evaluate()`** runs only when the post-drop window finishes and always returns a **`DrivingEvent`** (never **`None`**).
 
@@ -283,7 +283,7 @@ Solid = runtime sequence; dashed = preview, buffer store, or **`display_frames`*
 | **RecordingManager** | Owns buffers, **`clip_active`**, **`run_loop()`**; orchestrates Detector / EventManager / Buzzer when idle |
 | **Detector** | Idle when current state is **`'Watching'`**: **`classify(raw)`** → classifications patched onto latest **FrameRecord** |
 | **EventManager** | **`observe(pre_buffer)`** every idle lap; **`evaluate()`** → **`DrivingEvent`** when **`ready_to_evaluate`**. Owns area/motion deques; Watching → CollectPostDrop → kNN → emit (see [event_detection.md](event_detection.md)) |
-| **Buzzer** | **`open()`** / **`close()`** with **`run_loop`**; **`beep(event)`** after evaluate (daemon-thread PWM; gated by **`play_on`**; soft-fail) |
+| **Buzzer** | **`open()`** / **`close()`** with **`run_loop`**; **`pulse(n)`** on approach latch and after upload-done; **`beep(event)`** after evaluate (1/2/3 pulses; daemon-thread PWM; gated by **`play_on`**; soft-fail) |
 | **ClipPackage** | **`build(pre_frames, post_frames)`** from **`display_frames()`** on both buffers |
 | **Recorder** | **`write_clip(package, fps)`** → **ClipResult**; **`fps`** from buffer timestamps at write time |
 | **`clip_active`** | Explicit flag: **`false`** at start (**`Start → clip_active = false → Camera`**) and after clip write; **`true`** when begin-clip gate passes (**`begin_clip()`**) |
@@ -348,7 +348,7 @@ MP4 output uses **ffmpeg H.264** (`libx264`, `yuv420p`) via **`write_h264_mp4()`
 | Stage | Meaning |
 |--------|---------|
 | **classifications** | **Detector** output; **RecordingManager** writes onto latest **`pre_buffer`** entry via **`patch_classifications`**. |
-| **DrivingEvent** | **EventManager.evaluate()** returns when ready; **`StopSignEnum`** sets **`is_unsafe`** — **`COMPLETE_STOP`** is safe; **`ROLLING_STOP`** and **`RUN_THROUGH`** are unsafe. Clip gate: **`event.is_unsafe or record_safe_events`**. Beep gate (separate): **`buzzer.json`** **`play_on.unsafe`** / **`play_on.safe`**. |
+| **DrivingEvent** | **EventManager.evaluate()** returns when ready; **`StopSignEnum`** sets **`is_unsafe`** — **`COMPLETE_STOP`** is safe; **`ROLLING_STOP`** and **`RUN_THROUGH`** are unsafe. Clip gate: **`event.is_unsafe or record_safe_events`**. Classification beep count (separate from clip): complete=1, rolling=2, run-through=3, still gated by **`buzzer.json`** **`play_on.unsafe`** / **`play_on.safe`**. Approach latch and upload-done each play **`pulse(1)`** when the buzzer is enabled. |
 
 ---
 

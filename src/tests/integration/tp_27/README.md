@@ -2,7 +2,8 @@
 
 Integration harness for **TP-27** (`test.md`): build the real edge pipeline
 (including the real `Buzzer`), mock the camera, inject mock `DrivingEvent`s, and
-confirm audible feedback for unsafe stop-sign types within **10 seconds**.
+confirm audible feedback for each stop-sign type within **10 seconds**
+(1 pulse complete, 2 rolling, 3 run-through).
 
 ## Run (on Pi)
 
@@ -36,9 +37,9 @@ python src/tests/integration/tp_27/tp_27_stubbed_event_buzzer_integration.py --a
 
 | Event | Expect |
 |-------|--------|
-| `ROLLING_STOP` | `buzzer.beep` within 10 s; operator hears tone |
-| `RUN_THROUGH` | same |
-| `COMPLETE_STOP` | **no** beep (`play_on.safe=false`) |
+| `ROLLING_STOP` | `buzzer.beep` 2 pulses within 10 s; operator hears tones |
+| `RUN_THROUGH` | 3 pulses |
+| `COMPLETE_STOP` | 1 pulse (`play_on.safe=true`) |
 
 ## How it works
 

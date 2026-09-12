@@ -71,14 +71,53 @@ def test_beep_plays_for_unsafe_event():
         assert buzzer.beep(DrivingEvent(type=StopSignEnum.ROLLING_STOP)) is True
         import time
 
-        time.sleep(0.1)
+        time.sleep(0.25)
         buzzer.close()
 
     gpio.setup.assert_called_once_with(18, gpio.OUT)
     pwm.ChangeFrequency.assert_called_with(1000.0)
-    assert any(call.args[0] == 50.0 for call in pwm.ChangeDutyCycle.call_args_list)
+    duty_on = [call.args[0] for call in pwm.ChangeDutyCycle.call_args_list if call.args[0] == 50.0]
+    assert len(duty_on) == 2
     pwm.stop.assert_called_once()
     gpio.cleanup.assert_called_once()
+
+
+def test_beep_plays_one_pulse_for_complete_stop_when_safe_enabled():
+    gpio = MagicMock()
+    pwm = MagicMock()
+    gpio.PWM.return_value = pwm
+    fake_rpi = SimpleNamespace(GPIO=gpio)
+
+    buzzer = Buzzer(_buzzer_config(unsafe=True, safe=True, duration_seconds=0.01))
+    with patch.dict("sys.modules", {"RPi": fake_rpi, "RPi.GPIO": gpio}):
+        buzzer.open()
+        assert buzzer.beep(DrivingEvent(type=StopSignEnum.COMPLETE_STOP)) is True
+        import time
+
+        time.sleep(0.05)
+        buzzer.close()
+
+    duty_on = [call.args[0] for call in pwm.ChangeDutyCycle.call_args_list if call.args[0] == 50.0]
+    assert len(duty_on) == 1
+
+
+def test_pulse_plays_requested_count():
+    gpio = MagicMock()
+    pwm = MagicMock()
+    gpio.PWM.return_value = pwm
+    fake_rpi = SimpleNamespace(GPIO=gpio)
+
+    buzzer = Buzzer(_buzzer_config(duration_seconds=0.01))
+    with patch.dict("sys.modules", {"RPi": fake_rpi, "RPi.GPIO": gpio}):
+        buzzer.open()
+        assert buzzer.pulse(3) is True
+        import time
+
+        time.sleep(0.12)
+        buzzer.close()
+
+    duty_on = [call.args[0] for call in pwm.ChangeDutyCycle.call_args_list if call.args[0] == 50.0]
+    assert len(duty_on) == 3
 
 
 def test_close_swallows_cleanup_errors():

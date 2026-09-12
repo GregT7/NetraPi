@@ -12,14 +12,20 @@ import PlaybackStateDiagram, {
   stateIdAtTime,
 } from './PlaybackStateDiagram'
 import {
+  clipDisplayLabel,
+  FLAG_ERROR,
   FLAG_IN_OPERATING_ENVELOPE,
   clipHasFlag,
   falsePositiveRate,
+  errorRate,
+  fieldClips,
   formatNamedAccuracy,
   formatPendingLabels,
+  formatTripTime,
   liveAccuracySnapshot,
   realWorldClips,
 } from '@/lib/clipAccuracy'
+import { persistAccuracyCache, readAccuracyCache } from '@/lib/accuracyCache'
 
 const PAGE_SIZE = 5
 const MINT_DEBOUNCE_MS = 300
@@ -57,6 +63,9 @@ export default function TryItOut() {
   const [listError, setListError] = useState('')
   const [listLoading, setListLoading] = useState(true)
   const [message, setMessage] = useState('')
+  const [tripSeconds, setTripSeconds] = useState(
+    () => readAccuracyCache()?.tripSeconds ?? 0,
+  )
   const [page, setPage] = useState(0)
   const [selectedId, setSelectedId] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
@@ -112,6 +121,10 @@ export default function TryItOut() {
         setClips(result.clips)
         setLiveUrls(result.liveUrls)
         setLiveUrlMax(result.liveUrlMax)
+        setTripSeconds(result.tripSeconds)
+        persistAccuracyCache(
+          liveAccuracySnapshot(result.clips, result.tripSeconds),
+        )
         setPage(0)
         setListLoading(false)
       })
@@ -444,9 +457,13 @@ export default function TryItOut() {
                 <p>
                   {formatNamedAccuracy(
                     'False Positives',
-                    falsePositiveRate(visibleClips),
+                    falsePositiveRate(fieldClips(visibleClips)),
                   )}
                 </p>
+                <p>
+                  {formatNamedAccuracy('Errors', errorRate(visibleClips))}
+                </p>
+                <p>{formatTripTime(tripSeconds)}</p>
                 <p>
                   {formatPendingLabels(liveAccuracy.field.unlabeled)}
                 </p>
@@ -530,8 +547,11 @@ export default function TryItOut() {
                         </tr>
                       )
                     }
-                    const unlabeled = clip.label === '-'
-                    const matched = !unlabeled && clip.classification === clip.label
+                    const isError = clipHasFlag(clip, FLAG_ERROR)
+                    const label = clipDisplayLabel(clip)
+                    const unlabeled = !isError && clip.label === '-'
+                    const matched =
+                      !isError && !unlabeled && clip.classification === clip.label
                     const selected = selectedId === clip.id
                     return (
                       <tr
@@ -554,10 +574,10 @@ export default function TryItOut() {
                         <td className="truncate px-4">{clip.id}</td>
                         <td className="truncate px-4">{clip.drivingSessionId}</td>
                         <td className="truncate px-4">{clip.dateTime}</td>
-                        <td className="truncate px-4">{clip.label}</td>
+                        <td className="truncate px-4">{label}</td>
                         <td
                           className={`truncate px-4 ${
-                            unlabeled
+                            unlabeled || isError
                               ? ''
                               : matched
                                 ? 'text-emerald-400'
@@ -567,7 +587,7 @@ export default function TryItOut() {
                           {clip.classification}
                         </td>
                         <td className="truncate px-4">
-                          {clipHasFlag(clip, FLAG_IN_OPERATING_ENVELOPE)
+                          {clipHasFlag(clip, FLAG_IN_OPERATING_ENVELOPE) && !isError
                             ? 'Calibrated'
                             : ''}
                         </td>

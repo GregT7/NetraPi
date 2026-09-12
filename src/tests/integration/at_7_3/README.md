@@ -20,9 +20,9 @@ python src/tests/integration/at_7_3/at_7_3_incar_e2e_deployed_cloud.py
 ```
 
 1. Click the preview window (focus).
-2. **SPACE** → **complete stop** (no beep, no clip; metadata persists).
-3. **SPACE** → **rolling stop** (beep + clip + upload).
-4. **SPACE** → **run-through** (beep + clip + upload).
+2. **SPACE** → **complete stop** (1 beep, no clip; metadata persists).
+3. **SPACE** → **rolling stop** (2 beeps + clip + upload).
+4. **SPACE** → **run-through** (3 beeps + clip + upload).
 
 Classifications before SPACE are ignored. Clips: `clips_dir/at_7_3/`.
 SQLite is the Pi file from `DATABASE_URL` (usually `src/main/db/netrapi.db`).
@@ -133,4 +133,4 @@ https://dashboard.render.com → `netrapi` → Logs for this drive:
 ### Local clips / buzzer
 
 - `clips_dir/at_7_3/` has **two** new MP4s (rolling + run-through), none for complete stop.
-- Hear beep on the two unsafe phases only.
+- Hear coded beeps on all three phases (1 complete / 2 rolling / 3 run-through), plus one more after clip upload finishes.

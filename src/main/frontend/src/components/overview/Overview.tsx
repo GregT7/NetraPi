@@ -11,11 +11,7 @@ import {
   liveAccuracySnapshot,
   type LiveAccuracyBlock as AccuracyBlock,
 } from '@/lib/clipAccuracy'
-import {
-  accuracySnapshotsEqual,
-  readAccuracyCache,
-  writeAccuracyCache,
-} from '@/lib/accuracyCache'
+import { persistAccuracyCache, readAccuracyCache } from '@/lib/accuracyCache'
 
 const looAccuracy = [
   { key: 'Unrelated', value: '96.2%', count: 26 },
@@ -190,11 +186,8 @@ function Results() {
         if (controller.signal.aborted) {
           return
         }
-        const next = liveAccuracySnapshot(result.clips)
-        const cached = readAccuracyCache()
-        if (!cached || !accuracySnapshotsEqual(cached, next)) {
-          writeAccuracyCache(next)
-        }
+        const next = liveAccuracySnapshot(result.clips, result.tripSeconds)
+        persistAccuracyCache(next)
         setSnapshot(next)
         setFromCache(false)
         setLiveReady(true)
@@ -285,7 +278,7 @@ function Results() {
 
       <LiveAccuracyBlock
         block={field}
-        definition="Live match rate on labeled complete, rolling, and run-through clips (synthetic / parking-lot clips excluded)."
+        definition="Live match rate on labeled complete, rolling, and run-through clips (synthetic / parking-lot and error clips excluded)."
         ready={liveReady || snapshot != null}
         title="Field Accuracy"
       />

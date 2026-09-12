@@ -53,6 +53,7 @@ def test_upgrade_head_seeds_master_config_and_types(sqlite_url: str) -> None:
     assert "rolling-stop" in values
     assert "run-through" in values
     assert flags == {
+        "error",
         "in_operating_envelope",
         "real_world",
         "synthetic",
@@ -150,3 +151,60 @@ def test_upgrade_hides_non_real_world_clips(sqlite_url: str) -> None:
         assert synthetic_clip.public_visible is False
         assert real_clip.public_visible is True
         assert untagged_clip.public_visible is False
+
+
+def test_upgrade_keeps_error_clips_visible(sqlite_url: str) -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    database.set_database_url_override(sqlite_url)
+    config = Config(str(ALEMBIC_INI))
+    command.upgrade(config, "0008")
+    init_engine(sqlite_url)
+    now = datetime(2026, 9, 12, 16, 0, tzinfo=timezone.utc)
+    with get_session() as session:
+        driving = DrivingSession(master_config_id=1, start_time=now)
+        session.add(driving)
+        session.commit()
+        session.refresh(driving)
+        assert driving.id is not None
+        session.add(Event(driving_session_id=driving.id, time=now))
+        session.commit()
+        event = session.exec(select(Event)).one()
+        assert event.id is not None
+        session.add(
+            Clip(
+                event_id=event.id,
+                fps=30,
+                num_frames=10,
+                order_number=1,
+                public_visible=True,
+                start_time=now,
+                end_time=now,
+            )
+        )
+        session.commit()
+        clip = session.exec(select(Clip)).one()
+        real_world = session.exec(
+            select(FlagDef).where(FlagDef.value == "real_world")
+        ).one()
+        session.add(FlagDef(value="error", note="pre-seed"))
+        session.commit()
+        error = session.exec(select(FlagDef).where(FlagDef.value == "error")).one()
+        session.add(ClipFlag(clip_id=clip.id, flag_def_id=real_world.id))
+        session.add(ClipFlag(clip_id=clip.id, flag_def_id=error.id))
+        session.commit()
+        clip_id = clip.id
+
+    if database._engine is not None:
+        database._engine.dispose()
+        database._engine = None
+    command.upgrade(config, "0009")
+    init_engine(sqlite_url)
+    with get_session() as session:
+        clip = session.get(Clip, clip_id)
+        errors = session.exec(select(FlagDef).where(FlagDef.value == "error")).all()
+        assert clip is not None
+        assert clip.public_visible is True
+        assert len(errors) == 1
+        assert errors[0].note.startswith("Clip is unusable")

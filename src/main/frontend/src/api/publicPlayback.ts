@@ -21,6 +21,7 @@ export type PublicClipList = {
   clips: PublicClipRow[]
   liveUrlMax: number
   liveUrls: number
+  tripSeconds: number
 }
 
 type PublicClipListResponse = {
@@ -35,6 +36,7 @@ type PublicClipListResponse = {
   }>
   live_url_max?: number
   live_urls?: number
+  trip_seconds?: number
 }
 
 type PublicMintResponse = {
@@ -101,6 +103,8 @@ export async function fetchPublicClips(signal?: AbortSignal): Promise<PublicClip
     })),
     liveUrlMax: body.live_url_max ?? 20,
     liveUrls: body.live_urls ?? 0,
+    tripSeconds:
+      typeof body.trip_seconds === 'number' ? body.trip_seconds : 0,
   }
 }
 

@@ -364,6 +364,7 @@ def test_unsafe_stop_sign_starts_clip_collection(tmp_path: Path):
     assert manager.clip_active is True
     assert len(manager.post_buffer) == 0
     buzzer.beep.assert_called_once_with(event)
+    buzzer.pulse.assert_not_called()
 
 
 def test_complete_stop_beeps_even_when_clip_not_started(tmp_path: Path):
@@ -382,6 +383,41 @@ def test_complete_stop_beeps_even_when_clip_not_started(tmp_path: Path):
 
     assert manager.clip_active is False
     buzzer.beep.assert_called_once_with(event)
+    buzzer.pulse.assert_not_called()
+
+
+def test_approach_latch_pulses_buzzer(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+    event_manager = _event_manager_mock(ready_to_evaluate=False)
+    event_manager.observe.return_value = True
+    buzzer = MagicMock()
+    manager = _recording_manager(
+        _app_config(tmp_path),
+        frame,
+        event_manager=event_manager,
+        buzzer=buzzer,
+    )
+
+    manager.run_one_lap()
+
+    buzzer.pulse.assert_called_once_with(1)
+    buzzer.beep.assert_not_called()
+
+
+def test_upload_done_callback_pulses_buzzer(tmp_path: Path):
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+
+    class _Cloud:
+        def set_on_upload_done(self, callback):
+            self.callback = callback
+
+    cloud = _Cloud()
+    buzzer = MagicMock()
+    _recording_manager(_app_config(tmp_path), frame, cloud_ingest=cloud, buzzer=buzzer)
+
+    cloud.callback()
+
+    buzzer.pulse.assert_called_once_with(1)
 
 
 def test_complete_stop_starts_clip_when_safe_recording_enabled(tmp_path: Path):

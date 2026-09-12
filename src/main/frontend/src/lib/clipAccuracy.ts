@@ -1,6 +1,8 @@
+export const FLAG_ERROR = 'error'
 export const FLAG_IN_OPERATING_ENVELOPE = 'in_operating_envelope'
 export const FLAG_REAL_WORLD = 'real_world'
 export const FLAG_SYNTHETIC = 'synthetic'
+export const ERROR_LABEL = 'Error'
 
 export const STOP_CLASSES = [
   'Complete Stop',
@@ -33,6 +35,7 @@ export type ClassAccuracy = {
 export type LiveAccuracySnapshot = {
   field: LiveAccuracyBlock
   ideal: LiveAccuracyBlock
+  tripSeconds: number
 }
 
 export type LiveAccuracyBlock = {
@@ -50,6 +53,10 @@ export function clipHasFlag(clip: ClipForAccuracy, flag: string): boolean {
   return (clip.flags ?? []).includes(flag)
 }
 
+export function clipDisplayLabel(clip: ClipForAccuracy): string {
+  return clipHasFlag(clip, FLAG_ERROR) ? ERROR_LABEL : clip.label
+}
+
 export function filterByFlags<T extends ClipForAccuracy>(
   clips: T[],
   flags: string[],
@@ -61,7 +68,10 @@ export function filterByFlags<T extends ClipForAccuracy>(
 }
 
 export function fieldClips<T extends ClipForAccuracy>(clips: T[]): T[] {
-  return clips.filter((clip) => !clipHasFlag(clip, FLAG_SYNTHETIC))
+  return clips.filter(
+    (clip) =>
+      !clipHasFlag(clip, FLAG_SYNTHETIC) && !clipHasFlag(clip, FLAG_ERROR),
+  )
 }
 
 export function realWorldClips<T extends ClipForAccuracy>(clips: T[]): T[] {
@@ -72,7 +82,8 @@ export function idealClips<T extends ClipForAccuracy>(clips: T[]): T[] {
   return clips.filter(
     (clip) =>
       clipHasFlag(clip, FLAG_IN_OPERATING_ENVELOPE) &&
-      !clipHasFlag(clip, FLAG_SYNTHETIC),
+      !clipHasFlag(clip, FLAG_SYNTHETIC) &&
+      !clipHasFlag(clip, FLAG_ERROR),
   )
 }
 
@@ -131,6 +142,24 @@ export function falsePositiveRate(clips: ClipForAccuracy[]): {
   }
 }
 
+export function errorCount(clips: ClipForAccuracy[]): number {
+  return clips.filter((clip) => clipHasFlag(clip, FLAG_ERROR)).length
+}
+
+export function errorRate(clips: ClipForAccuracy[]): {
+  labeled: number
+  matches: number
+  percent: number | null
+} {
+  const total = clips.length
+  const errors = errorCount(clips)
+  return {
+    labeled: total,
+    matches: errors,
+    percent: total === 0 ? null : Math.round((100 * errors) / total),
+  }
+}
+
 export function perStopAccuracy(clips: ClipForAccuracy[]): ClassAccuracy[] {
   const labeled = clips.filter((clip) => clip.label !== '-')
   return STOP_CLASSES.map((name) => {
@@ -164,10 +193,12 @@ export function liveAccuracyBlock(clips: ClipForAccuracy[]): LiveAccuracyBlock {
 
 export function liveAccuracySnapshot(
   clips: ClipForAccuracy[],
+  tripSeconds = 0,
 ): LiveAccuracySnapshot {
   return {
     field: liveAccuracyBlock(fieldClips(clips)),
     ideal: liveAccuracyBlock(idealClips(clips)),
+    tripSeconds,
   }
 }
 
@@ -196,6 +227,13 @@ export function formatFalsePositives(count: number): string {
 
 export function formatPendingLabels(count: number): string {
   return `Clips Pending Labels: ${count}`
+}
+
+export function formatTripTime(seconds: number): string {
+  const hours = Math.round((Math.max(0, seconds) / 3600) * 10) / 10
+  const text = Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
+  const noun = hours === 1 ? 'hour' : 'hours'
+  return `Total Trip Time: ${text} ${noun}`
 }
 
 export function formatNamedAccuracy(
