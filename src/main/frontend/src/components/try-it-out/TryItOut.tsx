@@ -16,6 +16,10 @@ import {
   FLAG_ERROR,
   FLAG_IN_OPERATING_ENVELOPE,
   clipHasFlag,
+  CALIBRATED_ACCURACY_DEFINITION,
+  ERRORS_DEFINITION,
+  FALSE_POSITIVE_DEFINITION,
+  FIELD_ACCURACY_DEFINITION,
   falsePositiveRate,
   errorRate,
   fieldClips,
@@ -467,6 +471,12 @@ export default function TryItOut() {
                 <p>
                   {formatPendingLabels(liveAccuracy.field.unlabeled)}
                 </p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-zinc-400">
+                  <li>Field Accuracy: {FIELD_ACCURACY_DEFINITION}</li>
+                  <li>Calibrated Accuracy: {CALIBRATED_ACCURACY_DEFINITION}</li>
+                  <li>False Positives: {FALSE_POSITIVE_DEFINITION}</li>
+                  <li>Errors: {ERRORS_DEFINITION}</li>
+                </ul>
               </>
             )}
           </div>

@@ -22,7 +22,7 @@ Target ER for edge/cloud event metadata. Open constraints and review-time behavi
 
 Lookup rows that do not change per session. Alembic revision `0002` inserts `classification_type` once, plus the initial `edge-json` config snapshot. Flags say which FKs may point at the row (`auto_stage1` / `auto_stage2` on `auto_classification`, `manual` on a manual `classification`).
 
-Alembic `0006` inserts `flag_def` lookup rows. Optional review tags live in `clip_flag` (presence of a row means the flag applies; absence means not reviewed / not this property). `in_operating_envelope` is the composite “ideal scenario” tag (right-most lane, sign on the right, halt line close to the sign). `real_world` and `synthetic` are mutually exclusive; do not combine `in_operating_envelope` with `synthetic` or `error`. Alembic `0007` sets `public_visible = false` on clips tagged `synthetic`. Alembic `0008` sets `public_visible = false` on every clip that is not tagged `real_world`. Alembic `0009` seeds `error`. Error-tagged real-world clips stay listed; Try-it-out shows Label Error and accuracy ignores them. Alembic `0010` sets `buzzer_config.play_on_safe = true` on the `edge-json` seed so it matches live `buzzer.json`.
+Alembic `0006` inserts `flag_def` lookup rows. Optional review tags live in `clip_flag` (presence of a row means the flag applies; absence means not reviewed / not this property). `in_operating_envelope` is the composite “ideal scenario” tag (right-most lane, sign on the right, halt line close to the sign). `real_world` and `synthetic` are mutually exclusive; do not combine `in_operating_envelope` with `synthetic`, `error`, or `testing`. `testing` is mutually exclusive with `real_world` and `synthetic`. Alembic `0007` sets `public_visible = false` on clips tagged `synthetic`. Alembic `0008` sets `public_visible = false` on every clip that is not tagged `real_world`. Alembic `0009` seeds `error`. Error-tagged real-world clips stay listed; Try-it-out shows Label Error and accuracy ignores them. Alembic `0010` sets `buzzer_config.play_on_safe = true` on the `edge-json` seed so it matches live `buzzer.json`. Alembic `0011` seeds `testing` for pipeline-only clips (not real-world, not synthetic); they stay off the public list unless also tagged `real_world`.
 
 | value | Purpose |
 |---|---|
@@ -30,6 +30,7 @@ Alembic `0006` inserts `flag_def` lookup rows. Optional review tags live in `cli
 | `real_world` | Public-road clip with a real stop sign. |
 | `synthetic` | Parking-lot / homemade-sign training clip. Hidden from the public list (`public_visible` false). |
 | `error` | Unusable clip (recording glitch, truncated file, obstructed camera). Listed with Label Error; excluded from Field/Calibrated Accuracy. |
+| `testing` | Pipeline-only clip. Not real-world and not synthetic. Do not use for evaluation. Hidden from the public list unless also tagged `real_world`. |
 
 | value | is_unsafe | auto_stage1 | auto_stage2 | manual | Purpose |
 |---|---|---|---|---|---|

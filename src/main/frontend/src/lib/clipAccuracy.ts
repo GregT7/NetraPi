@@ -49,6 +49,20 @@ export type LiveAccuracyBlock = {
 
 const UNRELATED_LABEL = 'Unrelated'
 
+const FIELD_LABELS: readonly string[] = [...STOP_CLASSES, UNRELATED_LABEL]
+
+export const FIELD_ACCURACY_DEFINITION =
+  'Auto vs hand label on every labeled clip except error and synthetic. Unrelated (false-positive) labels count here as misses unless the model also predicted Unrelated.'
+
+export const CALIBRATED_ACCURACY_DEFINITION =
+  'Same math as Field Accuracy, but only clips tagged in_operating_envelope (right-most lane, stop line close to the sign).'
+
+export const FALSE_POSITIVE_DEFINITION =
+  'Share of the Field pool whose hand label is Unrelated. Error-tagged clips are omitted from this pool.'
+
+export const ERRORS_DEFINITION =
+  'Share of listed real-world clips tagged error. Those rows stay in the table as Label Error and are left out of Field, Calibrated, and False Positives.'
+
 export function clipHasFlag(clip: ClipForAccuracy, flag: string): boolean {
   return (clip.flags ?? []).includes(flag)
 }
@@ -105,21 +119,28 @@ export function overallAccuracy(clips: ClipForAccuracy[]): OverallAccuracy {
 }
 
 export function stopAccuracy(clips: ClipForAccuracy[]): OverallAccuracy {
-  const stopClips = clips.filter((clip) =>
-    STOP_CLASSES.includes(clip.label as AccuracyClass),
-  )
-  const matches = stopClips.filter(
+  return labeledAccuracy(clips, STOP_CLASSES)
+}
+
+export function fieldLabeledAccuracy(clips: ClipForAccuracy[]): OverallAccuracy {
+  return labeledAccuracy(clips, FIELD_LABELS)
+}
+
+function labeledAccuracy(
+  clips: ClipForAccuracy[],
+  labels: readonly string[],
+): OverallAccuracy {
+  const scored = clips.filter((clip) => labels.includes(clip.label))
+  const matches = scored.filter(
     (clip) => clip.classification === clip.label,
   ).length
   const unlabeled = clips.filter((clip) => clip.label === '-').length
   return {
-    labeled: stopClips.length,
+    labeled: scored.length,
     matches,
     unlabeled,
     percent:
-      stopClips.length === 0
-        ? null
-        : Math.round((100 * matches) / stopClips.length),
+      scored.length === 0 ? null : Math.round((100 * matches) / scored.length),
   }
 }
 
@@ -180,7 +201,7 @@ export function perStopAccuracy(clips: ClipForAccuracy[]): ClassAccuracy[] {
 }
 
 export function liveAccuracyBlock(clips: ClipForAccuracy[]): LiveAccuracyBlock {
-  const stats = stopAccuracy(clips)
+  const stats = fieldLabeledAccuracy(clips)
   return {
     classes: perStopAccuracy(clips),
     falsePositives: falsePositiveCount(clips),

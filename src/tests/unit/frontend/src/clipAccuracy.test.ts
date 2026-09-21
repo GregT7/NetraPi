@@ -90,10 +90,10 @@ describe('clipAccuracy', () => {
     expect(idealClips(clips)[0]?.label).toBe('Complete Stop')
   })
 
-  it('reports stop-class accuracy and counts unrelated as false positives', () => {
+  it('reports stop-class accuracy and counts unrelated as false positives in Field', () => {
     const snapshot = liveAccuracySnapshot(clips)
-    expect(snapshot.field.percent).toBe(50)
-    expect(snapshot.field.labeled).toBe(2)
+    expect(snapshot.field.percent).toBe(33)
+    expect(snapshot.field.labeled).toBe(3)
     expect(snapshot.field.matches).toBe(1)
     expect(snapshot.field.falsePositives).toBe(1)
     expect(snapshot.ideal.percent).toBe(100)
@@ -105,7 +105,7 @@ describe('clipAccuracy', () => {
     expect(formatTripTime(3600)).toBe('Total Trip Time: 1 hour')
     expect(formatTripTime(37800)).toBe('Total Trip Time: 10.5 hours')
     expect(formatNamedAccuracy('Field Accuracy', snapshot.field)).toBe(
-      'Field Accuracy: 50% (1/2 clips)',
+      'Field Accuracy: 33% (1/3 clips)',
     )
     expect(
       formatNamedAccuracy('False Positives', falsePositiveRate(fieldClips(clips))),

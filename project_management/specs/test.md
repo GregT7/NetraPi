@@ -1509,7 +1509,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Unit coverage in `test_public_clip.py`.
 
 ### TP-66: Try it out browse and play
-- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows), shows Field / False Positives (Unrelated over total clips) / Errors (error-tagged over listed real-world clips) / Calibrated accuracy with clip counts, Total Trip Time from confirmed trip segments, and that selecting a row sets the video `src` to a minted GET URL.
+- **Description**: Verifies the Try-it-out table loads confirmed clips from the API (no dummy rows), shows Field (Unrelated included in the labeled set) / False Positives (Unrelated over Field pool) / Errors (error-tagged over listed real-world clips) / Calibrated accuracy with clip counts, Total Trip Time from confirmed trip segments, and that selecting a row sets the video `src` to a minted GET URL.
 - **Test level**: Unit
 - **Verification approach**: Test
 - **Reqs**: M-7.14, M-9.21, M-9.22, M-9.23, M-9.24, M-9.25, M-9.26, M-9.27, M-9.28
@@ -1517,7 +1517,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Try-it-out wired to `GET /api/public/clips` and `POST /api/public/clip-download-url`.
 - **Steps**
   1. Load the portfolio; table reflects API rows or an honest empty/error state (no stub `clip-12`). Unlabeled clips show `-` with the same table styling as labeled rows (no sky highlight). Session column shows `driving_session_id`.
-  2. Confirm Field Accuracy, False Positives (Unrelated count / total clips), Errors (error-tagged count / listed clips), Calibrated Accuracy with correct/total clip counts, Total Trip Time in hours, plus a Clips Pending Labels count.
+  2. Confirm Field Accuracy (Unrelated included in the labeled set), False Positives (Unrelated count / Field pool), Errors (error-tagged count / listed clips), Calibrated Accuracy with correct/total clip counts, Total Trip Time in hours, plus a Clips Pending Labels count.
   3. Confirm the table is real-world clips only (no filter chips) and the Scenario column tags `in_operating_envelope` as Calibrated.
   4. Click a clip row; video `src` becomes the minted GET URL.
   5. Confirm **Detailed Analysis** is checked by default (Style A: no native scrub bar; play overlay).
@@ -1525,7 +1525,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 - **Pass criteria**
   - No dummy table rows.
   - Unlabeled clips (no manual classification) show `-` with no special highlight.
-  - Accuracy shows Field, False Positives (Unrelated / total clips), Errors (error-tagged / listed clips), Calibrated counts, Total Trip Time, plus Clips Pending Labels.
+  - Accuracy shows Field (Unrelated in the labeled set), False Positives (Unrelated / Field pool), Errors (error-tagged / listed clips), Calibrated counts, Total Trip Time, plus Clips Pending Labels.
   - Table is real-world only; Scenario tags ideal-envelope clips; Field, False Positives, Errors, and Calibrated Accuracy include clip counts.
   - Session column is present.
   - Click sets video `src` to the minted GET.
@@ -1601,22 +1601,22 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   - Unit coverage in `test_public_clip.py`.
 
 ### TP-71: Clip flags and live Results accuracy
-- **Description**: Verifies `flag_def` / `clip_flag` exist, public clip rows include `flags`, Try-it-out lists real-world clips with Field/Calibrated Accuracy and an ideal-scenario tag, and Overview Results shows live Field vs Calibrated Accuracy with per-class clip counts (hardcoded LOO grid remains). Clips without `real_world` are not public_visible. Clips tagged `error` stay listed with Label Error and are excluded from accuracy.
+- **Description**: Verifies `flag_def` / `clip_flag` exist (including `testing`), public clip rows include `flags`, Try-it-out lists real-world clips with Field/Calibrated Accuracy and an ideal-scenario tag, and Overview Results shows live Field vs Calibrated Accuracy with per-class clip counts (hardcoded LOO grid remains). Clips without `real_world` are not public_visible. Clips tagged `error` stay listed with Label Error and are excluded from accuracy.
 - **Test level**: Unit
 - **Verification approach**: Test
 - **Reqs**: M-8.14, M-9.21, M-9.27, M-9.28, M-9.50, M-9.53
 - **Prerequisites**
-  - Alembic 0009 applied.
+  - Alembic 0011 applied.
   - Public list returns `flags`.
 - **Steps**
-  1. Confirm `flag_def` seed rows (`in_operating_envelope`, `real_world`, `synthetic`, `error`) and `clip_flag` unique `(clip_id, flag_def_id)` (TP-40 inspects tables).
+  1. Confirm `flag_def` seed rows (`in_operating_envelope`, `real_world`, `synthetic`, `error`, `testing`) and `clip_flag` unique `(clip_id, flag_def_id)` (TP-40 inspects tables).
   2. Tag a clip; `GET /api/public/clips` includes those `flag_def.value`s.
-  3. Confirm clips without `real_world` (including `synthetic` and untagged) are `public_visible = false` after 0008, and error-tagged real-world clips stay `public_visible` after 0009 (`test_migrations.py`).
+  3. Confirm clips without `real_world` (including `synthetic`, `testing`, and untagged) are `public_visible = false` after 0008, error-tagged real-world clips stay `public_visible` after 0009, and `testing` is seeded after 0011 (`test_migrations.py`).
   4. In Try-it-out, confirm no filter chips; synthetic rows are omitted; error rows show Label Error; Scenario shows Calibrated for `in_operating_envelope`; Field, Calibrated, False Positives, Errors, and Total Trip Time lines include counts (`TryItOut.test.tsx`).
-  5. In Results, confirm hardcoded LOO percents with counts and live Field / Calibrated blocks; Field Accuracy ignores synthetic and error (`App.test.tsx`, `clipAccuracy.test.ts`).
+  5. In Results, confirm hardcoded LOO percents with counts and live Field / Calibrated blocks; Field Accuracy ignores synthetic and error and includes Unrelated in the labeled set (`App.test.tsx`, `clipAccuracy.test.ts`).
 - **Pass criteria**
   - Untagged clips return `flags: []`.
-  - Field Accuracy excludes `synthetic` and `error`. Calibrated Accuracy uses `in_operating_envelope` and excludes `synthetic` and `error`. Error-tagged real-world clips remain in the table with Label Error. Errors is error-tagged count over listed real-world clips.
+  - Field Accuracy excludes `synthetic` and `error` and includes Unrelated false positives in the labeled set. Calibrated Accuracy uses `in_operating_envelope` and the same labeled set rules. Error-tagged real-world clips remain in the table with Label Error. Errors is error-tagged count over listed real-world clips.
   - Unit coverage in `test_public_clip.py`, `test_migrations.py`, `TryItOut.test.tsx`, `App.test.tsx`.
 
 ---

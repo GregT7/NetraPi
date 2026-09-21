@@ -61,6 +61,7 @@ def test_upgrade_head_seeds_master_config_and_types(sqlite_url: str) -> None:
         "in_operating_envelope",
         "real_world",
         "synthetic",
+        "testing",
     }
     assert health.render_wait_s == 90
     assert health.wlan_interface == "wlan0"
@@ -213,3 +214,26 @@ def test_upgrade_keeps_error_clips_visible(sqlite_url: str) -> None:
         assert clip.public_visible is True
         assert len(errors) == 1
         assert errors[0].note.startswith("Clip is unusable")
+
+
+def test_upgrade_seeds_testing_flag(sqlite_url: str) -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    database.set_database_url_override(sqlite_url)
+    config = Config(str(ALEMBIC_INI))
+    command.upgrade(config, "0010")
+    init_engine(sqlite_url)
+    with get_session() as session:
+        session.add(FlagDef(value="testing", note="pre-seed"))
+        session.commit()
+
+    if database._engine is not None:
+        database._engine.dispose()
+        database._engine = None
+    command.upgrade(config, "0011")
+    init_engine(sqlite_url)
+    with get_session() as session:
+        rows = session.exec(select(FlagDef).where(FlagDef.value == "testing")).all()
+        assert len(rows) == 1
+        assert rows[0].note.startswith("Clip recorded only to exercise")

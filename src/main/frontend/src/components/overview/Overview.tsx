@@ -5,6 +5,8 @@ import { HARDWARE_NODE_CARDS } from '../diagrams/hardwareNodeCards'
 import MermaidDiagram from '../diagrams/MermaidDiagram'
 import { HARDWARE_CHART, SOFTWARE_CHART } from '../diagrams/mermaidCharts'
 import {
+  CALIBRATED_ACCURACY_DEFINITION,
+  FIELD_ACCURACY_DEFINITION,
   formatClassLine,
   formatFalsePositives,
   formatOverallLine,
@@ -278,13 +280,13 @@ function Results() {
 
       <LiveAccuracyBlock
         block={field}
-        definition="Live match rate on labeled complete, rolling, and run-through clips (synthetic / parking-lot and error clips excluded)."
+        definition={FIELD_ACCURACY_DEFINITION}
         ready={liveReady || snapshot != null}
         title="Field Accuracy"
       />
       <LiveAccuracyBlock
         block={ideal}
-        definition="Same as Field Accuracy, but only right-most-lane clips where the stop line sits close to the sign."
+        definition={CALIBRATED_ACCURACY_DEFINITION}
         emptyLabel="No tagged calibrated clips yet"
         ready={liveReady || snapshot != null}
         title="Calibrated Accuracy"
@@ -294,11 +296,13 @@ function Results() {
         <h4 className="text-xl font-medium text-amber-400">Limitations</h4>
         <p>
           LOO overstates on-road behavior because training was mostly
-          parking-lot geometry. Field Accuracy is the honest live number;
-          Calibrated Accuracy is a smaller operating-envelope subset. Unrelated
-          detections are tracked separately as false positives. Live figures
-          come from the public clip list and are cached in the browser if the
-          API is down.
+          parking-lot geometry. Field Accuracy is the honest live number and
+          includes Unrelated false positives as misses unless the model also
+          predicted Unrelated; Calibrated Accuracy is the same math on a
+          smaller operating-envelope subset. Error-tagged clips stay in the
+          table but are left out of Field and Calibrated. The False Positives
+          line is Unrelated over that Field pool. Live figures come from the
+          public clip list and are cached in the browser if the API is down.
         </p>
       </div>
     </div>
