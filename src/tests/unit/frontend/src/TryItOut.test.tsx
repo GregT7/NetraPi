@@ -111,6 +111,40 @@ describe('TryItOut', () => {
     )
   })
 
+  it('pages six real-world clips five at a time', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/public/clips')) {
+          return jsonResponse({
+            clips: [10, 11, 12, 13, 14, 15].map((id) => clipRow(id)),
+            live_url_max: 20,
+            live_urls: 0,
+          })
+        }
+        return jsonResponse({
+          expires_in: 120,
+          url: 'https://s3.example/clip.mp4',
+        })
+      }),
+    )
+
+    render(<TryItOut />)
+    expect(await screen.findByText('clip-10')).toBeTruthy()
+    expect(screen.getByText('clip-14')).toBeTruthy()
+    expect(screen.queryByText('clip-15')).toBeNull()
+    expect(screen.getByText('1–5 of 6')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('clip-15')).toBeTruthy()
+    expect(screen.queryByText('clip-10')).toBeNull()
+    expect(screen.getByText('6–6 of 6')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }))
+    expect(screen.getByText('clip-10')).toBeTruthy()
+    expect(screen.queryByText('clip-15')).toBeNull()
+    expect(screen.getByText('1–5 of 6')).toBeTruthy()
+  })
+
   it('shows a 429 from the mint as a retry message', async () => {
     vi.stubGlobal(
       'fetch',
