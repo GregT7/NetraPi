@@ -122,8 +122,8 @@ Implemented:
 - `GET /api/public/clips` — all confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings), newest event first, no newest-N cap, plus `trip_seconds` (sum of confirmed S3 trip_segment durations). The table pages 5 rows in the browser; accuracy uses the full public set.
 - CORS for `http://localhost:5173` and `http://127.0.0.1:5173` (add the Vercel origin via `CORS_ORIGINS` on Render)
 - Try it out click-to-play (`VITE_API_URL` on Vercel; Vite proxies `/api` to local FastAPI)
-- Try it out lists real-world clips only (no visitor filter chips); Scenario column tags `in_operating_envelope` as Calibrated; Field, False Positives (Unrelated / total clips), Errors (error-tagged / listed clips), Calibrated Accuracy with correct/total clip counts, and Total Trip Time (hours, cached in localStorage with Field/Calibrated and refreshed when the public list fetch succeeds and the snapshot changed)
-- Overview Results live Field vs Calibrated Accuracy from the same public clip list (clips without `real_world` are not public_visible; `error` clips stay listed with Label Error and are excluded from accuracy)
+- Try it out lists real-world clips only (no visitor filter chips); Scenario column tags `in_operating_envelope` as Calibrated; Field Accuracy includes Unrelated false positives in the labeled set (error and synthetic excluded); False Positives (Unrelated / Field pool), Errors (error-tagged / listed clips), Calibrated Accuracy with correct/total clip counts, and Total Trip Time (hours, cached in localStorage with Field/Calibrated and refreshed when the public list fetch succeeds and the snapshot changed)
+- Overview Results live Field vs Calibrated Accuracy from the same public clip list (clips without `real_world` are not public_visible; `error` clips stay listed with Label Error and are excluded from Field/Calibrated)
 - Public mint inlines `areas`/`motion`/`transitions` JSON (one live slot for the MP4). Try it out detailed analysis is the default; simple video-only remains available. Detailed playback uses native HTML5 controls with seeking disabled.
 
 Not in this pass:

@@ -264,11 +264,11 @@ describe('TryItOut', () => {
 
     render(<TryItOut />)
     expect(await screen.findByText('clip-10')).toBeTruthy()
-    expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
+    expect(screen.getByText('Field Accuracy: 67% (2/3 clips)')).toBeTruthy()
     expect(screen.getByText('False Positives: 25% (1/4 clips)')).toBeTruthy()
     expect(screen.getByText('Errors: 0% (0/4 clips)')).toBeTruthy()
     expect(screen.getByText('Total Trip Time: 0 hours')).toBeTruthy()
-    expect(screen.getByText('Clips Pending Labels: 1')).toBeTruthy()
+    expect(screen.getByText(/Unrelated \(false-positive\) labels count here/)).toBeTruthy()
   })
 
   it('shows real-world clips, Field and Calibrated Accuracy, and a Calibrated tag', async () => {

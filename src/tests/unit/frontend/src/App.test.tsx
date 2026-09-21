@@ -170,9 +170,7 @@ describe('App', () => {
     expect(screen.getByText(/leave-one-out \(LOO\)/)).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Field Accuracy' })).toBeTruthy()
     expect(
-      screen.getByText(
-        /Live match rate on labeled complete, rolling, and run-through clips \(synthetic \/ parking-lot and error clips excluded\)/,
-      ),
+      screen.getByText(/Unrelated \(false-positive\) labels count here/),
     ).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Calibrated Accuracy' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Limitations' })).toBeTruthy()
@@ -181,14 +179,14 @@ describe('App', () => {
     ).toBeTruthy()
     expect(
       screen.getByText(
-        /only right-most-lane clips where the stop line sits close to the sign/,
+        /only clips tagged in_operating_envelope/,
       ),
     ).toBeTruthy()
-    expect(await screen.findByText('50% (1/2 clips predicted correctly)')).toBeTruthy()
+    expect(await screen.findByText('33% (1/3 clips predicted correctly)')).toBeTruthy()
     expect(screen.getByText('100% (1/1 clips predicted correctly)')).toBeTruthy()
     expect(screen.getByText('1 false positive (unrelated detections)')).toBeTruthy()
     expect(screen.getByText('0 false positives (unrelated detections)')).toBeTruthy()
-    expect(localStorage.getItem('netrapi.resultsAccuracy.v1')).toContain('"percent":50')
+    expect(localStorage.getItem('netrapi.resultsAccuracy.v1')).toContain('"percent":33')
     expect(screen.getByRole('heading', { name: 'What It Is' })).toBeTruthy()
     expect(
       screen.getByText(/blends "Netradyne" and "Pi"/),
@@ -213,7 +211,7 @@ describe('App', () => {
     expect(screen.queryByText('clip-13')).toBeNull()
     expect(screen.getByRole('columnheader', { name: 'Scenario' })).toBeTruthy()
     expect(screen.getByText('Calibrated')).toBeTruthy()
-    expect(screen.getByText('Field Accuracy: 50% (1/2 clips)')).toBeTruthy()
+    expect(screen.getByText('Field Accuracy: 33% (1/3 clips)')).toBeTruthy()
     expect(screen.getByText('Calibrated Accuracy: 100% (1/1 clip)')).toBeTruthy()
     expect(screen.getByText('False Positives: 33% (1/3 clips)')).toBeTruthy()
     expect(screen.getByText('Errors: 0% (0/3 clips)')).toBeTruthy()
