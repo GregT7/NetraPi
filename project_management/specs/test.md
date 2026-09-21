@@ -1451,7 +1451,7 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
 > **Focus:** Unauthenticated public clip list and short-lived signed GET mint for Try-it-out. Design: [frontend_playback.md](../diagrams/frontend_playback.md). Unit: `src/tests/unit/backend/app/routes/test_public_clip.py`, `src/tests/unit/frontend/src/TryItOut.test.tsx`. Ingest signed GET remains TP-46. Live Field/Calibrated Results: TP-71.
 
 ### TP-63: Public confirmed-clip list
-- **Description**: Verifies `GET /api/public/clips` returns confirmed, publicly visible S3 clips without an API key, newest event first, and leaves ingest routes keyed.
+- **Description**: Verifies `GET /api/public/clips` returns all confirmed, publicly visible S3 clips without an API key, newest event first, without a newest-N cap, and leaves ingest routes keyed.
 - **Test level**: Integration
 - **Verification approach**: Test
 - **Reqs**: M-7.14, M-7.16, M-8.14, M-9.23, M-9.24, M-9.27
@@ -1462,10 +1462,12 @@ Backlogs: **Recording System Design** (TP-16–TP-17), **Detector** (TP-18–TP-
   1. `GET /api/public/clips` with no `X-API-Key`.
   2. Confirm only `s3_stored` and `public_visible` rows appear; timestamps are newest-first; Label is the manual classification from the database (or `-` when none); each row includes `driving_session_id` and `flags` (`flag_def.value` list, empty when untagged).
   3. Confirm a stored clip with `public_visible = false` is omitted, and minting that `clip_id` returns 404.
-  4. Call an ingest route (`POST /api/netrapi/s3-download-url` or similar) without a key (401).
+  4. Confirm more than 50 matching clips are all returned (unit: 51 confirmed visible rows; oldest still present).
+  5. Call an ingest route (`POST /api/netrapi/s3-download-url` or similar) without a key (401).
 - **Pass criteria**
   - List succeeds without an API key.
   - Unconfirmed and non-visible clips are omitted; order is descending event time.
+  - The list is not truncated to the newest 50 (or any newest-N cap).
   - Label is `classification.kind = 'manual'` (display name), or `-` when that row is missing.
   - `flags` is a list of `flag_def.value` strings for that clip.
   - Hidden-clip mint is 404.

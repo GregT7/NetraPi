@@ -97,20 +97,29 @@ def _clip_flags(session, clip_ids: list[int]) -> dict[int, list[str]]:
     return flags
 
 
-def _clip_labels(session, event_id: int, types: dict[int, str]) -> tuple[str, str]:
+def _clip_labels_by_event(
+    session, event_ids: list[int], types: dict[int, str]
+) -> dict[int, tuple[str, str]]:
+    labels: dict[int, tuple[str, str]] = {
+        event_id: ("-", "—") for event_id in event_ids
+    }
+    if not event_ids:
+        return labels
+    auto_by_event: dict[int, str] = {}
+    manual_by_event: dict[int, str] = {}
     rows = session.exec(
-        select(Classification).where(Classification.event_id == event_id)
+        select(Classification).where(Classification.event_id.in_(event_ids))
     ).all()
-    auto = ""
-    manual = ""
     for row in rows:
         label = _display_type(types.get(row.classification_type_id, ""))
         if row.kind == "auto":
-            auto = label
+            auto_by_event[row.event_id] = label
         elif row.kind == "manual":
-            manual = label
-    prediction = auto or "—"
-    return (manual or "-", prediction)
+            manual_by_event[row.event_id] = label
+    for event_id in event_ids:
+        prediction = auto_by_event.get(event_id) or "—"
+        labels[event_id] = (manual_by_event.get(event_id) or "-", prediction)
+    return labels
 
 
 def _format_clip_time(value) -> str:
@@ -165,7 +174,6 @@ def list_public_clips():
             .where(Clip.s3_key.is_not(None))
             .where(Clip.public_visible.is_(True))
             .order_by(Event.time.desc())
-            .limit(50)
         ).all()
         listed = [
             (clip, event)
@@ -176,9 +184,14 @@ def list_public_clips():
             session,
             [clip.id for clip, _event in listed if clip.id is not None],
         )
+        labels_by_event = _clip_labels_by_event(
+            session,
+            [clip.event_id for clip, _event in listed],
+            types,
+        )
         body = []
         for clip, event in listed:
-            label, prediction = _clip_labels(session, clip.event_id, types)
+            label, prediction = labels_by_event.get(clip.event_id, ("-", "—"))
             body.append(
                 {
                     "clip_id": clip.id,

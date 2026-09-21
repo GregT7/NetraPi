@@ -107,7 +107,7 @@ Build a minimal, end-to-end smart dash cam system that detects stop-sign-related
 - M-9.24: The frontend shall allow users to browse and select clips from the collected footage.
 - M-9.25: The Try-it-out section shall offer detailed analysis playback (default) and simple video-only playback, toggled by the visitor.
 - M-9.26: Detailed analysis playback shall synchronize a state diagram and area/motion graphs to clip playback time using native video controls without seeking.
-- M-9.27: The public clip list and mint shall include only clips whose `public_visible` flag is true. Clips that are not tagged `real_world` shall not be public_visible.
+- M-9.27: The public clip list and mint shall include only clips whose `public_visible` flag is true. Clips that are not tagged `real_world` shall not be public_visible. `GET /api/public/clips` shall return all confirmed, `public_visible` clips, newest event first, not a newest-N subset.
 - M-9.28: The Try-it-out table shall mark clips tagged `in_operating_envelope` as Calibrated and shall show live Field Accuracy, False Positives (Unrelated-labeled count over total clips), Errors (error-tagged count over listed real-world clips), Calibrated Accuracy with correct/total clip counts, and Total Trip Time in hours. Clips tagged `error` shall appear with Label Error and shall not count toward Field, Calibrated, or False Positive lines. Total Trip Time shall be the sum of confirmed S3 `trip_segment` durations, cached locally, and refreshed when the public clip list fetch succeeds and the cached snapshot changed.
 
 ### R-9.3 Visualization

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -351,6 +352,63 @@ def test_public_list_includes_clip_flags(ingest_client: TestClient) -> None:
     assert response.status_code == 200
     row = response.json()["clips"][0]
     assert sorted(row["flags"]) == ["in_operating_envelope", "real_world"]
+
+
+def test_public_list_returns_all_confirmed_clips_not_newest_50(
+    ingest_client: TestClient,
+) -> None:
+    session_resp = ingest_client.post(
+        "/api/netrapi/driving-session", json=_SESSION, headers=_HEADERS
+    )
+    assert session_resp.status_code == 200
+
+    from db.database import get_session
+    from db.models import Clip, Event
+
+    start = datetime(2026, 8, 16, 18, 0, 0, tzinfo=timezone.utc)
+    with get_session() as session:
+        for index in range(51):
+            session.add(
+                Event(
+                    id=100 + index,
+                    driving_session_id=1,
+                    time=start + timedelta(seconds=index),
+                )
+            )
+        session.flush()
+        for index in range(51):
+            event_time = start + timedelta(seconds=index)
+            event_id = 100 + index
+            clip_id = 200 + index
+            session.add(
+                Clip(
+                    id=clip_id,
+                    event_id=event_id,
+                    local_path=f"/tmp/clip-{clip_id}.mp4",
+                    s3_key=(
+                        "Aug-2026/driving_session_id_1/"
+                        f"clips/clip-{clip_id}/clip.mp4"
+                    ),
+                    init_local_stored=True,
+                    s3_stored=True,
+                    public_visible=True,
+                    fps=30,
+                    order_number=index + 1,
+                    num_frames=60,
+                    start_time=event_time,
+                    end_time=event_time + timedelta(seconds=2),
+                )
+            )
+        session.commit()
+
+    response = ingest_client.get("/api/public/clips")
+    assert response.status_code == 200
+    clips = response.json()["clips"]
+    assert len(clips) == 51
+    ids = [row["clip_id"] for row in clips]
+    assert ids[0] == 250
+    assert ids[-1] == 200
+    assert 200 in ids
 
 
 def test_public_list_omits_hidden_clip_and_mint_404s(

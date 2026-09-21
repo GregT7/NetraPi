@@ -58,7 +58,7 @@ sequenceDiagram
   end
 ```
 
-Click a table row → POST that row’s Postgres `clip.id` to `POST /api/public/clip-download-url` (no API key) → set `<video src>` to the returned URL. The table debounces row selection and reuses an unexpired minted URL so click-through does not burn the per-IP rate or live-slot caps. The table is filled only by `GET /api/public/clips` (confirmed, `public_visible` clips in cloud Postgres, each with a `flags` list). There is no sample/dummy table.
+Click a table row → POST that row’s Postgres `clip.id` to `POST /api/public/clip-download-url` (no API key) → set `<video src>` to the returned URL. The table debounces row selection and reuses an unexpired minted URL so click-through does not burn the per-IP rate or live-slot caps. The table is filled only by `GET /api/public/clips` (all confirmed, `public_visible` clips in cloud Postgres, newest event first, each with a `flags` list; no newest-N cap). Try it out pages that payload 5 rows at a time in the browser. There is no sample/dummy table.
 
 Only **confirmed and visible** clips mint: `s3_stored` true, `s3_key` set, and `public_visible` true. Unconfirmed → 400. Hidden (`public_visible` false) → 404.
 
@@ -119,7 +119,7 @@ Use CORS anyway. Do not treat it as authentication. The limits in [§3](#3-three
 Implemented:
 
 - `POST /api/public/clip-download-url` — 2-minute GET, 20 live slots, 10 mints/minute/IP
-- `GET /api/public/clips` — confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings) plus `trip_seconds` (sum of confirmed S3 trip_segment durations)
+- `GET /api/public/clips` — all confirmed, `public_visible` clips for the Try it out table (includes `flags`: `flag_def.value` strings), newest event first, no newest-N cap, plus `trip_seconds` (sum of confirmed S3 trip_segment durations). The table pages 5 rows in the browser; accuracy uses the full public set.
 - CORS for `http://localhost:5173` and `http://127.0.0.1:5173` (add the Vercel origin via `CORS_ORIGINS` on Render)
 - Try it out click-to-play (`VITE_API_URL` on Vercel; Vite proxies `/api` to local FastAPI)
 - Try it out lists real-world clips only (no visitor filter chips); Scenario column tags `in_operating_envelope` as Calibrated; Field, False Positives (Unrelated / total clips), Errors (error-tagged / listed clips), Calibrated Accuracy with correct/total clip counts, and Total Trip Time (hours, cached in localStorage with Field/Calibrated and refreshed when the public list fetch succeeds and the snapshot changed)
